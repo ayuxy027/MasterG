@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/error.middleware';
 import uploadRoutes from './routes/upload.routes';
 import queryRoutes from './routes/query.routes';
 import chatRoutes from './routes/chat.routes';
+import browseRoutes from './routes/browse.routes';
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.get('/', (req: Request, res: Response) => {
       upload: '/api/upload',
       query: '/api/query',
       chats: '/api/chats',
+      browse: '/api/browse',
       health: '/api/query/health',
       stats: '/api/upload/stats',
     },
@@ -42,6 +44,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/upload', uploadRoutes);
 app.use('/api/query', queryRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/browse', browseRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
