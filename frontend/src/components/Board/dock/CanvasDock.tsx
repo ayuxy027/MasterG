@@ -280,7 +280,7 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
               </div>
 
               {/* Center Section - Color and Size */}
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-6">
                 {/* Color Picker */}
                 <div className="flex items-center gap-2">
                   <LuPalette size={18} className="text-orange-500" />

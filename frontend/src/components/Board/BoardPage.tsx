@@ -1,10 +1,15 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { DottedBackground, CanvasDock, StickyNote, TextBox } from './index';
 import { getToolById, Point, DrawingPath } from './tools';
-import { StickyNote as StickyNoteIcon, Type } from 'lucide-react';
 import { parseAIResponse, extractSections } from '../../utils/jsonParser';
 import { sendMessage } from '../../services/groqClient';
 import MinimizedNavbar from './MinimizedNavbar';
+
+const DEFAULT_VIEW_OFFSET = { x: 0, y: 0 };
+const DEFAULT_ZOOM = 1;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 0.1;
 
 // Simple word limit function
 const truncateToWords = (text: string, maxWords: number = 40): string => {
@@ -77,11 +82,28 @@ const BoardPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Canvas view state (for unlimited scrolling)
-  const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  const [viewOffset, setViewOffset] = useState(DEFAULT_VIEW_OFFSET);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const pinchStateRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+
+  const clampZoom = useCallback((value: number) => {
+    return Number(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value)).toFixed(2));
+  }, []);
+
+  const applyZoom = useCallback((nextValue: number | ((current: number) => number)) => {
+    setZoom(prev => {
+      const resolved = typeof nextValue === 'function' ? nextValue(prev) : nextValue;
+      const clamped = clampZoom(resolved);
+      if (clamped < MIN_ZOOM && prev <= MIN_ZOOM) {
+        return prev;
+      }
+      return Math.max(MIN_ZOOM, clamped);
+    });
+  }, [clampZoom]);
 
   // Keyboard shortcuts and mouse wheel zoom
   useEffect(() => {
@@ -103,11 +125,13 @@ const BoardPage: React.FC = () => {
         setCurrentTool(toolMap[e.key] || 'select');
         e.preventDefault();
       }
-      // Z for zoom reset
-      if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        setZoom(1);
-        setViewOffset({ x: 0, y: 0 });
+      // Z for zoom reset, Shift + Z resets pan as well
+      if (e.key === 'z' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
+        applyZoom(DEFAULT_ZOOM);
+        if (e.shiftKey) {
+          setViewOffset({ ...DEFAULT_VIEW_OFFSET });
+        }
       }
       // Escape to switch back to select
       if (e.key === 'Escape') {
@@ -129,8 +153,8 @@ const BoardPage: React.FC = () => {
       // Zoom with Ctrl/Cmd + wheel
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setZoom(prev => Math.max(0.25, Math.min(3, prev + delta)));
+        const direction = e.deltaY > 0 ? -1 : 1;
+        applyZoom(prev => prev + direction * ZOOM_STEP);
       }
     };
 
@@ -142,7 +166,7 @@ const BoardPage: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [isPanning]);
+  }, [applyZoom, isPanning]);
 
   // Navbar state
   const [isNavbarExpanded, setIsNavbarExpanded] = useState(false);
@@ -152,22 +176,6 @@ const BoardPage: React.FC = () => {
   const [dragStrokeIndex, setDragStrokeIndex] = useState<number | null>(null);
   const [dragStartPoint, setDragStartPoint] = useState<Point | null>(null);
   const [originalStrokePoints, setOriginalStrokePoints] = useState<Point[] | null>(null);
-
-  // Custom cursor state
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [showCustomCursor, setShowCustomCursor] = useState(false);
-
-  // Track mouse globally for cursor
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-      // Show custom cursor for drawing tools (not select mode or when panning)
-      setShowCustomCursor(!isPanning && !isSpacePressed && currentTool !== 'select' && (currentTool === 'pen' || currentTool === 'eraser' || currentTool === 'sticky-note' || currentTool === 'text'));
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [isPanning, isSpacePressed, currentTool]);
 
 
   // Calculate word count
@@ -372,9 +380,10 @@ const BoardPage: React.FC = () => {
       ctx.miterLimit = 2;
 
       // Apply tool-specific styles
+      const rawStrokeWidth = toolConfig.getStrokeWidth(path.strokeWidth);
       ctx.globalCompositeOperation = toolConfig.getCompositeOperation();
       ctx.strokeStyle = toolConfig.getStrokeStyle(path.color);
-      ctx.lineWidth = toolConfig.getStrokeWidth(path.strokeWidth);
+      ctx.lineWidth = Math.max(0.5, rawStrokeWidth / zoom);
       ctx.globalAlpha = toolConfig.getAlpha();
 
       // Smooth curve rendering using quadratic bezier curves
@@ -474,14 +483,32 @@ const BoardPage: React.FC = () => {
     return { x, y };
   };
 
+  const getPinchDistance = (touchA: Touch, touchB: Touch): number => {
+    return Math.hypot(touchB.clientX - touchA.clientX, touchB.clientY - touchA.clientY);
+  };
+
+  const getPinchCenter = (touchA: Touch, touchB: Touch) => {
+    return {
+      x: (touchA.clientX + touchB.clientX) / 2,
+      y: (touchA.clientY + touchB.clientY) / 2
+    };
+  };
+
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     // Prevent page scroll/zoom gestures on canvas
     e.preventDefault();
 
     if (e.touches.length === 2) {
-      // Two-finger pan
+      const first = e.touches[0];
+      const second = e.touches[1];
+      if (!first || !second) return;
+      pinchStateRef.current = {
+        distance: getPinchDistance(first, second),
+        zoom
+      };
       setIsPanning(true);
-      setPanStart({ x: e.touches[0].clientX - viewOffset.x, y: e.touches[0].clientY - viewOffset.y });
+      const center = getPinchCenter(first, second);
+      setPanStart({ x: center.x - viewOffset.x, y: center.y - viewOffset.y });
       return;
     }
 
@@ -523,7 +550,6 @@ const BoardPage: React.FC = () => {
         enableMarkdown: false
       };
       setStickyNotes(prev => [...prev, newNote]);
-      setCurrentTool('pen');
       return;
     }
 
@@ -543,7 +569,6 @@ const BoardPage: React.FC = () => {
         isUnderline: false
       };
       setTextBoxes(prev => [...prev, newTextBox]);
-      setCurrentTool('pen');
       return;
     }
 
@@ -557,8 +582,30 @@ const BoardPage: React.FC = () => {
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
 
+    if (e.touches.length === 2) {
+      const first = e.touches[0];
+      const second = e.touches[1];
+      if (!first || !second) return;
+      if (pinchStateRef.current && pinchStateRef.current.distance > 0) {
+        const newDistance = getPinchDistance(first, second);
+        const scale = newDistance / pinchStateRef.current.distance;
+        const nextZoom = clampZoom(pinchStateRef.current.zoom * scale);
+        applyZoom(nextZoom);
+      }
+      if (isPanning) {
+        const center = getPinchCenter(first, second);
+        setViewOffset({
+          x: center.x - panStart.x,
+          y: center.y - panStart.y
+        });
+      }
+      return;
+    }
+
     if (isPanning && e.touches.length >= 1) {
-      setViewOffset({ x: e.touches[0].clientX - panStart.x, y: e.touches[0].clientY - panStart.y });
+      const activeTouch = e.touches[0];
+      if (!activeTouch) return;
+      setViewOffset({ x: activeTouch.clientX - panStart.x, y: activeTouch.clientY - panStart.y });
       return;
     }
 
@@ -584,7 +631,8 @@ const BoardPage: React.FC = () => {
     ctx.miterLimit = 2;
     ctx.globalCompositeOperation = toolConfig.getCompositeOperation();
     ctx.strokeStyle = toolConfig.getStrokeStyle(currentColor);
-    ctx.lineWidth = toolConfig.getStrokeWidth(strokeWidth);
+    const normalizedWidth = Math.max(0.5, toolConfig.getStrokeWidth(strokeWidth) / zoom);
+    ctx.lineWidth = normalizedWidth;
     ctx.globalAlpha = toolConfig.getAlpha();
 
     if (lastPoint) {
@@ -595,7 +643,7 @@ const BoardPage: React.FC = () => {
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
     } else {
-      ctx.arc(point.x, point.y, toolConfig.getStrokeWidth(strokeWidth) / 2, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, normalizedWidth / 2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -603,8 +651,14 @@ const BoardPage: React.FC = () => {
     ctx.restore();
   };
 
-  const handleTouchEnd = () => {
-    if (isPanning) { setIsPanning(false); return; }
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length < 2) {
+      pinchStateRef.current = null;
+    }
+    if (isPanning && e.touches.length === 0 && !isDrawing) {
+      setIsPanning(false);
+      return;
+    }
     if (!isDrawing) return;
     setIsDrawing(false);
     lastDrawingPointRef.current = null;
@@ -622,7 +676,7 @@ const BoardPage: React.FC = () => {
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     // Handle panning with middle mouse button, spacebar, or shift + click
-    if (e.button === 1 || isSpacePressed || (e.button === 0 && e.shiftKey)) {
+    if (e.button === 1 || e.button === 2 || isSpacePressed || (e.button === 0 && e.shiftKey)) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - viewOffset.x, y: e.clientY - viewOffset.y });
       return;
@@ -666,8 +720,6 @@ const BoardPage: React.FC = () => {
         enableMarkdown: false
       };
       setStickyNotes(prev => [...prev, newNote]);
-      // Switch back to pen tool after placing a sticky note
-      setCurrentTool('pen');
       return;
     }
 
@@ -688,8 +740,6 @@ const BoardPage: React.FC = () => {
         isUnderline: false
       };
       setTextBoxes(prev => [...prev, newTextBox]);
-      // Switch back to pen tool after placing a text box
-      setCurrentTool('pen');
       return;
     }
 
@@ -701,6 +751,12 @@ const BoardPage: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (currentTool === 'eraser' && !isPanning && !isSpacePressed) {
+      setCursorPosition({ x: e.clientX, y: e.clientY });
+    } else if (cursorPosition) {
+      setCursorPosition(null);
+    }
+
     // Handle panning
     if (isPanning) {
       setViewOffset({
@@ -757,7 +813,8 @@ const BoardPage: React.FC = () => {
     // Apply tool-specific styles for live drawing
     ctx.globalCompositeOperation = toolConfig.getCompositeOperation();
     ctx.strokeStyle = toolConfig.getStrokeStyle(currentColor);
-    ctx.lineWidth = toolConfig.getStrokeWidth(strokeWidth);
+    const normalizedWidth = Math.max(0.5, toolConfig.getStrokeWidth(strokeWidth) / zoom);
+    ctx.lineWidth = normalizedWidth;
     ctx.globalAlpha = toolConfig.getAlpha();
 
     // Draw from last point to current point with smooth curve
@@ -772,7 +829,7 @@ const BoardPage: React.FC = () => {
       ctx.stroke();
     } else {
       // First point - draw a small smooth dot
-      ctx.arc(point.x, point.y, toolConfig.getStrokeWidth(strokeWidth) / 2, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, normalizedWidth / 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -880,6 +937,11 @@ const BoardPage: React.FC = () => {
     setActiveToolbarOption(option);
   };
 
+  const eraserPreviewDiameter =
+    currentTool === 'eraser'
+      ? Math.max(4, getToolById('eraser')?.getStrokeWidth(strokeWidth) ?? strokeWidth)
+      : null;
+
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
       {/* Infinite Dotted Background - follows viewOffset */}
@@ -910,37 +972,21 @@ const BoardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Custom Cursor - Always visible for drawing tools */}
-      {showCustomCursor && (() => {
-        let CursorIcon: React.ComponentType<{ className?: string }> | null = null;
-
-        // Get cursor icon based on current tool
-        if (currentTool === 'sticky-note') {
-          CursorIcon = StickyNoteIcon;
-        } else if (currentTool === 'text') {
-          CursorIcon = Type;
-        } else if (currentTool === 'pen' || currentTool === 'eraser') {
-          const toolConfig = getToolById(currentTool);
-          if (toolConfig?.cursor && typeof toolConfig.cursor !== 'string') {
-            CursorIcon = toolConfig.cursor as React.ComponentType<{ className?: string }>;
-          }
-        }
-
-        if (!CursorIcon) return null;
-
-        return (
-          <div
-            className="fixed pointer-events-none z-[100] transition-opacity duration-150"
-            style={{
-              left: mousePosition.x,
-              top: mousePosition.y,
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            <CursorIcon className={`w-6 h-6 text-orange-500 drop-shadow-2xl ${currentTool === 'eraser' ? 'opacity-90' : ''}`} />
-          </div>
-        );
-      })()}
+      {currentTool === 'eraser' && cursorPosition && eraserPreviewDiameter && (
+        <div
+          className="fixed pointer-events-none z-[100]"
+          style={{
+            left: cursorPosition.x,
+            top: cursorPosition.y,
+            width: eraserPreviewDiameter,
+            height: eraserPreviewDiameter,
+            transform: 'translate(-50%, -50%)',
+            borderRadius: '50%',
+            border: '2px solid rgba(249, 115, 22, 0.85)',
+            boxShadow: '0 0 8px rgba(249,115,22,0.4)'
+          }}
+        />
+      )}
 
       {/* Canvas Container - truly infinite with visual pan/zoom */}
       <div
@@ -953,19 +999,25 @@ const BoardPage: React.FC = () => {
       >
         <canvas
           ref={canvasRef}
-          className={`absolute inset-0 ${isPanning || isSpacePressed ? 'cursor-grabbing' : currentTool === 'select' ? 'cursor-default' : 'cursor-none'}`}
+          className={`absolute inset-0 ${
+            isPanning || isSpacePressed
+              ? 'cursor-grabbing'
+              : currentTool === 'select'
+                ? 'cursor-default'
+                : 'cursor-crosshair'
+          }`}
           style={{
-            cursor: isPanning || isSpacePressed ? 'grabbing' : currentTool === 'select' ? 'default' : 'none',
             touchAction: 'none',
             width: '100%',
             height: '100%'
           }}
+          onContextMenu={(e) => e.preventDefault()}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={() => {
             handleMouseUp();
-            setShowCustomCursor(false);
+            setCursorPosition(null);
           }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -1056,12 +1108,6 @@ const BoardPage: React.FC = () => {
         isLoading={isLoading}
         activeToolbarOption={activeToolbarOption}
         onToolbarOptionChange={handleToolbarOptionChange}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        onZoomReset={() => {
-          setZoom(1);
-          setViewOffset({ x: 0, y: 0 });
-        }}
       />
     </div>
   );
@@ -1071,7 +1117,9 @@ export default BoardPage;
 
 // Helper for hit testing paths
 function hitTestPath(point: Point, path: DrawingPath): boolean {
-  const tolerance = Math.max(8, path.strokeWidth + 6);
+  const toolConfig = getToolById(path.tool);
+  const baseWidth = toolConfig ? toolConfig.getStrokeWidth(path.strokeWidth) : path.strokeWidth;
+  const tolerance = Math.max(8, baseWidth + 6);
   for (let i = 0; i < path.points.length - 1; i++) {
     const distance = distancePointToSegment(point, path.points[i], path.points[i + 1]);
     if (distance <= tolerance) {
