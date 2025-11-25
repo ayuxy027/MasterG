@@ -7,6 +7,7 @@ import uploadRoutes from './routes/upload.routes';
 import queryRoutes from './routes/query.routes';
 import chatRoutes from './routes/chat.routes';
 import browseRoutes from './routes/browse.routes';
+import posterRoutes from './routes/poster.routes';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.get('/', (req: Request, res: Response) => {
       query: '/api/query',
       chats: '/api/chats',
       browse: '/api/browse',
+      posters: '/api/posters',
       health: '/api/query/health',
       stats: '/api/upload/stats',
     },
@@ -45,6 +47,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/query', queryRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/browse', browseRoutes);
+app.use('/api/posters', posterRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
