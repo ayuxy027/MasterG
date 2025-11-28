@@ -12,7 +12,7 @@ export class EmbeddingService {
   private readonly RETRY_DELAY = 2000; // 2 seconds
 
   constructor() {
-    this.apiKey = env.GEMMA_API_KEY;
+    this.apiKey = env.GEMINI_API_KEY;
     this.apiUrl = API_ENDPOINTS.GEMMA_EMBEDDING;
   }
 

@@ -24,7 +24,7 @@ export class GeminiService {
   private model: string = 'gemini-2.0-flash-exp';
 
   constructor() {
-    this.apiKey = env.GEMMA_API_KEY;
+    this.apiKey = env.GEMINI_API_KEY;
   }
 
   /**
