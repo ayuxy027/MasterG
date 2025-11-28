@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, ReactNode } from 'react';
 import MaterialsTab from './MaterialsTab';
 import QuestionsTab from './QuestionsTab';
+
+type ViewId = 'summary' | 'questions' | 'quiz' | 'notes' | 'pdf';
+interface ViewOption {
+  id: ViewId;
+  label: string;
+  icon: ReactNode;
+}
 
 const LMRPage: React.FC = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -8,7 +15,7 @@ const LMRPage: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState('deepseek');
   const [selectedLanguage, setSelectedLanguage] = useState('english');
   const [selectedTone, setSelectedTone] = useState('professional');
-  const [activeView, setActiveView] = useState<'summary' | 'questions' | 'quiz' | 'notes' | 'pdf'>('summary');
+  const [activeView, setActiveView] = useState<ViewId>('summary');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,7 +55,7 @@ const LMRPage: React.FC = () => {
     { value: 'concise', label: 'Concise', description: 'Brief and to-the-point tone' }
   ];
 
-  const views = [
+  const views: ViewOption[] = [
     { 
       id: 'summary', 
       label: 'Summary', 
@@ -257,7 +264,7 @@ const LMRPage: React.FC = () => {
                     return (
                       <button
                         key={view.id}
-                        onClick={() => hasContent && setActiveView(view.id as any)}
+                        onClick={() => hasContent && setActiveView(view.id)}
                         disabled={isDisabled}
                         className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 rounded-full transition-all font-semibold text-xs sm:text-sm md:text-base shadow-md transform whitespace-nowrap flex-shrink-0 ${
                           isDisabled

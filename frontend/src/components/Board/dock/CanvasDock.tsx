@@ -1,9 +1,31 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { HiOutlineCursorClick } from 'react-icons/hi';
-import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuChevronDown, LuSparkles } from 'react-icons/lu';
+import { LuPencil, LuPalette, LuRotateCcw, LuRotateCw, LuTrash2, LuEraser, LuChevronDown, LuSparkles } from 'react-icons/lu';
 import { MdOutlineEventNote } from 'react-icons/md';
 import { IoText } from 'react-icons/io5';
 import { Bot, X, List, Target, GitBranch, Layers } from 'lucide-react';
+
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+
+interface PrimaryTool {
+  id: string;
+  icon: IconComponent;
+  label: string;
+  shortcut?: string;
+}
+
+type OverflowTool =
+  | {
+      id: string;
+      icon: IconComponent;
+      label: string;
+      action: 'query' | 'toolbar';
+    }
+  | {
+      id: string;
+      icon: IconComponent;
+      label: string;
+    };
 
 interface CanvasDockProps {
   currentTool: string;
@@ -13,7 +35,10 @@ interface CanvasDockProps {
   onColorChange: (color: string) => void;
   onStrokeWidthChange: (width: number) => void;
   onUndo: () => void;
+  onRedo: () => void;
   onClear: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   sidebarOpen?: boolean;
   query?: string;
   setQuery?: (query: string) => void;
@@ -31,7 +56,10 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
   onColorChange,
   onStrokeWidthChange,
   onUndo,
+  onRedo,
   onClear,
+  canUndo = false,
+  canRedo = false,
   sidebarOpen = true,
   query = '',
   setQuery,
@@ -65,18 +93,18 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const primaryTools = useMemo(
+  const primaryTools: PrimaryTool[] = useMemo(
     () => [
-      { id: 'select', icon: HiOutlineCursorClick, label: 'Select' },
-      { id: 'pen', icon: LuPencil, label: 'Pen' },
-      { id: 'eraser', icon: LuEraser, label: 'Eraser' },
-      { id: 'sticky-note', icon: MdOutlineEventNote, label: 'Note' },
-      { id: 'text', icon: IoText, label: 'Text' }
+      { id: 'select', icon: HiOutlineCursorClick, label: 'Select', shortcut: '5' },
+      { id: 'pen', icon: LuPencil, label: 'Pen', shortcut: '1' },
+      { id: 'eraser', icon: LuEraser, label: 'Eraser', shortcut: '2' },
+      { id: 'sticky-note', icon: MdOutlineEventNote, label: 'Note', shortcut: '3' },
+      { id: 'text', icon: IoText, label: 'Text', shortcut: '4' }
     ],
     []
   );
 
-  const overflowTools = useMemo(
+  const overflowTools: OverflowTool[] = useMemo(
     () => [
       { id: 'query', icon: Bot, label: 'Generate', action: 'query' },
       { id: 'toolbar', icon: LuSparkles, label: 'Modes', action: 'toolbar' }
@@ -103,9 +131,9 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
           <div
             className="rounded-2xl px-6 py-4 backdrop-blur-xl bg-white/90 shadow-lg"
           >
-            <div className="flex items-center justify-between gap-8">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               {/* Left Section - Primary Tools */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {primaryTools.map((tool) => {
                   const IconComponent = tool.icon as React.ComponentType<{ size?: number; className?: string }>;
                   const isActive = currentTool === tool.id;
@@ -113,16 +141,14 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
                     <button
                       key={tool.id}
                       onClick={() => onToolChange(tool.id)}
-                      className={`group flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 ease-out focus:outline-none ${
+                      className={`group flex items-center justify-center rounded-full p-2 transition-all duration-300 focus:outline-none ${
                         isActive 
-                          ? 'bg-orange-400 text-white shadow-[0_8px_24px_rgba(249,115,22,0.25)]' 
+                          ? 'bg-orange-500 text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)]' 
                           : 'text-orange-500 hover:bg-orange-50'
                       }`}
-                      title={tool.label}
-                      style={{ transform: isActive ? 'translateY(-2px)' : 'translateY(0px)' }}
+                      title={`${tool.label}${tool.shortcut ? ` (${tool.shortcut})` : ''}`}
                     >
                       <IconComponent size={18} />
-                      <span className={`text-[11px] leading-none font-medium ${isActive ? 'text-white' : 'opacity-80'}`}>{tool.label}</span>
                     </button>
                   );
                 })}
@@ -131,15 +157,14 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
                 <div className="relative" ref={overflowRef}>
                   <button
                     onClick={() => setIsOverflowOpen((v) => !v)}
-                    className={`ml-1 flex items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 ${
+                    className={`flex items-center justify-center rounded-full p-2 transition-all duration-300 ${
                       isOverflowOpen 
-                        ? 'bg-orange-400 text-white shadow-md' 
+                        ? 'bg-orange-500 text-white shadow-md' 
                         : 'text-orange-500 hover:bg-orange-50'
                     }`}
                     title="More tools"
                   >
                     <LuChevronDown size={16} className={isOverflowOpen ? 'rotate-180 transition-transform' : ''} />
-                    <span className="text-[11px] font-medium opacity-80">More</span>
                   </button>
 
                   {isOverflowOpen && (
@@ -151,16 +176,14 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
                         {overflowTools.map((tool) => {
                           const Icon = tool.icon as React.ComponentType<{ size?: number; className?: string }>;
                           const isActive = currentTool === tool.id;
-                          const isAction = (tool as any).action;
-                          
                           return (
                             <button
                               key={tool.id}
                               onClick={() => {
-                                if (isAction === 'query') {
+                                if ('action' in tool && tool.action === 'query') {
                                   setIsQueryPanelOpen(true);
                                   setIsOverflowOpen(false);
-                                } else if (isAction === 'toolbar') {
+                                } else if ('action' in tool && tool.action === 'toolbar') {
                                   setIsToolbarOpen(true);
                                   setIsOverflowOpen(false);
                                 } else {
@@ -319,19 +342,30 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={onUndo}
-                  className="flex items-center gap-2 px-3 py-2 text-orange-500 hover:bg-orange-50 rounded-xl transition-all duration-300 hover:scale-105"
-                  title="Undo"
+                  disabled={!canUndo}
+                  className={`p-2 rounded-full transition-all duration-200 ${
+                    canUndo ? 'text-orange-500 hover:bg-orange-50' : 'text-orange-300 cursor-not-allowed opacity-60'
+                  }`}
+                  title="Undo (Ctrl+Z / Delete)"
                 >
-                  <LuRotateCcw size={16} />
-                  <span className="text-sm font-medium">Undo</span>
+                  <LuRotateCcw size={18} />
+                </button>
+                <button
+                  onClick={onRedo}
+                  disabled={!canRedo}
+                  className={`p-2 rounded-full transition-all duration-200 ${
+                    canRedo ? 'text-orange-500 hover:bg-orange-50' : 'text-orange-300 cursor-not-allowed opacity-60'
+                  }`}
+                  title="Redo (Ctrl+Shift+Z / Ctrl+Y)"
+                >
+                  <LuRotateCw size={18} />
                 </button>
                 <button
                   onClick={onClear}
-                  className="flex items-center gap-2 px-3 py-2 text-orange-500 hover:bg-orange-50 rounded-xl transition-all duration-300 hover:scale-105"
+                  className="p-2 rounded-full text-orange-500 hover:bg-orange-50 transition-all duration-200"
                   title="Clear Canvas"
                 >
-                  <LuTrash2 size={16} />
-                  <span className="text-sm font-medium">Clear</span>
+                  <LuTrash2 size={18} />
                 </button>
               </div>
             </div>

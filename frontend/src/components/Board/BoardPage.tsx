@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { DottedBackground, CanvasDock, StickyNote, TextBox } from './index';
 import { getToolById, Point, DrawingPath } from './tools';
 import { parseAIResponse, extractSections } from '../../utils/jsonParser';
@@ -10,6 +11,7 @@ const DEFAULT_ZOOM = 1;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
+const HOTKEY_OPTIONS = { enableOnFormTags: true };
 
 // Simple word limit function
 const truncateToWords = (text: string, maxWords: number = 40): string => {
@@ -70,6 +72,7 @@ const BoardPage: React.FC = () => {
   const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
   const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
   const [currentTool, setCurrentTool] = useState('select');
+  const previousToolRef = useRef<string>('pen');
   const [currentColor, setCurrentColor] = useState('#F97316'); // Orange theme
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [activeToolbarOption, setActiveToolbarOption] = useState('summarise');
@@ -89,6 +92,8 @@ const BoardPage: React.FC = () => {
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const pinchStateRef = useRef<{ distance: number; zoom: number } | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const [redoStack, setRedoStack] = useState<DrawingPath[]>([]);
+  const shiftHoldTimeoutRef = useRef<number | null>(null);
 
   const clampZoom = useCallback((value: number) => {
     return Number(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value)).toFixed(2));
@@ -105,6 +110,75 @@ const BoardPage: React.FC = () => {
     });
   }, [clampZoom]);
 
+  const handleUndo = useCallback(() => {
+    setDrawingPaths(prev => {
+      if (!prev.length) return prev;
+      const updated = prev.slice(0, -1);
+      const removed = prev[prev.length - 1];
+      setRedoStack(stack => [...stack, removed]);
+      return updated;
+    });
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack(prev => {
+      if (!prev.length) return prev;
+      const restored = prev[prev.length - 1];
+      setDrawingPaths(paths => [...paths, restored]);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  const duplicateLastElement = useCallback(() => {
+    const offset = 24;
+    if (stickyNotes.length > 0) {
+      const last = stickyNotes[stickyNotes.length - 1];
+      const duplicated = {
+        ...last,
+        id: `${Date.now()}-note`,
+        x: last.x + offset,
+        y: last.y + offset
+      };
+      setStickyNotes(prev => [...prev, duplicated]);
+      return;
+    }
+    if (textBoxes.length > 0) {
+      const last = textBoxes[textBoxes.length - 1];
+      const duplicated = {
+        ...last,
+        id: `${Date.now()}-text`,
+        x: last.x + offset,
+        y: last.y + offset
+      };
+      setTextBoxes(prev => [...prev, duplicated]);
+      return;
+    }
+    if (drawingPaths.length > 0) {
+      const last = drawingPaths[drawingPaths.length - 1];
+      const duplicatedPath: DrawingPath = {
+        ...last,
+        points: last.points.map(point => ({ x: point.x + offset, y: point.y + offset }))
+      };
+      setDrawingPaths(prev => [...prev, duplicatedPath]);
+      setRedoStack([]);
+    }
+  }, [stickyNotes, textBoxes, drawingPaths]);
+
+  const isEditableTarget = (event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return false;
+    const tag = target.tagName;
+    return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  };
+
+  const toolShortcutMap: Record<string, string> = {
+    '1': 'pen',
+    '2': 'eraser',
+    '3': 'sticky-note',
+    '4': 'text',
+    '5': 'select'
+  };
+
   // Keyboard shortcuts and mouse wheel zoom
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -113,18 +187,19 @@ const BoardPage: React.FC = () => {
         setIsSpacePressed(true);
         e.preventDefault();
       }
-      // Number keys for tool selection
-      if (e.key >= '1' && e.key <= '5' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const toolMap: { [key: string]: string } = {
-          '1': 'select',
-          '2': 'pen',
-          '3': 'eraser',
-          '4': 'sticky-note',
-          '5': 'text'
-        };
-        setCurrentTool(toolMap[e.key] || 'select');
-        e.preventDefault();
+
+      // Shift hold toggles select after 3s
+      if (e.key === 'Shift' && !e.repeat && !shiftHoldTimeoutRef.current) {
+        shiftHoldTimeoutRef.current = window.setTimeout(() => {
+          if (currentTool === 'select') {
+            handleToolChange(previousToolRef.current || 'pen');
+          } else {
+            previousToolRef.current = currentTool;
+            handleToolChange('select');
+          }
+        }, 3000);
       }
+
       // Z for zoom reset, Shift + Z resets pan as well
       if (e.key === 'z' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
@@ -135,9 +210,10 @@ const BoardPage: React.FC = () => {
       }
       // Escape to switch back to select
       if (e.key === 'Escape') {
-        setCurrentTool('select');
+        handleToolChange('select');
         e.preventDefault();
       }
+
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -145,6 +221,12 @@ const BoardPage: React.FC = () => {
         setIsSpacePressed(false);
         if (isPanning) {
           setIsPanning(false);
+        }
+      }
+      if (e.key === 'Shift') {
+        if (shiftHoldTimeoutRef.current) {
+          window.clearTimeout(shiftHoldTimeoutRef.current);
+          shiftHoldTimeoutRef.current = null;
         }
       }
     };
@@ -166,7 +248,64 @@ const BoardPage: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [applyZoom, isPanning]);
+  }, [applyZoom, currentTool, handleToolChange, isPanning]);
+
+  useHotkeys(
+    '1,2,3,4,5',
+    (event) => {
+      if (isEditableTarget(event) || event.ctrlKey || event.metaKey || event.altKey) return;
+      const tool = toolShortcutMap[event.key];
+      if (!tool) return;
+      event.preventDefault();
+      handleToolChange(tool);
+    },
+    HOTKEY_OPTIONS,
+    [handleToolChange]
+  );
+
+  useHotkeys(
+    'delete,backspace',
+    (event) => {
+      if (isEditableTarget(event)) return;
+      event.preventDefault();
+      handleUndo();
+    },
+    HOTKEY_OPTIONS,
+    [handleUndo]
+  );
+
+  useHotkeys(
+    'ctrl+z,meta+z',
+    (event) => {
+      if (isEditableTarget(event) || event.shiftKey) return;
+      event.preventDefault();
+      handleUndo();
+    },
+    HOTKEY_OPTIONS,
+    [handleUndo]
+  );
+
+  useHotkeys(
+    'ctrl+shift+z,meta+shift+z,ctrl+y,meta+y',
+    (event) => {
+      if (isEditableTarget(event)) return;
+      event.preventDefault();
+      handleRedo();
+    },
+    HOTKEY_OPTIONS,
+    [handleRedo]
+  );
+
+  useHotkeys(
+    'ctrl+d,meta+d',
+    (event) => {
+      if (isEditableTarget(event)) return;
+      event.preventDefault();
+      duplicateLastElement();
+    },
+    HOTKEY_OPTIONS,
+    [duplicateLastElement]
+  );
 
   // Navbar state
   const [isNavbarExpanded, setIsNavbarExpanded] = useState(false);
@@ -273,7 +412,6 @@ const BoardPage: React.FC = () => {
 
     const startX = canvasCenterX - 300;
     const startY = canvasCenterY - 150;
-    let currentX = startX;
     const cardSpacing = 40;
 
     const newTextBoxes = sections.map((section, index) => {
@@ -282,7 +420,7 @@ const BoardPage: React.FC = () => {
 
       return {
         id: `ai-streaming-${index}`,
-        x: currentX,
+        x: startX,
         y: startY + (index * (height + cardSpacing)),
         text: fullText,
         color: '#ffffff',
@@ -474,7 +612,7 @@ const BoardPage: React.FC = () => {
   };
 
   // Touch helpers for iPad/mobile
-  const getTouchPos = (touch: any): Point => {
+  const getTouchPos = (touch: Touch): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -666,6 +804,7 @@ const BoardPage: React.FC = () => {
       const toolConfig = getToolById(currentTool); if (!toolConfig) return;
       const newPath: DrawingPath = { points: [...currentPath], color: currentColor, strokeWidth, tool: currentTool };
       setDrawingPaths(prev => [...prev, newPath]);
+      setRedoStack([]);
       setCurrentPath([]);
       redrawCanvas();
     } else {
@@ -885,9 +1024,12 @@ const BoardPage: React.FC = () => {
     }
   };
 
-  const handleToolChange = (tool: string) => {
+  const handleToolChange = useCallback((tool: string) => {
+    if (tool !== 'select') {
+      previousToolRef.current = tool;
+    }
     setCurrentTool(tool);
-  };
+  }, []);
 
   const handleColorChange = (color: string) => {
     setCurrentColor(color);
@@ -897,18 +1039,12 @@ const BoardPage: React.FC = () => {
     setStrokeWidth(width);
   };
 
-  const handleUndo = () => {
-    if (drawingPaths.length > 0) {
-      setDrawingPaths(prev => prev.slice(0, -1));
-      redrawCanvas();
-    }
-  };
-
   const handleClear = () => {
     if (window.confirm('Are you sure you want to clear the canvas?')) {
       setDrawingPaths([]);
       setStickyNotes([]);
       setTextBoxes([]);
+      setRedoStack([]);
       redrawCanvas();
     }
   };
@@ -941,6 +1077,9 @@ const BoardPage: React.FC = () => {
     currentTool === 'eraser'
       ? Math.max(4, getToolById('eraser')?.getStrokeWidth(strokeWidth) ?? strokeWidth)
       : null;
+
+  const canUndo = drawingPaths.length > 0;
+  const canRedo = redoStack.length > 0;
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
@@ -1100,7 +1239,10 @@ const BoardPage: React.FC = () => {
         onColorChange={handleColorChange}
         onStrokeWidthChange={handleStrokeWidthChange}
         onUndo={handleUndo}
+        onRedo={handleRedo}
         onClear={handleClear}
+        canUndo={canUndo}
+        canRedo={canRedo}
         sidebarOpen={!isNavbarExpanded}
         query={query}
         setQuery={setQuery}

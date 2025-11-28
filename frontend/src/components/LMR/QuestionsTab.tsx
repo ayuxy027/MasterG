@@ -14,7 +14,7 @@ interface QuestionsTabProps {
   tone?: string;
 }
 
-const QuestionsTab: React.FC<QuestionsTabProps> = ({ language, model, tone }) => {
+const QuestionsTab: React.FC<QuestionsTabProps> = () => {
   const mockQuestions: QuestionAnswer[] = [
     { 
       id: 1, 

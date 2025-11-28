@@ -15,7 +15,7 @@ interface MaterialsTabProps {
   tone?: string;
 }
 
-const MaterialsTab: React.FC<MaterialsTabProps> = ({ language, model, tone }) => {
+const MaterialsTab: React.FC<MaterialsTabProps> = () => {
   const mockMaterials: Material[] = [
     { 
       id: 1, 

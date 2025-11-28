@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { LuSettings } from 'react-icons/lu';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
 
@@ -70,16 +70,16 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     setDragStart({ x: e.clientX - x, y: e.clientY - y });
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     const newX = e.clientX - dragStart.x;
     const newY = e.clientY - dragStart.y;
     onUpdate(id, { x: newX, y: newY });
-  };
+  }, [isDragging, dragStart.x, dragStart.y, id, onUpdate]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
 
   // Simple resize handling
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -89,18 +89,18 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     setIsResizing(true);
   };
 
-  const handleResizeMove = (e: MouseEvent) => {
+  const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizing) return;
     const rect = noteRef.current?.getBoundingClientRect();
     if (!rect) return;
     const newWidth = Math.max(150, e.clientX - rect.left);
     const newHeight = Math.max(100, e.clientY - rect.top);
     onUpdate(id, { width: newWidth, height: newHeight });
-  };
+  }, [isResizing, id, onUpdate]);
 
-  const handleResizeEnd = () => {
+  const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
-  };
+  }, []);
 
   // Simple text editing
   const handleClick = () => {
@@ -125,11 +125,11 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     setShowSettings(!showSettings);
   };
 
-  const handleClickOutside = (e: MouseEvent) => {
+  const handleClickOutside = useCallback((e: MouseEvent) => {
     if (noteRef.current && !noteRef.current.contains(e.target as Node)) {
       setShowSettings(false);
     }
-  };
+  }, []);
 
   // Simple event listeners
   React.useEffect(() => {
@@ -141,7 +141,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart.x, dragStart.y, id, onUpdate]);
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   React.useEffect(() => {
     if (isResizing) {
@@ -152,14 +152,14 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         document.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, id, onUpdate]);
+  }, [handleResizeMove, handleResizeEnd, isResizing]);
 
   React.useEffect(() => {
     if (showSettings) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showSettings]);
+  }, [handleClickOutside, showSettings]);
 
   return (
     <div

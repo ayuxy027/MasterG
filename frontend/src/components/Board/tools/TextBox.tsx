@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { LuSettings } from 'react-icons/lu';
 import TextSettings from './TextSettings';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
@@ -59,16 +59,16 @@ const TextBox: React.FC<TextBoxProps> = ({
     setDragStart({ x: e.clientX - x, y: e.clientY - y });
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     const newX = e.clientX - dragStart.x;
     const newY = e.clientY - dragStart.y;
     onUpdate(id, { x: newX, y: newY });
-  };
+  }, [dragStart.x, dragStart.y, id, isDragging, onUpdate]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
 
   // Simple resize handling
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -78,18 +78,18 @@ const TextBox: React.FC<TextBoxProps> = ({
     setIsResizing(true);
   };
 
-  const handleResizeMove = (e: MouseEvent) => {
+  const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizing) return;
     const rect = textBoxRef.current?.getBoundingClientRect();
     if (!rect) return;
     const newWidth = Math.max(200, e.clientX - rect.left);
     const newHeight = Math.max(100, e.clientY - rect.top);
     onUpdate(id, { width: newWidth, height: newHeight });
-  };
+  }, [id, isResizing, onUpdate]);
 
-  const handleResizeEnd = () => {
+  const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
-  };
+  }, []);
 
   // Simple text editing
   const handleClick = () => {
@@ -114,11 +114,11 @@ const TextBox: React.FC<TextBoxProps> = ({
     setShowSettings(!showSettings);
   };
 
-  const handleClickOutside = (e: MouseEvent) => {
+  const handleClickOutside = useCallback((e: MouseEvent) => {
     if (textBoxRef.current && !textBoxRef.current.contains(e.target as Node)) {
       setShowSettings(false);
     }
-  };
+  }, []);
 
   // Simple event listeners
   React.useEffect(() => {
@@ -130,7 +130,7 @@ const TextBox: React.FC<TextBoxProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart.x, dragStart.y, id, onUpdate]);
+  }, [handleMouseMove, handleMouseUp, isDragging]);
 
   React.useEffect(() => {
     if (isResizing) {
@@ -141,7 +141,7 @@ const TextBox: React.FC<TextBoxProps> = ({
         document.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, id, onUpdate]);
+  }, [handleResizeEnd, handleResizeMove, isResizing]);
 
   React.useEffect(() => {
     if (showSettings) {
@@ -166,7 +166,7 @@ const TextBox: React.FC<TextBoxProps> = ({
         });
       };
     }
-  }, [showSettings]);
+  }, [handleClickOutside, showSettings]);
 
   return (
     <div
