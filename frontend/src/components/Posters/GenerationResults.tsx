@@ -1,109 +1,112 @@
 import React from 'react';
+import type { GeneratedPoster } from '../../types/poster';
 
 interface GenerationResultsProps {
+  posters: GeneratedPoster[];
   isGenerating: boolean;
-  selectedCategory: string;
-  numImages?: number;  // Optional prop to control number of images
+  count: number;
+  onDownload: (poster: GeneratedPoster, index: number) => void;
+  onDownloadAll: () => void;
 }
 
-const GenerationResults: React.FC<GenerationResultsProps> = ({ isGenerating, selectedCategory, numImages = 3 }) => {
-  // Generate mock images based on the number requested
-  const mockImages = Array.from({ length: numImages }, (_, index) => ({
-    id: index + 1,
-    url: `https://placehold.co/400x300/FF6B35/FFFFFF?text=Educational+Poster+${index + 1}`,
-  }));
-
-  const getSystemFeatures = () => {
-    return [
-      { 
-        title: 'Multilingual Support', 
-        desc: 'Supports 22+ Indian languages', 
-        icon: '🌐' 
-      },
-      { 
-        title: 'Cultural Context', 
-        desc: 'Relevant to Indian educational themes', 
-        icon: '🎨' 
-      },
-      { 
-        title: 'Subject Specific', 
-        desc: 'Tailored for different educational subjects', 
-        icon: '🎯' 
-      },
-      { 
-        title: 'Accessibility', 
-        desc: 'High contrast and visual clarity', 
-        icon: '♿' 
-      }
-    ];
-  };
-
+const GenerationResults: React.FC<GenerationResultsProps> = ({ 
+  posters,
+  isGenerating, 
+  count,
+  onDownload,
+  onDownloadAll
+}) => {
   // Determine grid columns based on number of images
   const getGridClass = () => {
-    if (numImages === 1) return 'grid-cols-1';
-    if (numImages === 2) return 'grid-cols-1 md:grid-cols-2';
+    if (count === 1) return 'grid-cols-1';
+    if (count === 2) return 'grid-cols-1 md:grid-cols-2';
     return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'; // Default for 3 or more
   };
 
+  // Show loading state
+  if (isGenerating) {
+    return (
+      <div className="bg-white/80 backdrop-blur-md rounded-2xl p-12 shadow-xl border-2 border-orange-100">
+        <div className="flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500 mb-6"></div>
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">Generating Educational Posters...</h3>
+          <p className="text-gray-600 text-center max-w-md">
+            Our AI is creating culturally relevant and educationally appropriate images using Google Imagen 3.0
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state
+  if (posters.length === 0) {
+    return (
+      <div className="bg-white/80 backdrop-blur-md rounded-2xl p-12 shadow-xl border-2 border-orange-100">
+        <div className="flex flex-col items-center justify-center text-center">
+          <svg className="w-24 h-24 text-orange-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">No Posters Generated Yet</h3>
+          <p className="text-gray-500 max-w-md">
+            Enter a prompt and click "Generate Educational Posters" to create AI-powered educational images
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-orange-100 rounded-2xl shadow-lg overflow-hidden border border-orange-200">
-      <div className="p-6 border-b border-orange-200 bg-white">
-        <h3 className="text-xl font-bold text-orange-800">Generated Educational Posters</h3>
-        <p className="text-gray-600">{numImages} poster grid layout for effective learning</p>
+    <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-100 overflow-hidden">
+      {/* Header with Download All Button */}
+      <div className="p-6 border-b-2 border-orange-100 bg-gradient-to-br from-orange-50 to-white flex justify-between items-center">
+        <div>
+          <h3 className="text-xl font-bold text-gray-800">Generated Educational Posters</h3>
+          <p className="text-gray-600 text-sm">{posters.length} poster{posters.length > 1 ? 's' : ''} created successfully</p>
+        </div>
+        {posters.length > 1 && (
+          <button
+            onClick={onDownloadAll}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-md"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download All
+          </button>
+        )}
       </div>
       
-      {isGenerating ? (
-        <div className="p-16 text-center bg-gradient-to-b from-orange-50 to-beige-50">
-          <div className="flex justify-center mb-6">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500"></div>
-          </div>
-          <h4 className="text-xl font-bold text-orange-800 mb-3">Generating your educational visuals...</h4>
-          <p className="text-gray-700 text-lg">Our AI is creating contextual images relevant to {selectedCategory} in Indian educational context</p>
-        </div>
-      ) : (
-        <div className="p-8">
-          <div className={`grid ${getGridClass()} gap-8`}>
-            {mockImages.map((image) => (
-              <div key={image.id} className="group relative overflow-hidden rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-                <img 
-                  src={image.url} 
-                  alt={`Generated educational poster ${image.id}`} 
-                  className="w-full h-72 object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-5">
-                  <div>
-                    <h4 className="text-white font-bold text-lg">Educational Poster #{image.id}</h4>
-                    <p className="text-orange-200 text-sm">Click to download</p>
-                  </div>
+      {/* Posters Grid */}
+      <div className="p-8">
+        <div className={`grid ${getGridClass()} gap-6`}>
+          {posters.map((poster, index) => (
+            <div 
+              key={`${poster.imageBase64.substring(0, 20)}-${index}`}
+              className="group relative overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
+            >
+              <img 
+                src={`data:${poster.mimeType};base64,${poster.imageBase64}`}
+                alt={`Educational poster ${index + 1}`} 
+                className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-5">
+                <div className="text-white">
+                  <h4 className="font-bold text-lg">Poster #{index + 1}</h4>
+                  <p className="text-orange-200 text-sm">Click download to save</p>
                 </div>
-                <button className="absolute top-5 right-5 bg-orange-500 text-white rounded-full p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-600 transform hover:scale-105">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                  </svg>
-                </button>
               </div>
-            ))}
-          </div>
-          
-          <div className="mt-12">
-            <h4 className="text-xl font-bold text-orange-800 mb-6">Features of our <span className="text-orange-600">Image Generation</span> System:</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {getSystemFeatures().map((feature, index) => (
-                <div 
-                  key={index} 
-                  className="bg-white p-6 rounded-xl shadow-sm border border-orange-200 hover:shadow-md transition-shadow duration-300"
-                >
-                  <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mb-5">
-                    <span className="text-2xl">{feature.icon}</span>
-                  </div>
-                  <h5 className="font-bold text-orange-800 text-lg mb-2">{feature.title}</h5>
-                  <p className="text-gray-600">{feature.desc}</p>
-                </div>
-              ))}
+              <button 
+                onClick={() => onDownload(poster, index)}
+                className="absolute top-4 right-4 bg-orange-500 text-white rounded-full p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-orange-600 transform hover:scale-110"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
             </div>
-          </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };
