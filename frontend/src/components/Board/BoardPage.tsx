@@ -1458,8 +1458,8 @@ const BoardPage: React.FC = () => {
         }}
       >
         {stickyNotes.map((note) => (
-          <div 
-            key={note.id} 
+          <div
+            key={note.id}
             style={{ pointerEvents: "auto" }}
             onMouseEnter={() => setIsOverElement(true)}
             onMouseLeave={() => setIsOverElement(false)}
@@ -1497,8 +1497,8 @@ const BoardPage: React.FC = () => {
         }}
       >
         {textBoxes.map((textBox) => (
-          <div 
-            key={textBox.id} 
+          <div
+            key={textBox.id}
             style={{ pointerEvents: "auto" }}
             onMouseEnter={() => setIsOverElement(true)}
             onMouseLeave={() => setIsOverElement(false)}

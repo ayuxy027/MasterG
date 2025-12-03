@@ -270,9 +270,7 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
                   </button>
 
                   {isOverflowOpen && (
-                    <div
-                      className="absolute bottom-full mb-2 left-0 min-w-40 rounded-xl p-2 backdrop-blur-xl bg-white/95 shadow-xl border border-orange-200/60 z-100"
-                    >
+                    <div className="absolute bottom-full mb-2 left-0 min-w-40 rounded-xl p-2 backdrop-blur-xl bg-white/95 shadow-xl border border-orange-200/60 z-100">
                       <div className="grid grid-cols-3 gap-2">
                         {overflowTools.map((tool) => {
                           const Icon = tool.icon as React.ComponentType<{
