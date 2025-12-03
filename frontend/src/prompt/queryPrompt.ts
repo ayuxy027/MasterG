@@ -46,11 +46,40 @@ SPACING RULES:
 - Keep bullet points compact
 - No extra spacing between elements
 
-CRITICAL: Return ONLY valid JSON. If query is unclear, return empty content. No explanations, just JSON.`;
+CRITICAL: Return ONLY valid JSON. If query is unclear, return empty content. No explanations, just JSON.`
 
-export const createUserPrompt = (query: string): string => {
+// Mode-specific prompts for different content types
+export const MODE_PROMPTS: Record<string, string> = {
+  summarise: `Generate a SUMMARY with 3 sections:
+1. "Key Points" - Main ideas and takeaways
+2. "Core Concepts" - Essential concepts explained
+3. "Summary" - Brief overall summary`,
+
+  "action-points": `Generate ACTION POINTS with 3 sections:
+1. "Priority Actions" - Most important steps to take
+2. "Key Tasks" - Specific actionable items
+3. "Next Steps" - Follow-up actions`,
+
+  timeline: `Generate a TIMELINE with 3 sections:
+1. "Beginning" - Initial phase or starting point
+2. "Development" - Middle progression and key events
+3. "Outcome" - Final results or conclusion`,
+
+  breakdown: `Generate a BREAKDOWN with 3 sections:
+1. "Components" - Key parts or elements
+2. "Analysis" - How parts work together
+3. "Insights" - Key observations and conclusions`,
+}
+
+export const createUserPrompt = (
+  query: string,
+  mode: string = "summarise"
+): string => {
+  const modeInstruction = MODE_PROMPTS[mode] || MODE_PROMPTS["summarise"]
+
   return `Please provide a response to: "${query}"
 
-Return ONLY the JSON object described in the system prompt with exactly 3 sections, each with a dynamic title and markdown-enabled content.`;
-};
+${modeInstruction}
 
+Return ONLY the JSON object described in the system prompt with exactly 3 sections, each with a dynamic title and markdown-enabled content.`
+}

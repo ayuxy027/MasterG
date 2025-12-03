@@ -24,9 +24,11 @@ const WeavePage: React.FC = () => {
     null
   )
   const [error, setError] = useState<string | null>(null)
-  
+
   // Modal state for expanded slide view
-  const [selectedSlideIndex, setSelectedSlideIndex] = useState<number | null>(null)
+  const [selectedSlideIndex, setSelectedSlideIndex] = useState<number | null>(
+    null
+  )
   // Generation status for progress tracking
   const [generationStatus, setGenerationStatus] = useState<string>("")
 
@@ -42,8 +44,9 @@ const WeavePage: React.FC = () => {
       const request: PresentationRequest = {
         topic,
         language: selectedLanguage,
-        presentationStyle: presentationStyle as PresentationRequest['presentationStyle'],
-        targetAudience: targetAudience as PresentationRequest['targetAudience'],
+        presentationStyle:
+          presentationStyle as PresentationRequest["presentationStyle"],
+        targetAudience: targetAudience as PresentationRequest["targetAudience"],
         template: selectedTemplate,
         numSlides,
         customCriteria: customCriteria
@@ -738,19 +741,29 @@ const WeavePage: React.FC = () => {
                   </svg>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3">
-                  <span className="text-orange-400">Creating</span> Your Presentation
+                  <span className="text-orange-400">Creating</span> Your
+                  Presentation
                 </h3>
                 <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto mb-4">
                   {generationStatus}
                 </p>
                 <div className="flex justify-center gap-1">
-                  <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                  <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                  <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                  <span
+                    className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  ></span>
                 </div>
               </div>
             )}
-            
+
             {!hasGenerated && !isGenerating ? (
               <div className="text-center py-16 sm:py-20">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-6 rounded-full bg-orange-100 flex items-center justify-center">
@@ -841,7 +854,9 @@ const WeavePage: React.FC = () => {
 
                 {/* Slide Preview Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
-                  {presentation && presentation.slides && presentation.slides.length > 0
+                  {presentation &&
+                  presentation.slides &&
+                  presentation.slides.length > 0
                     ? presentation.slides.map((slide, index) => (
                         <SlidePreview
                           key={slide.id}
@@ -904,8 +919,17 @@ const WeavePage: React.FC = () => {
                     templateStyle={selectedTemplate}
                     isOpen={selectedSlideIndex !== null}
                     onClose={() => setSelectedSlideIndex(null)}
-                    onPrevious={() => setSelectedSlideIndex(Math.max(0, selectedSlideIndex - 1))}
-                    onNext={() => setSelectedSlideIndex(Math.min(presentation.slides.length - 1, selectedSlideIndex + 1))}
+                    onPrevious={() =>
+                      setSelectedSlideIndex(Math.max(0, selectedSlideIndex - 1))
+                    }
+                    onNext={() =>
+                      setSelectedSlideIndex(
+                        Math.min(
+                          presentation.slides.length - 1,
+                          selectedSlideIndex + 1
+                        )
+                      )
+                    }
                   />
                 )}
 

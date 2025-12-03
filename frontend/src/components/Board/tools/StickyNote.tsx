@@ -1,25 +1,26 @@
-import React, { useState, useRef } from 'react';
-import { LuSettings } from 'react-icons/lu';
-import MarkdownRenderer from '../../ui/MarkdownRenderer';
+import React, { useState, useRef } from "react"
+import { LuSettings } from "react-icons/lu"
+import MarkdownRenderer from "../../ui/MarkdownRenderer"
 
 interface StickyNoteProps {
-  id: string;
-  x: number;
-  y: number;
-  text: string;
-  color: string;
-  width: number;
-  height: number;
-  enableMarkdown?: boolean;
-  selectionMode?: boolean;
-  ruled?: boolean;
-  fontSize?: number;
-  fontFamily?: string;
-  isBold?: boolean;
-  isItalic?: boolean;
-  isUnderline?: boolean;
-  onUpdate: (id: string, updates: Partial<StickyNoteProps>) => void;
-  onDelete: (id: string) => void;
+  id: string
+  x: number
+  y: number
+  text: string
+  color: string
+  width: number
+  height: number
+  enableMarkdown?: boolean
+  selectionMode?: boolean
+  ruled?: boolean
+  fontSize?: number
+  fontFamily?: string
+  isBold?: boolean
+  isItalic?: boolean
+  isUnderline?: boolean
+  zoom?: number
+  onUpdate: (id: string, updates: Partial<StickyNoteProps>) => void
+  onDelete: (id: string) => void
 }
 
 const StickyNote: React.FC<StickyNoteProps> = ({
@@ -34,137 +35,141 @@ const StickyNote: React.FC<StickyNoteProps> = ({
   selectionMode = false,
   ruled = false,
   fontSize = 14,
-  fontFamily = 'Inter',
+  fontFamily = "Inter",
   isBold = false,
   isItalic = false,
   isUnderline = false,
+  zoom = 1,
   onUpdate,
-  onDelete
+  onDelete,
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isEditing, setIsEditing] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
 
-  const noteRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const noteRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Simple color options
   const colors = [
-    '#FFE4B5', // peach
-    '#FFB6C1', // light pink
-    '#F0E68C', // khaki
-    '#98FB98', // pale green
-    '#87CEEB', // sky blue
-    '#DDA0DD', // plum
-    '#F5DEB3', // wheat
-    '#E6E6FA', // lavender
-  ];
+    "#FFE4B5", // peach
+    "#FFB6C1", // light pink
+    "#F0E68C", // khaki
+    "#98FB98", // pale green
+    "#87CEEB", // sky blue
+    "#DDA0DD", // plum
+    "#F5DEB3", // wheat
+    "#E6E6FA", // lavender
+  ]
 
-  // Simple drag handling
+  // Simple drag handling - account for zoom
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!selectionMode) return;
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - x, y: e.clientY - y });
-  };
+    if (!selectionMode) return
+    e.preventDefault()
+    setIsDragging(true)
+    // Store the initial mouse position in canvas space
+    setDragStart({ x: e.clientX / zoom - x, y: e.clientY / zoom - y })
+  }
 
   const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return;
-    const newX = e.clientX - dragStart.x;
-    const newY = e.clientY - dragStart.y;
-    onUpdate(id, { x: newX, y: newY });
-  };
+    if (!isDragging) return
+    // Calculate new position accounting for zoom
+    const newX = e.clientX / zoom - dragStart.x
+    const newY = e.clientY / zoom - dragStart.y
+    onUpdate(id, { x: newX, y: newY })
+  }
 
   const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+    setIsDragging(false)
+  }
 
-  // Simple resize handling
+  // Simple resize handling - account for zoom
   const handleResizeStart = (e: React.MouseEvent) => {
-    if (!selectionMode) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-  };
+    if (!selectionMode) return
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+  }
 
   const handleResizeMove = (e: MouseEvent) => {
-    if (!isResizing) return;
-    const rect = noteRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const newWidth = Math.max(150, e.clientX - rect.left);
-    const newHeight = Math.max(100, e.clientY - rect.top);
-    onUpdate(id, { width: newWidth, height: newHeight });
-  };
+    if (!isResizing) return
+    const rect = noteRef.current?.getBoundingClientRect()
+    if (!rect) return
+    // Account for zoom when calculating new dimensions
+    const newWidth = Math.max(150, (e.clientX - rect.left) / zoom)
+    const newHeight = Math.max(100, (e.clientY - rect.top) / zoom)
+    onUpdate(id, { width: newWidth, height: newHeight })
+  }
 
   const handleResizeEnd = () => {
-    setIsResizing(false);
-  };
+    setIsResizing(false)
+  }
 
   // Simple text editing
   const handleClick = () => {
-    if (selectionMode) return;
-    setIsEditing(true);
-    setTimeout(() => textareaRef.current?.focus(), 0);
-  };
+    if (selectionMode) return
+    setIsEditing(true)
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onUpdate(id, { text: e.target.value });
-  };
+    onUpdate(id, { text: e.target.value })
+  }
 
-  const handleTextBlur = () => setIsEditing(false);
+  const handleTextBlur = () => setIsEditing(false)
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') setIsEditing(false);
-  };
+    if (e.key === "Escape") setIsEditing(false)
+  }
 
   // Simple settings
   const handleSettingsClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowSettings(!showSettings);
-  };
+    e.stopPropagation()
+    setShowSettings(!showSettings)
+  }
 
   const handleClickOutside = (e: MouseEvent) => {
     if (noteRef.current && !noteRef.current.contains(e.target as Node)) {
-      setShowSettings(false);
+      setShowSettings(false)
     }
-  };
+  }
 
   // Simple event listeners
   React.useEffect(() => {
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
+      }
     }
-  }, [isDragging, dragStart.x, dragStart.y, id, onUpdate]);
+  }, [isDragging, dragStart.x, dragStart.y, id, onUpdate])
 
   React.useEffect(() => {
     if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMove);
-      document.addEventListener('mouseup', handleResizeEnd);
+      document.addEventListener("mousemove", handleResizeMove)
+      document.addEventListener("mouseup", handleResizeEnd)
       return () => {
-        document.removeEventListener('mousemove', handleResizeMove);
-        document.removeEventListener('mouseup', handleResizeEnd);
-      };
+        document.removeEventListener("mousemove", handleResizeMove)
+        document.removeEventListener("mouseup", handleResizeEnd)
+      }
     }
-  }, [isResizing, id, onUpdate]);
+  }, [isResizing, id, onUpdate])
 
   React.useEffect(() => {
     if (showSettings) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside)
+      return () => document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [showSettings]);
+  }, [showSettings])
 
   return (
     <div
       ref={noteRef}
-      className={`absolute select-none ${selectionMode ? 'cursor-move' : ''}`}
+      className={`absolute select-none ${selectionMode ? "cursor-move" : ""}`}
       style={{ left: x, top: y, width, height, zIndex: 20 }}
       onMouseDown={handleMouseDown}
     >
@@ -181,7 +186,10 @@ const StickyNote: React.FC<StickyNoteProps> = ({
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="absolute top-8 right-0 bg-white rounded-md shadow-lg p-3 border border-gray-200 min-w-[180px]" style={{ zIndex: 99999 }}>
+        <div
+          className="absolute top-8 right-0 bg-white rounded-md shadow-lg p-3 border border-gray-200 min-w-[180px]"
+          style={{ zIndex: 99999 }}
+        >
           <div className="space-y-3">
             {/* Color Picker */}
             <div>
@@ -190,7 +198,11 @@ const StickyNote: React.FC<StickyNoteProps> = ({
                 {colors.map((colorOption) => (
                   <button
                     key={colorOption}
-                    className={`w-6 h-6 rounded-full border ${color === colorOption ? 'border-gray-700' : 'border-gray-200'}`}
+                    className={`w-6 h-6 rounded-full border ${
+                      color === colorOption
+                        ? "border-gray-700"
+                        : "border-gray-200"
+                    }`}
                     style={{ backgroundColor: colorOption }}
                     onClick={() => onUpdate(id, { color: colorOption })}
                     title={colorOption}
@@ -201,17 +213,23 @@ const StickyNote: React.FC<StickyNoteProps> = ({
 
             {/* Font Size */}
             <div>
-              <label className="block text-xs text-gray-700 mb-1">Text Size</label>
+              <label className="block text-xs text-gray-700 mb-1">
+                Text Size
+              </label>
               <select
                 value={fontSize}
-                onChange={(e) => onUpdate(id, { fontSize: Number(e.target.value) })}
+                onChange={(e) =>
+                  onUpdate(id, { fontSize: Number(e.target.value) })
+                }
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                 style={{ zIndex: 999999 }}
               >
                 {[12, 14, 16, 18, 20, 24].map((size) => (
-                  <option key={size} value={size}>{size}px</option>
+                  <option key={size} value={size}>
+                    {size}px
+                  </option>
                 ))}
               </select>
             </div>
@@ -222,14 +240,14 @@ const StickyNote: React.FC<StickyNoteProps> = ({
                 <span>Ruled Lines</span>
                 <button
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    ruled ? 'bg-orange-500' : 'bg-gray-300'
+                    ruled ? "bg-orange-500" : "bg-gray-300"
                   }`}
                   onClick={() => onUpdate(id, { ruled: !ruled })}
-                  title={ruled ? 'Disable ruled lines' : 'Enable ruled lines'}
+                  title={ruled ? "Disable ruled lines" : "Enable ruled lines"}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      ruled ? 'translate-x-4' : 'translate-x-0.5'
+                      ruled ? "translate-x-4" : "translate-x-0.5"
                     }`}
                   />
                 </button>
@@ -240,9 +258,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
             <button
               className="w-full text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded"
               onClick={() => {
-                if (window.confirm('Delete this note?')) {
-                  onDelete(id);
-                }
+                onDelete(id)
               }}
             >
               Delete
@@ -256,9 +272,9 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         className="relative h-full cursor-text rounded-lg overflow-hidden"
         style={{
           backgroundColor: color,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-          border: '1px solid rgba(0, 0, 0, 0.06)',
-          padding: ruled ? '16px 16px 16px 16px' : '16px',
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+          border: "1px solid rgba(0, 0, 0, 0.06)",
+          padding: ruled ? "16px 16px 16px 16px" : "16px",
           backgroundImage: ruled
             ? `repeating-linear-gradient(
                 to bottom,
@@ -267,8 +283,8 @@ const StickyNote: React.FC<StickyNoteProps> = ({
                 rgba(0, 0, 0, 0.08) ${Math.max(fontSize * 1.5, 21)}px,
                 rgba(0, 0, 0, 0.08) ${Math.max(fontSize * 1.5, 21) + 1}px
               )`
-            : 'none',
-          backgroundPosition: ruled ? '0 16px' : '0 0'
+            : "none",
+          backgroundPosition: ruled ? "0 16px" : "0 0",
         }}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
@@ -282,30 +298,40 @@ const StickyNote: React.FC<StickyNoteProps> = ({
             onKeyDown={handleKeyDown}
             className="w-full h-full bg-transparent border-none outline-none resize-none"
             style={{
-              fontFamily: enableMarkdown ? 'monospace' : fontFamily,
+              fontFamily: enableMarkdown ? "monospace" : fontFamily,
               fontSize: `${fontSize}px`,
-              lineHeight: ruled ? `${Math.max(fontSize * 1.5, 21)}px` : '1.5',
-              color: '#2c3e50',
-              fontWeight: isBold ? 'bold' : 'normal',
-              fontStyle: isItalic ? 'italic' : 'normal',
-              textDecoration: isUnderline ? 'underline' : 'none',
+              lineHeight: ruled ? `${Math.max(fontSize * 1.5, 21)}px` : "1.5",
+              color: "#2c3e50",
+              fontWeight: isBold ? "bold" : "normal",
+              fontStyle: isItalic ? "italic" : "normal",
+              textDecoration: isUnderline ? "underline" : "none",
               margin: 0,
-              padding: 0
+              padding: 0,
             }}
-            placeholder={enableMarkdown ? "Enter markdown text here..." : "Enter note here..."}
+            placeholder={
+              enableMarkdown
+                ? "Enter markdown text here..."
+                : "Enter note here..."
+            }
           />
         ) : (
           <div className="w-full h-full">
             {enableMarkdown ? (
-              <div style={{ lineHeight: ruled ? `${Math.max(fontSize * 1.5, 21)}px` : '1.5' }}>
+              <div
+                style={{
+                  lineHeight: ruled
+                    ? `${Math.max(fontSize * 1.5, 21)}px`
+                    : "1.5",
+                }}
+              >
                 <MarkdownRenderer
-                  content={text || 'Enter Text or Generate with AI...'}
+                  content={text || "Enter Text or Generate with AI..."}
                   fontFamily={fontFamily}
                   fontSize={fontSize}
                   isBold={isBold}
                   isItalic={isItalic}
                   isUnderline={isUnderline}
-                  color={text ? '#2c3e50' : 'rgba(44,62,80,0.35)'}
+                  color={text ? "#2c3e50" : "rgba(44,62,80,0.35)"}
                 />
               </div>
             ) : (
@@ -313,18 +339,24 @@ const StickyNote: React.FC<StickyNoteProps> = ({
                 style={{
                   fontFamily: fontFamily,
                   fontSize: `${fontSize}px`,
-                  lineHeight: ruled ? `${Math.max(fontSize * 1.5, 21)}px` : '1.5',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  color: '#2c3e50',
-                  fontWeight: isBold ? 'bold' : 'normal',
-                  fontStyle: isItalic ? 'italic' : 'normal',
-                  textDecoration: isUnderline ? 'underline' : 'none',
+                  lineHeight: ruled
+                    ? `${Math.max(fontSize * 1.5, 21)}px`
+                    : "1.5",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  color: "#2c3e50",
+                  fontWeight: isBold ? "bold" : "normal",
+                  fontStyle: isItalic ? "italic" : "normal",
+                  textDecoration: isUnderline ? "underline" : "none",
                   margin: 0,
-                  padding: 0
+                  padding: 0,
                 }}
               >
-                {text || <span style={{ color: 'rgba(44,62,80,0.35)' }}>Enter Text or Generate with AI...</span>}
+                {text || (
+                  <span style={{ color: "rgba(44,62,80,0.35)" }}>
+                    Enter Text or Generate with AI...
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -341,8 +373,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default StickyNote;
-
+export default StickyNote
