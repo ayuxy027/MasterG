@@ -1,7 +1,7 @@
-import axios from 'axios';
-import { API_ENDPOINTS } from '../config/constants';
-import env from '../config/env';
-import { EmbeddingResult } from '../types';
+import axios from "axios";
+import { API_ENDPOINTS } from "../config/constants";
+import env from "../config/env";
+import { EmbeddingResult } from "../types";
 
 export class EmbeddingService {
   private apiKey: string;
@@ -20,7 +20,7 @@ export class EmbeddingService {
    * Sleep utility for delays
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -31,44 +31,71 @@ export class EmbeddingService {
       const response = await axios.post(
         `${this.apiUrl}?key=${this.apiKey}`,
         {
-          model: 'models/embedding-001',
+          model: "models/embedding-001",
           content: {
             parts: [{ text }],
           },
         },
         {
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           timeout: 30000, // 30 second timeout
         }
       );
 
       const embedding = response.data.embedding.values;
-      
+
       if (!embedding || !Array.isArray(embedding)) {
-        throw new Error('Invalid embedding response');
+        throw new Error("Invalid embedding response");
       }
 
       return embedding;
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error?.message || error.message;
-      
-      // Retry on network errors or rate limiting
-      if (retryCount < this.MAX_RETRIES && 
-          (error.code === 'ECONNRESET' || 
-           error.code === 'ETIMEDOUT' ||
-           error.message.includes('socket') ||
-           error.message.includes('network') ||
-           error.response?.status === 429)) {
-        
-        console.warn(`Retry ${retryCount + 1}/${this.MAX_RETRIES} for embedding generation...`);
+      const errorMessage =
+        error.response?.data?.error?.message || error.message;
+      const statusCode = error.response?.status;
+
+      // Check for non-retryable errors (authentication, invalid API key, quota exceeded)
+      if (statusCode === 400 || statusCode === 401 || statusCode === 403) {
+        console.error(
+          "❌ API Authentication/Authorization error:",
+          errorMessage
+        );
+        throw new Error(`API authentication failed: ${errorMessage}`);
+      }
+
+      // Check for quota exceeded errors (don't retry - quota won't reset immediately)
+      if (
+        errorMessage?.includes("quota") ||
+        errorMessage?.includes("rate limit")
+      ) {
+        console.error("❌ API quota exceeded:", errorMessage);
+        throw new Error(`API quota exceeded: ${errorMessage}`);
+      }
+
+      // Retry only on network errors or temporary server errors (429, 500, 503)
+      if (
+        retryCount < this.MAX_RETRIES &&
+        (error.code === "ECONNRESET" ||
+          error.code === "ETIMEDOUT" ||
+          error.message.includes("socket") ||
+          error.message.includes("network") ||
+          statusCode === 429 ||
+          statusCode === 500 ||
+          statusCode === 503)
+      ) {
+        console.warn(
+          `⚠️  Retry ${retryCount + 1}/${
+            this.MAX_RETRIES
+          } for embedding generation...`
+        );
         await this.sleep(this.RETRY_DELAY * (retryCount + 1)); // Exponential backoff
         return this.generateEmbedding(text, retryCount + 1);
       }
 
       if (axios.isAxiosError(error)) {
-        console.error('Gemma API error:', errorMessage);
+        console.error("❌ Gemma API error:", errorMessage);
         throw new Error(`Embedding generation failed: ${errorMessage}`);
       }
       throw error;
@@ -80,8 +107,10 @@ export class EmbeddingService {
    */
   async generateEmbeddings(texts: string[]): Promise<EmbeddingResult[]> {
     try {
-      console.log(`🔄 Generating embeddings for ${texts.length} chunks in batches of ${this.BATCH_SIZE}...`);
-      
+      console.log(
+        `🔄 Generating embeddings for ${texts.length} chunks in batches of ${this.BATCH_SIZE}...`
+      );
+
       const results: EmbeddingResult[] = [];
       const totalBatches = Math.ceil(texts.length / this.BATCH_SIZE);
 
@@ -89,8 +118,10 @@ export class EmbeddingService {
       for (let i = 0; i < texts.length; i += this.BATCH_SIZE) {
         const batch = texts.slice(i, i + this.BATCH_SIZE);
         const batchNumber = Math.floor(i / this.BATCH_SIZE) + 1;
-        
-        console.log(`  📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} chunks)...`);
+
+        console.log(
+          `  📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} chunks)...`
+        );
 
         // Process batch with concurrency control
         const batchPromises = batch.map(async (text) => {
@@ -98,7 +129,12 @@ export class EmbeddingService {
             const embedding = await this.generateEmbedding(text);
             return { embedding, text };
           } catch (error) {
-            console.error(`Failed to generate embedding for chunk: ${text.substring(0, 50)}...`);
+            console.error(
+              `Failed to generate embedding for chunk: ${text.substring(
+                0,
+                50
+              )}...`
+            );
             throw error;
           }
         });
@@ -116,10 +152,9 @@ export class EmbeddingService {
 
       console.log(`✅ All ${results.length} embeddings generated successfully`);
       return results;
-
     } catch (error) {
-      console.error('Batch embedding error:', error);
-      throw new Error('Failed to generate embeddings for texts');
+      console.error("Batch embedding error:", error);
+      throw new Error("Failed to generate embeddings for texts");
     }
   }
 
@@ -127,7 +162,11 @@ export class EmbeddingService {
    * Validate embedding dimensions
    */
   validateEmbedding(embedding: number[]): boolean {
-    return Array.isArray(embedding) && embedding.length > 0 && embedding.every(val => typeof val === 'number');
+    return (
+      Array.isArray(embedding) &&
+      embedding.length > 0 &&
+      embedding.every((val) => typeof val === "number")
+    );
   }
 }
 

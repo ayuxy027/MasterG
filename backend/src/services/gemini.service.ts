@@ -1,16 +1,16 @@
-import axios from 'axios';
-import { SUPPORTED_LANGUAGES, LanguageCode } from '../config/constants';
-import { ChatMessage, SourceCitation } from '../types';
-import env from '../config/env';
+import axios from "axios";
+import { SUPPORTED_LANGUAGES, LanguageCode } from "../config/constants";
+import { ChatMessage, SourceCitation } from "../types";
+import env from "../config/env";
 
 /**
  * GEMINI-STYLE DOCUMENT ORCHESTRATION SERVICE
- * 
+ *
  * This service handles documents like Gemini does:
  * 1. Upload Phase: Ingest full document (not just chunks)
  * 2. Query Phase: Model has FULL document context
  * 3. No explicit retrieval - model already knows the document
- * 
+ *
  * Benefits:
  * - Better understanding (full context, not just chunks)
  * - Graceful handling of complex queries
@@ -20,8 +20,8 @@ import env from '../config/env';
 
 export class GeminiService {
   private apiKey: string;
-  private apiUrl: string = 'https://generativelanguage.googleapis.com/v1beta';
-  private model: string = 'gemini-2.0-flash-exp';
+  private apiUrl: string = "https://generativelanguage.googleapis.com/v1beta";
+  private model: string = "gemini-2.0-flash-exp";
 
   constructor() {
     this.apiKey = env.GEMMA_API_KEY;
@@ -46,21 +46,32 @@ export class GeminiService {
     const languageName = SUPPORTED_LANGUAGES[language];
 
     // Build chat context
-    const chatContext = chatHistory.length > 0
-      ? chatHistory.slice(-10).map(m => `${m.role === 'user' ? 'Student' : 'Assistant'}: ${m.content}`).join('\n')
-      : '';
+    const chatContext =
+      chatHistory.length > 0
+        ? chatHistory
+            .slice(-10)
+            .map(
+              (m) =>
+                `${m.role === "user" ? "Student" : "Assistant"}: ${m.content}`
+            )
+            .join("\n")
+        : "";
 
     // Build comprehensive prompt with FULL document
     const prompt = `You are an expert educational tutor. Answer the question directly based on the complete document provided.
 
 📚 DOCUMENT CONTENT:
-${documentMetadata ? `File: ${documentMetadata.fileName} (${documentMetadata.totalPages} pages)` : ''}
+${
+  documentMetadata
+    ? `File: ${documentMetadata.fileName} (${documentMetadata.totalPages} pages)`
+    : ""
+}
 
 ${fullDocumentContent}
 
-${'='.repeat(80)}
+${"=".repeat(80)}
 
-${chatContext ? `Previous conversation:\n${chatContext}\n` : ''}
+${chatContext ? `Previous conversation:\n${chatContext}\n` : ""}
 
 Question: ${query}
 
@@ -81,9 +92,11 @@ Start your answer NOW in ${languageName}:`;
       const response = await axios.post(
         `${this.apiUrl}/models/${this.model}:generateContent?key=${this.apiKey}`,
         {
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 4096,
@@ -91,40 +104,44 @@ Start your answer NOW in ${languageName}:`;
           },
           safetySettings: [
             {
-              category: 'HARM_CATEGORY_HARASSMENT',
-              threshold: 'BLOCK_NONE',
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_NONE",
             },
             {
-              category: 'HARM_CATEGORY_HATE_SPEECH',
-              threshold: 'BLOCK_NONE',
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_NONE",
             },
             {
-              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-              threshold: 'BLOCK_NONE',
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_NONE",
             },
             {
-              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-              threshold: 'BLOCK_NONE',
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_NONE",
             },
           ],
         },
         {
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           timeout: 30000,
         }
       );
 
-      const answer = response.data.candidates?.[0]?.content?.parts?.[0]?.text || 
-        'Unable to generate response. Please try again.';
+      const answer =
+        response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "Unable to generate response. Please try again.";
 
       return {
         answer,
-        strategy: 'FULL_DOCUMENT_CONTEXT',
+        strategy: "FULL_DOCUMENT_CONTEXT",
       };
     } catch (error: any) {
-      console.error('❌ Gemini API error:', error.response?.data || error.message);
+      console.error(
+        "❌ Gemini API error:",
+        error.response?.data || error.message
+      );
       throw new Error(`Gemini service failed: ${error.message}`);
     }
   }
@@ -132,7 +149,7 @@ Start your answer NOW in ${languageName}:`;
   /**
    * STRATEGY 2: Hybrid Approach - Smart Document Chunking
    * When document is too large for single context window
-   * 
+   *
    * Process:
    * 1. Analyze query to understand what sections are needed
    * 2. Extract only relevant sections (intelligent sampling)
@@ -160,20 +177,27 @@ Start your answer NOW in ${languageName}:`;
     // Step 2: Build focused context with only relevant pages
     const focusedContent = relevantPages
       .sort((a, b) => a.pageNumber - b.pageNumber)
-      .map(p => `[Page ${p.pageNumber}]\n${p.content}`)
-      .join('\n\n' + '='.repeat(80) + '\n\n');
+      .map((p) => `[Page ${p.pageNumber}]\n${p.content}`)
+      .join("\n\n" + "=".repeat(80) + "\n\n");
 
     // Step 3: Query with focused content
-    const chatContext = chatHistory.length > 0
-      ? chatHistory.slice(-10).map(m => `${m.role === 'user' ? 'Student' : 'Assistant'}: ${m.content}`).join('\n')
-      : '';
+    const chatContext =
+      chatHistory.length > 0
+        ? chatHistory
+            .slice(-10)
+            .map(
+              (m) =>
+                `${m.role === "user" ? "Student" : "Assistant"}: ${m.content}`
+            )
+            .join("\n")
+        : "";
 
     const prompt = `You are an expert educational tutor. Answer directly based on the relevant pages from the document.
 
-📚 RELEVANT PAGES FROM "${documentMetadata?.fileName || 'Document'}":
+📚 RELEVANT PAGES FROM "${documentMetadata?.fileName || "Document"}":
 ${focusedContent}
 
-${chatContext ? `Previous conversation:\n${chatContext}\n` : ''}
+${chatContext ? `Previous conversation:\n${chatContext}\n` : ""}
 
 Question: ${query}
 
@@ -186,30 +210,36 @@ Your direct answer in ${languageName}:`;
       const response = await axios.post(
         `${this.apiUrl}/models/${this.model}:generateContent?key=${this.apiKey}`,
         {
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 3072,
           },
         },
         {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { "Content-Type": "application/json" },
           timeout: 30000,
         }
       );
 
-      const answer = response.data.candidates?.[0]?.content?.parts?.[0]?.text || 
-        'Unable to generate response.';
+      const answer =
+        response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "Unable to generate response.";
 
       return {
         answer,
-        strategy: 'SMART_CHUNKING',
-        pagesUsed: relevantPages.map(p => p.pageNumber),
+        strategy: "SMART_CHUNKING",
+        pagesUsed: relevantPages.map((p) => p.pageNumber),
       };
     } catch (error: any) {
-      console.error('❌ Smart chunking error:', error.response?.data || error.message);
+      console.error(
+        "❌ Smart chunking error:",
+        error.response?.data || error.message
+      );
       throw new Error(`Smart chunking failed: ${error.message}`);
     }
   }
@@ -217,7 +247,7 @@ Your direct answer in ${languageName}:`;
   /**
    * STRATEGY 3: Agentic Multi-Step Query Decomposition
    * For complex queries like "compare chapter 1 and 3, then summarize differences"
-   * 
+   *
    * Process:
    * 1. Break down complex query into sub-queries
    * 2. Execute each sub-query with relevant document sections
@@ -231,15 +261,28 @@ Your direct answer in ${languageName}:`;
     documentMetadata?: {
       fileName: string;
     }
-  ): Promise<{ answer: string; strategy: string; subQueries: string[]; pagesUsed: number[] }> {
+  ): Promise<{
+    answer: string;
+    strategy: string;
+    subQueries: string[];
+    pagesUsed: number[];
+  }> {
     const languageName = SUPPORTED_LANGUAGES[language];
 
     // Step 1: Decompose complex query into sub-queries
-    const decomposition = await this.decomposeQuery(query, documentPages.length, language);
+    const decomposition = await this.decomposeQuery(
+      query,
+      documentPages.length,
+      language
+    );
 
     // Step 2: Execute each sub-query
-    const subAnswers: Array<{ query: string; answer: string; pages: number[] }> = [];
-    
+    const subAnswers: Array<{
+      query: string;
+      answer: string;
+      pages: number[];
+    }> = [];
+
     for (const subQuery of decomposition.subQueries) {
       const relevantPages = await this.identifyRelevantPages(
         subQuery.query,
@@ -248,8 +291,8 @@ Your direct answer in ${languageName}:`;
       );
 
       const pageContent = relevantPages
-        .map(p => `[Page ${p.pageNumber}]\n${p.content}`)
-        .join('\n\n');
+        .map((p) => `[Page ${p.pageNumber}]\n${p.content}`)
+        .join("\n\n");
 
       const subPrompt = `Document Content:\n${pageContent}\n\nQuestion: ${subQuery.query}\n\nAnswer in ${languageName}:`;
 
@@ -259,15 +302,16 @@ Your direct answer in ${languageName}:`;
           contents: [{ parts: [{ text: subPrompt }] }],
           generationConfig: { temperature: 0.6, maxOutputTokens: 1536 },
         },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 20000 }
+        { headers: { "Content-Type": "application/json" }, timeout: 20000 }
       );
 
-      const subAnswer = response.data.candidates?.[0]?.content?.parts?.[0]?.text || 'No answer';
-      
+      const subAnswer =
+        response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No answer";
+
       subAnswers.push({
         query: subQuery.query,
         answer: subAnswer,
-        pages: relevantPages.map(p => p.pageNumber),
+        pages: relevantPages.map((p) => p.pageNumber),
       });
     }
 
@@ -277,11 +321,15 @@ Your direct answer in ${languageName}:`;
 ORIGINAL QUESTION: ${query}
 
 SUB-ANSWERS:
-${subAnswers.map((sa, idx) => `
+${subAnswers
+  .map(
+    (sa, idx) => `
 Sub-question ${idx + 1}: ${sa.query}
 Answer: ${sa.answer}
-Pages used: ${sa.pages.join(', ')}
-`).join('\n' + '='.repeat(60) + '\n')}
+Pages used: ${sa.pages.join(", ")}
+`
+  )
+  .join("\n" + "=".repeat(60) + "\n")}
 
 DO NOT: Say "Let me", "I'm analyzing", "Searching"
 DO: Provide the final answer immediately in ${languageName}
@@ -294,18 +342,21 @@ Final answer NOW in ${languageName}:`;
         contents: [{ parts: [{ text: synthesisPrompt }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+      { headers: { "Content-Type": "application/json" }, timeout: 30000 }
     );
 
-    const finalAnswer = finalResponse.data.candidates?.[0]?.content?.parts?.[0]?.text || 
-      subAnswers.map(sa => sa.answer).join('\n\n');
+    const finalAnswer =
+      finalResponse.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      subAnswers.map((sa) => sa.answer).join("\n\n");
 
-    const allPagesUsed = [...new Set(subAnswers.flatMap(sa => sa.pages))].sort((a, b) => a - b);
+    const allPagesUsed = [
+      ...new Set(subAnswers.flatMap((sa) => sa.pages)),
+    ].sort((a, b) => a - b);
 
     return {
       answer: finalAnswer,
-      strategy: 'AGENTIC_DECOMPOSITION',
-      subQueries: decomposition.subQueries.map(sq => sq.query),
+      strategy: "AGENTIC_DECOMPOSITION",
+      subQueries: decomposition.subQueries.map((sq) => sq.query),
       pagesUsed: allPagesUsed,
     };
   }
@@ -328,7 +379,10 @@ Final answer NOW in ${languageName}:`;
     const analysisPrompt = `Given this query: "${query}"
 
 And these page summaries:
-${documentPages.slice(0, 20).map(p => `Page ${p.pageNumber}: ${p.content.substring(0, 200)}...`).join('\n')}
+${documentPages
+  .slice(0, 20)
+  .map((p) => `Page ${p.pageNumber}: ${p.content.substring(0, 200)}...`)
+  .join("\n")}
 
 Return a JSON array of relevant page numbers (maximum 10 pages):
 { "pages": [1, 3, 5] }`;
@@ -340,20 +394,23 @@ Return a JSON array of relevant page numbers (maximum 10 pages):
           contents: [{ parts: [{ text: analysisPrompt }] }],
           generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
         },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+        { headers: { "Content-Type": "application/json" }, timeout: 10000 }
       );
 
-      const resultText = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const resultText =
+        response.data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
       const jsonMatch = resultText.match(/\{[^}]+\}/);
-      
+
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         const relevantPageNumbers = parsed.pages || [];
-        
-        return documentPages.filter(p => relevantPageNumbers.includes(p.pageNumber));
+
+        return documentPages.filter((p) =>
+          relevantPageNumbers.includes(p.pageNumber)
+        );
       }
     } catch (error) {
-      console.warn('Page identification failed, using first 10 pages');
+      console.warn("Page identification failed, using first 10 pages");
     }
 
     // Fallback: Return first 10 pages
@@ -403,23 +460,24 @@ Now decompose this query into JSON format:
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.4, maxOutputTokens: 512 },
         },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+        { headers: { "Content-Type": "application/json" }, timeout: 10000 }
       );
 
-      const resultText = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const resultText =
+        response.data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
       const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-      
+
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return parsed;
       }
     } catch (error) {
-      console.warn('Query decomposition failed, using original query');
+      console.warn("Query decomposition failed, using original query");
     }
 
     // Fallback: Use original query
     return {
-      subQueries: [{ query, reason: 'Original query used as-is' }],
+      subQueries: [{ query, reason: "Original query used as-is" }],
     };
   }
 }
