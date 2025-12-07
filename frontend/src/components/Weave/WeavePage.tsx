@@ -1,49 +1,51 @@
-import React, { useState } from "react"
+import React, { useState } from "react";
 import {
   PresentationRequest,
   PresentationResponse,
-} from "../../types/presentation"
-import { weaveAPI } from "../../services/weaveAPI"
-import SlidePreview from "./SlidePreview"
-import SlideModal from "./SlideModal"
+} from "../../types/presentation";
+import { weaveAPI } from "../../services/weaveAPI";
+import SlidePreview from "./SlidePreview";
+import SlideModal from "./SlideModal";
 
 const WeavePage: React.FC = () => {
-  const [topic, setTopic] = useState("")
-  const [numSlides, setNumSlides] = useState(5)
-  const [presentationStyle, setPresentationStyle] = useState("academic")
-  const [targetAudience, setTargetAudience] = useState("school")
-  const [selectedLanguage, setSelectedLanguage] = useState("english")
-  const [selectedModel, setSelectedModel] = useState("deepseek")
-  const [selectedTemplate, setSelectedTemplate] = useState("modern")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [hasGenerated, setHasGenerated] = useState(false)
+  const [topic, setTopic] = useState("");
+  const [numSlides, setNumSlides] = useState(5);
+  const [presentationStyle, setPresentationStyle] = useState("academic");
+  const [targetAudience, setTargetAudience] = useState("school");
+  const [selectedLanguage, setSelectedLanguage] = useState("english");
+  const [selectedTemplate, setSelectedTemplate] = useState("modern");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
   const [customCriteria, setCustomCriteria] = useState<
     Array<{ id: string; label: string; value: string }>
-  >([])
+  >([]);
   const [presentation, setPresentation] = useState<PresentationResponse | null>(
     null
-  )
-  const [error, setError] = useState<string | null>(null)
-  
+  );
+  const [error, setError] = useState<string | null>(null);
+
   // Modal state for expanded slide view
-  const [selectedSlideIndex, setSelectedSlideIndex] = useState<number | null>(null)
+  const [selectedSlideIndex, setSelectedSlideIndex] = useState<number | null>(
+    null
+  );
   // Generation status for progress tracking
-  const [generationStatus, setGenerationStatus] = useState<string>("")
+  const [generationStatus, setGenerationStatus] = useState<string>("");
 
   const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!topic.trim()) return
+    e.preventDefault();
+    if (!topic.trim()) return;
 
-    setIsGenerating(true)
-    setError(null)
-    setGenerationStatus("Preparing presentation outline...")
+    setIsGenerating(true);
+    setError(null);
+    setGenerationStatus("Preparing presentation outline...");
 
     try {
       const request: PresentationRequest = {
         topic,
         language: selectedLanguage,
-        presentationStyle: presentationStyle as PresentationRequest['presentationStyle'],
-        targetAudience: targetAudience as PresentationRequest['targetAudience'],
+        presentationStyle:
+          presentationStyle as PresentationRequest["presentationStyle"],
+        targetAudience: targetAudience as PresentationRequest["targetAudience"],
         template: selectedTemplate,
         numSlides,
         customCriteria: customCriteria
@@ -55,33 +57,33 @@ const WeavePage: React.FC = () => {
             (criteria) =>
               criteria.label.trim() !== "" || criteria.value.trim() !== ""
           ),
-      }
+      };
 
-      setGenerationStatus("Generating slide content with AI...")
-      const response = await weaveAPI.generatePresentation(request)
+      setGenerationStatus("Generating slide content with AI...");
+      const response = await weaveAPI.generatePresentation(request);
 
       if (response.success && response.data) {
-        setGenerationStatus("Presentation ready!")
-        setPresentation(response.data)
-        setHasGenerated(true)
+        setGenerationStatus("Presentation ready!");
+        setPresentation(response.data);
+        setHasGenerated(true);
       } else {
-        setError(response.error || "Failed to generate presentation")
+        setError(response.error || "Failed to generate presentation");
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "An error occurred while generating the presentation"
-      )
+      );
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
   const addCustomCriteria = () => {
-    const newId = `criteria-${Date.now()}`
-    setCustomCriteria([...customCriteria, { id: newId, label: "", value: "" }])
-  }
+    const newId = `criteria-${Date.now()}`;
+    setCustomCriteria([...customCriteria, { id: newId, label: "", value: "" }]);
+  };
 
   const updateCustomCriteria = (
     id: string,
@@ -92,62 +94,84 @@ const WeavePage: React.FC = () => {
       customCriteria.map((criteria) =>
         criteria.id === id ? { ...criteria, [field]: newValue } : criteria
       )
-    )
-  }
+    );
+  };
 
   const removeCustomCriteria = (id: string) => {
-    setCustomCriteria(customCriteria.filter((criteria) => criteria.id !== id))
-  }
+    setCustomCriteria(customCriteria.filter((criteria) => criteria.id !== id));
+  };
 
   // Add export handler
-  const handleExport = (format: "pdf" | "pptx" | "json") => {
-    if (!presentation) return
+  const handleExport = async (format: "pdf" | "pptx" | "json") => {
+    if (!presentation) return;
 
-    // Create a download link for the presentation
-    const API_BASE_URL = import.meta.env.VITE_API_URL
-      ? `${import.meta.env.VITE_API_URL}/api`
-      : "http://localhost:5000/api"
-    const url = `${API_BASE_URL}/weave/${presentation.id}/export/${format}`
+    try {
+      if (format === "pptx") {
+        // Use direct PPTX export endpoint
+        const API_BASE_URL = import.meta.env.VITE_API_URL
+          ? `${import.meta.env.VITE_API_URL}/api`
+          : "http://localhost:5000/api";
 
-    // Create a temporary link and click it to trigger download
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `presentation-${presentation.id}.${format}`
-    link.target = "_blank" // Open in new tab to avoid issues with some browsers
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
+        const response = await fetch(`${API_BASE_URL}/weave/export/pptx`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(presentation),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to generate PPTX");
+        }
+
+        // Get the blob and create download link
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${presentation.title
+          .replace(/[^a-z0-9]/gi, "_")
+          .toLowerCase()}_presentation.pptx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        console.log("✅ PPTX download started");
+      } else {
+        // For other formats, use the old method (or show not implemented message)
+        alert(`${format.toUpperCase()} export is coming soon!`);
+      }
+    } catch (error) {
+      console.error("Error exporting presentation:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to export presentation"
+      );
+    }
+  };
 
   // Add save handler
   const handleSavePresentation = async () => {
-    if (!presentation) return
+    if (!presentation) return;
 
     try {
       // For now, we'll use a placeholder user ID - in a real app, this would come from auth
-      const userId = "placeholder-user-id"
-      const response = await weaveAPI.savePresentation(presentation, userId)
+      const userId = "placeholder-user-id";
+      const response = await weaveAPI.savePresentation(presentation, userId);
 
       if (response.success) {
-        alert("Presentation saved successfully!")
+        alert("Presentation saved successfully!");
       } else {
-        setError(response.error || "Failed to save presentation")
+        setError(response.error || "Failed to save presentation");
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "An error occurred while saving the presentation"
-      )
+      );
     }
-  }
-
-  const models = [
-    { value: "deepseek", label: "DeepSeek R1" },
-    { value: "llama", label: "Llama 4 Scout" },
-    { value: "qwen", label: "Qwen 3 7b" },
-    { value: "kimi", label: "Kimi K2 Instruct" },
-  ]
+  };
 
   const languages = [
     { value: "english", label: "English" },
@@ -158,7 +182,7 @@ const WeavePage: React.FC = () => {
     { value: "marathi", label: "मराठी" },
     { value: "gujarati", label: "ગુજરાતી" },
     { value: "kannada", label: "ಕನ್ನಡ" },
-  ]
+  ];
 
   const presentationStyles = [
     {
@@ -181,7 +205,7 @@ const WeavePage: React.FC = () => {
       label: "Technical",
       description: "Detailed and precise tone",
     },
-  ]
+  ];
 
   const audiences = [
     {
@@ -200,7 +224,7 @@ const WeavePage: React.FC = () => {
       label: "Training",
       description: "Workshops and seminars",
     },
-  ]
+  ];
 
   const templates = [
     {
@@ -239,7 +263,7 @@ const WeavePage: React.FC = () => {
       description: "Simple and elegant",
       preview: "bg-gradient-to-br from-slate-400 to-slate-600",
     },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
@@ -600,49 +624,17 @@ const WeavePage: React.FC = () => {
           </div>
         )}
 
-        {/* Add Custom Criteria Button */}
-        <div className="mb-6 sm:mb-8">
-          <button
-            onClick={addCustomCriteria}
-            className="w-full bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-dashed border-orange-300 p-5 sm:p-6 md:p-8 hover:border-orange-400 hover:bg-orange-50/50 transition-all group"
-          >
-            <div className="flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-orange-100 group-hover:bg-orange-200 flex items-center justify-center transition-all">
-                <svg
-                  className="w-6 h-6 sm:w-7 sm:h-7 text-orange-400 group-hover:text-orange-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  ></path>
-                </svg>
-              </div>
-              <div className="text-center">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1">
-                  Add Custom Criteria
-                </h3>
-                <p className="text-xs sm:text-sm text-gray-600">
-                  Add specific requirements or preferences for your presentation
-                </p>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* AI Model and Generate Section */}
-        <div className="mb-6 sm:mb-8">
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-5 sm:p-6 md:p-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
-              <div className="flex-1">
-                <label className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-gray-800 mb-2.5">
+        {/* Add Custom Criteria Button - Hidden when criteria exist */}
+        {customCriteria.length === 0 && (
+          <div className="mb-6 sm:mb-8">
+            <button
+              onClick={addCustomCriteria}
+              className="w-full bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-dashed border-orange-300 p-5 sm:p-6 md:p-8 hover:border-orange-400 hover:bg-orange-50/50 transition-all group"
+            >
+              <div className="flex flex-col items-center justify-center gap-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-orange-100 group-hover:bg-orange-200 flex items-center justify-center transition-all">
                   <svg
-                    className="w-4 h-4 text-orange-400"
+                    className="w-6 h-6 sm:w-7 sm:h-7 text-orange-400 group-hover:text-orange-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -652,61 +644,85 @@ const WeavePage: React.FC = () => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="2"
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                     ></path>
                   </svg>
-                  AI Model
-                </label>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="w-full sm:w-auto min-w-[200px] px-3 py-2.5 bg-white border-2 border-orange-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-700 transition-all"
-                >
-                  {models.map((model) => (
-                    <option key={model.value} value={model.value}>
-                      {model.label}
-                    </option>
-                  ))}
-                </select>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1">
+                    Add Custom Criteria
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-600">
+                    Add specific requirements or preferences for your
+                    presentation
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={handleGenerate}
-                disabled={isGenerating || !topic.trim()}
-                className={`px-6 sm:px-8 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base shadow-md transition-all transform w-full sm:w-auto ${
-                  isGenerating || !topic.trim()
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-orange-400 text-white hover:bg-orange-500 hover:shadow-lg hover:scale-105"
-                }`}
-              >
-                {isGenerating ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg
-                      className="animate-spin h-5 w-5"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    {generationStatus || "Generating..."}
-                  </span>
-                ) : (
-                  "Generate Presentation"
-                )}
-              </button>
-            </div>
+            </button>
+          </div>
+        )}
+
+        {/* Generate Button Section */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating || !topic.trim()}
+              className={`px-8 sm:px-12 py-4 sm:py-5 rounded-full font-semibold text-base sm:text-lg shadow-lg transition-all transform w-full sm:w-auto ${
+                isGenerating || !topic.trim()
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-orange-400 text-white hover:bg-orange-500 hover:shadow-xl hover:scale-105"
+              }`}
+            >
+              {isGenerating ? (
+                <span className="flex items-center justify-center gap-3">
+                  <svg
+                    className="animate-spin h-6 w-6"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  {generationStatus || "Generating..."}
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    ></path>
+                  </svg>
+                  Generate Presentation
+                </span>
+              )}
+            </button>
+            {!isGenerating && !topic.trim() && (
+              <p className="text-xs sm:text-sm text-gray-500">
+                Enter a topic to get started
+              </p>
+            )}
           </div>
         </div>
 
@@ -738,19 +754,29 @@ const WeavePage: React.FC = () => {
                   </svg>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3">
-                  <span className="text-orange-400">Creating</span> Your Presentation
+                  <span className="text-orange-400">Creating</span> Your
+                  Presentation
                 </h3>
                 <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto mb-4">
                   {generationStatus}
                 </p>
                 <div className="flex justify-center gap-1">
-                  <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                  <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                  <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                  <span
+                    className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  ></span>
                 </div>
               </div>
             )}
-            
+
             {!hasGenerated && !isGenerating ? (
               <div className="text-center py-16 sm:py-20">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-6 rounded-full bg-orange-100 flex items-center justify-center">
@@ -841,7 +867,9 @@ const WeavePage: React.FC = () => {
 
                 {/* Slide Preview Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
-                  {presentation && presentation.slides && presentation.slides.length > 0
+                  {presentation &&
+                  presentation.slides &&
+                  presentation.slides.length > 0
                     ? presentation.slides.map((slide, index) => (
                         <SlidePreview
                           key={slide.id}
@@ -904,47 +932,29 @@ const WeavePage: React.FC = () => {
                     templateStyle={selectedTemplate}
                     isOpen={selectedSlideIndex !== null}
                     onClose={() => setSelectedSlideIndex(null)}
-                    onPrevious={() => setSelectedSlideIndex(Math.max(0, selectedSlideIndex - 1))}
-                    onNext={() => setSelectedSlideIndex(Math.min(presentation.slides.length - 1, selectedSlideIndex + 1))}
+                    onPrevious={() =>
+                      setSelectedSlideIndex(Math.max(0, selectedSlideIndex - 1))
+                    }
+                    onNext={() =>
+                      setSelectedSlideIndex(
+                        Math.min(
+                          presentation.slides.length - 1,
+                          selectedSlideIndex + 1
+                        )
+                      )
+                    }
                   />
                 )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
                   <button
-                    onClick={() => handleExport("pdf")}
+                    onClick={() => handleExport("pptx")}
                     disabled={!presentation}
                     className={`px-5 sm:px-6 py-2.5 sm:py-3 rounded-full font-semibold text-sm sm:text-base hover:scale-105 transition-all shadow-md hover:shadow-lg ${
                       presentation
                         ? "bg-orange-400 text-white hover:bg-orange-500"
                         : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 sm:w-5 sm:h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        ></path>
-                      </svg>
-                      Download PDF
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => handleExport("pptx")}
-                    disabled={!presentation}
-                    className={`px-5 sm:px-6 py-2.5 sm:py-3 rounded-full font-semibold text-sm sm:text-base hover:scale-105 transition-all shadow-md hover:shadow-lg ${
-                      presentation
-                        ? "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
-                        : "bg-gray-200 text-gray-400 border-2 border-gray-300 cursor-not-allowed"
                     }`}
                   >
                     <span className="flex items-center gap-2">
@@ -965,33 +975,6 @@ const WeavePage: React.FC = () => {
                       Export PPTX
                     </span>
                   </button>
-                  <button
-                    onClick={() => handleSavePresentation()}
-                    disabled={!presentation}
-                    className={`px-5 sm:px-6 py-2.5 sm:py-3 rounded-full font-semibold text-sm sm:text-base hover:scale-105 transition-all shadow-md hover:shadow-lg ${
-                      presentation
-                        ? "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
-                        : "bg-gray-200 text-gray-400 border-2 border-gray-300 cursor-not-allowed"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 sm:w-5 sm:h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                        ></path>
-                      </svg>
-                      Save Presentation
-                    </span>
-                  </button>
                 </div>
               </div>
             )}
@@ -999,7 +982,7 @@ const WeavePage: React.FC = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default WeavePage
+export default WeavePage;

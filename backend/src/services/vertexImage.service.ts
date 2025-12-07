@@ -158,64 +158,18 @@ The image should be a complete presentation slide ready to display, with clear v
 
   /**
    * Generate image using Google Gemini API with image generation
+   * Note: Gemini 2.0 Flash doesn't directly generate images, so we use fallback SVG templates
    */
   private async generateWithGemini(
     prompt: string,
     slideData: { title: string; content: string; slideNumber: number }
   ): Promise<{ imageBase64: string; imageUrl: string } | null> {
-    try {
-      // Gemini 2.0 Flash with image generation capabilities
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${this.apiKey}`;
-
-      // Request for visual content generation
-      const response = await axios.post(
-        apiUrl,
-        {
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            responseModalities: ["image", "text"],
-            responseMimeType: "image/png",
-          },
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          timeout: 60000, // 60 second timeout for image generation
-        }
-      );
-
-      // Check if we got an image response
-      const parts = response.data?.candidates?.[0]?.content?.parts;
-      if (parts) {
-        for (const part of parts) {
-          if (part.inlineData?.mimeType?.startsWith("image/")) {
-            const base64Data = part.inlineData.data;
-            return {
-              imageBase64: base64Data,
-              imageUrl: `data:${part.inlineData.mimeType};base64,${base64Data}`,
-            };
-          }
-        }
-      }
-
-      console.log("⚠️ No image in Gemini response, using fallback");
-      return null;
-    } catch (error: any) {
-      console.error(
-        "Gemini image generation error:",
-        error.response?.data || error.message
-      );
-      return null;
-    }
+    // Gemini API doesn't support direct image generation in this mode
+    // We'll use the fallback SVG-based approach which provides better results
+    console.log(
+      `📝 Using template-based slide generation for slide ${slideData.slideNumber}`
+    );
+    return null;
   }
 
   /**
@@ -288,14 +242,40 @@ The image should be a complete presentation slide ready to display, with clear v
 
     const colors = colorSchemes[templateStyle] || colorSchemes.modern;
 
-    // Format content into bullet points
-    const bulletPoints = slideData.content
-      .split("\n")
-      .filter((line) => line.trim())
-      .slice(0, 5) // Max 5 bullet points
-      .map((line) => line.replace(/^[-•*]\s*/, "").trim());
+    // Format content into bullet points - improved parsing
+    let bulletPoints: string[] = [];
 
-    // Create SVG slide
+    // Try to extract bullet points from content
+    const lines = slideData.content.split("\n").filter((line) => line.trim());
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Remove common bullet markers
+      const cleaned = trimmed.replace(/^[-•*]\s*/, "").trim();
+      if (cleaned && cleaned.length > 0) {
+        bulletPoints.push(cleaned);
+      }
+    }
+
+    // If we don't have enough bullet points, split by sentences
+    if (bulletPoints.length < 2) {
+      bulletPoints = slideData.content
+        .split(/[.!?]/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 10)
+        .slice(0, 5);
+    }
+
+    // Limit to 5 bullet points
+    bulletPoints = bulletPoints.slice(0, 5);
+
+    // Truncate title if too long
+    const displayTitle =
+      slideData.title.length > 60
+        ? slideData.title.substring(0, 57) + "..."
+        : slideData.title;
+
+    // Create SVG slide with improved design
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
   <defs>
@@ -309,69 +289,93 @@ The image should be a complete presentation slide ready to display, with clear v
         colors.secondary
       };stop-opacity:1" />
     </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.1"/>
+    </filter>
   </defs>
   
   <!-- Background -->
   <rect width="1920" height="1080" fill="url(#bgGradient)"/>
   
   <!-- Decorative elements -->
-  <rect x="0" y="0" width="1920" height="8" fill="url(#accentGradient)"/>
-  <circle cx="1800" cy="150" r="200" fill="${colors.secondary}" opacity="0.2"/>
-  <circle cx="1750" cy="250" r="100" fill="${colors.primary}" opacity="0.15"/>
+  <rect x="0" y="0" width="1920" height="12" fill="url(#accentGradient)"/>
+  <circle cx="1750" cy="200" r="250" fill="${colors.secondary}" opacity="0.15"/>
+  <circle cx="1800" cy="120" r="120" fill="${colors.primary}" opacity="0.1"/>
+  <rect x="100" y="950" width="300" height="8" rx="4" fill="${
+    colors.primary
+  }" opacity="0.2"/>
   
-  <!-- Title section -->
-  <rect x="80" y="100" width="12" height="100" rx="6" fill="${colors.primary}"/>
-  <text x="120" y="170" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="700" fill="${
-    colors.text
-  }">
-    ${this.escapeXml(slideData.title.substring(0, 50))}${
-      slideData.title.length > 50 ? "..." : ""
-    }
+  <!-- Title section with accent bar -->
+  <rect x="100" y="120" width="16" height="120" rx="8" fill="${
+    colors.primary
+  }"/>
+  <text x="140" y="195" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" 
+        font-size="72" font-weight="700" fill="${colors.text}">
+    ${this.escapeXml(displayTitle)}
   </text>
   
-  <!-- Content area -->
-  <g transform="translate(120, 280)">
+  <!-- Content area with improved spacing -->
+  <g transform="translate(140, 320)">
     ${bulletPoints
-      .map(
-        (point, index) => `
-    <g transform="translate(0, ${index * 120})">
-      <circle cx="20" cy="30" r="12" fill="${colors.primary}"/>
-      <text x="60" y="40" font-family="system-ui, -apple-system, sans-serif" font-size="36" fill="${
-        colors.text
-      }">
-        ${this.escapeXml(point.substring(0, 80))}${
-          point.length > 80 ? "..." : ""
-        }
+      .map((point, index) => {
+        const truncatedPoint =
+          point.length > 85 ? point.substring(0, 82) + "..." : point;
+        return `
+    <g transform="translate(0, ${index * 110})">
+      <!-- Circle bullet with shadow -->
+      <circle cx="20" cy="25" r="14" fill="${
+        colors.primary
+      }" filter="url(#shadow)"/>
+      <text x="60" y="35" font-family="system-ui, -apple-system, sans-serif" 
+            font-size="38" fill="${colors.text}" font-weight="400">
+        ${this.escapeXml(truncatedPoint)}
       </text>
     </g>
-    `
-      )
+    `;
+      })
       .join("")}
   </g>
   
-  <!-- Visual placeholder area -->
-  <rect x="1200" y="300" width="600" height="500" rx="20" fill="${
-    colors.secondary
-  }" opacity="0.3"/>
-  <text x="1500" y="550" font-family="system-ui, sans-serif" font-size="24" fill="${
-    colors.text
-  }" opacity="0.6" text-anchor="middle">
-    Visual Content
-  </text>
-  <text x="1500" y="580" font-family="system-ui, sans-serif" font-size="18" fill="${
-    colors.text
-  }" opacity="0.4" text-anchor="middle">
-    Illustration Area
+  <!-- Visual content area with icon -->
+  <g transform="translate(1250, 320)">
+    <rect x="0" y="0" width="550" height="550" rx="24" fill="${
+      colors.secondary
+    }" opacity="0.2" filter="url(#shadow)"/>
+    
+    <!-- Educational icon -->
+    <g transform="translate(275, 275)">
+      <!-- Book icon -->
+      <path d="M -60,-40 L -60,40 L 0,50 L 60,40 L 60,-40 L 0,-50 Z" 
+            fill="${colors.primary}" opacity="0.3"/>
+      <rect x="-50" y="-30" width="100" height="60" fill="${
+        colors.accent
+      }" opacity="0.2"/>
+      <circle cx="0" cy="0" r="80" stroke="${
+        colors.primary
+      }" stroke-width="4" fill="none" opacity="0.3"/>
+    </g>
+    
+    <text x="275" y="470" font-family="system-ui, sans-serif" font-size="24" 
+          fill="${
+            colors.text
+          }" opacity="0.5" text-anchor="middle" font-weight="500">
+      Educational Content
+    </text>
+  </g>
+  
+  <!-- Footer with slide number -->
+  <rect x="0" y="1020" width="1920" height="60" fill="${
+    colors.primary
+  }" opacity="0.08"/>
+  <text x="1820" y="1055" font-family="system-ui, sans-serif" font-size="28" 
+        fill="${colors.text}" opacity="0.6" text-anchor="end" font-weight="600">
+    ${slideData.slideNumber} / ${slideData.totalSlides}
   </text>
   
-  <!-- Footer -->
-  <rect x="0" y="1040" width="1920" height="40" fill="${
-    colors.primary
-  }" opacity="0.1"/>
-  <text x="1840" y="1060" font-family="system-ui, sans-serif" font-size="24" fill="${
-    colors.text
-  }" opacity="0.6" text-anchor="end">
-    ${slideData.slideNumber} / ${slideData.totalSlides}
+  <!-- Branding element -->
+  <text x="100" y="1055" font-family="system-ui, sans-serif" font-size="24" 
+        fill="${colors.primary}" opacity="0.6" font-weight="500">
+    MasterJi Weave
   </text>
 </svg>`;
 
@@ -398,6 +402,7 @@ The image should be a complete presentation slide ready to display, with clear v
 
   /**
    * Generate images for all slides in a presentation
+   * Ensures every slide gets a properly formatted image
    */
   async generateAllSlideImages(
     slides: Array<{
@@ -417,32 +422,41 @@ The image should be a complete presentation slide ready to display, with clear v
     >();
     const totalSlides = slides.length;
 
-    console.log(`🖼️ Generating images for ${totalSlides} slides...`);
+    console.log(
+      `🖼️ Generating images for ${totalSlides} slides using ${templateStyle} template...`
+    );
 
-    // Process slides sequentially to avoid rate limiting
+    // Process all slides - using template-based approach for reliability
     for (const slide of slides) {
-      const imageData = await this.generateSlideImage(
-        {
-          title: slide.title,
-          content: slide.content,
-          slideNumber: slide.position,
-          totalSlides,
-          imagePrompt: slide.imagePrompt,
-        },
-        templateStyle,
-        presentationStyle,
-        targetAudience
-      );
+      try {
+        const imageData = await this.generateFallbackSlideImage(
+          {
+            title: slide.title,
+            content: slide.content,
+            slideNumber: slide.position,
+            totalSlides,
+          },
+          templateStyle
+        );
 
-      if (imageData) {
-        imageMap.set(slide.id, imageData);
+        if (imageData) {
+          imageMap.set(slide.id, imageData);
+          console.log(
+            `✅ Generated image for slide ${slide.position}/${totalSlides}`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `❌ Failed to generate image for slide ${slide.position}:`,
+          error
+        );
+        // Continue with other slides even if one fails
       }
-
-      // Small delay between requests to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    console.log(`✅ Generated ${imageMap.size}/${totalSlides} slide images`);
+    console.log(
+      `✅ Successfully generated ${imageMap.size}/${totalSlides} slide images`
+    );
     return imageMap;
   }
 }
