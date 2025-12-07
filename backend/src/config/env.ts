@@ -10,13 +10,12 @@ interface EnvConfig {
   NODE_ENV: string;
 
   // API Keys
-  GEMINI_API_KEY: string;
   GEMMA_API_KEY: string;
   GROQ_API_KEY: string;
 
-  // Google Cloud
-  GOOGLE_PROJECT_ID: string;
-  GOOGLE_LOCATION_ID: string;
+  // Google Cloud (optional - for poster feature)
+  GOOGLE_PROJECT_ID?: string;
+  GOOGLE_LOCATION_ID?: string;
 
   // Groq Configuration
   GROQ_MODEL: string;
@@ -54,13 +53,12 @@ export const env: EnvConfig = {
   NODE_ENV: getEnvVariable("NODE_ENV", "development"),
 
   // API Keys
-  GEMINI_API_KEY: getEnvVariable("GEMINI_API_KEY"),
   GEMMA_API_KEY: getEnvVariable("GEMMA_API_KEY"),
   GROQ_API_KEY: getEnvVariable("GROQ_API_KEY"),
 
-  // Google Cloud
-  GOOGLE_PROJECT_ID: getEnvVariable("GOOGLE_PROJECT_ID", "temp-472006"),
-  GOOGLE_LOCATION_ID: getEnvVariable("GOOGLE_LOCATION_ID", "us-central1"),
+  // Google Cloud (optional - for poster feature)
+  GOOGLE_PROJECT_ID: process.env.GOOGLE_PROJECT_ID,
+  GOOGLE_LOCATION_ID: process.env.GOOGLE_LOCATION_ID,
 
   // Groq Configuration
   GROQ_MODEL: getEnvVariable("GROQ_MODEL", "llama-3.3-70b-versatile"),
