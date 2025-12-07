@@ -1,13 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { sendQuery, uploadFile, ChatApiError } from '../../services/chatApi';
-import type { MessageUI, UploadProgress } from '../../types/chat';
-import MarkdownRenderer from '../ui/MarkdownRenderer';
+import React, { useState, useRef, useEffect } from "react";
+import {
+  sendQuery,
+  uploadFile,
+  ChatApiError,
+  getSessionDocuments,
+} from "../../services/chatApi";
+import type { MessageUI, UploadProgress, FileListItem } from "../../types/chat";
+import MarkdownRenderer from "../ui/MarkdownRenderer";
+import Accordion from "../ui/Accordion";
+import { MessageSkeleton } from "../ui/Skeleton";
 
 interface ChatInterfaceProps {
   userId: string;
   sessionId: string;
-  currentMode: 'study' | 'plan' | 'ideation';
-  setCurrentMode: (mode: 'study' | 'plan' | 'ideation') => void;
+  currentMode: "study" | "plan" | "ideation";
+  setCurrentMode: (mode: "study" | "plan" | "ideation") => void;
   messages: MessageUI[];
   setMessages: React.Dispatch<React.SetStateAction<MessageUI[]>>;
   onSessionUpdate: () => void;
@@ -22,30 +29,45 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   setMessages,
   onSessionUpdate,
 }) => {
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
-  const [showMetadata, setShowMetadata] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<FileListItem[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Load uploaded files for dynamic prompt generation
+  // Load uploaded files for dynamic prompt generation
+  useEffect(() => {
+    loadUploadedFiles();
+  }, [sessionId]);
+
+  const loadUploadedFiles = async () => {
+    try {
+      const files = await getSessionDocuments(userId, sessionId);
+      setUploadedFiles(files);
+    } catch (error) {
+      console.error("Failed to load files:", error);
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (inputValue.trim() === '' || isLoading) return;
+    if (inputValue.trim() === "" || isLoading) return;
 
     const userMessage: MessageUI = {
       id: `user-${Date.now()}`,
-      role: 'user',
+      role: "user",
       content: inputValue.trim(),
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputValue('');
+    setInputValue("");
     setIsLoading(true);
 
     try {
@@ -53,7 +75,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       const assistantMessage: MessageUI = {
         id: `assistant-${Date.now()}`,
-        role: 'assistant',
+        role: "assistant",
         content: response.answer,
         timestamp: new Date(),
         sources: response.sources,
@@ -63,14 +85,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       setMessages((prev) => [...prev, assistantMessage]);
       onSessionUpdate(); // Refresh session list
     } catch (error) {
-      console.error('Failed to send message:', error);
-      
+      console.error("Failed to send message:", error);
+
       const errorMessage: MessageUI = {
         id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: error instanceof ChatApiError
-          ? `⚠️ Error: ${error.message}`
-          : '⚠️ Failed to get response. Please try again.',
+        role: "assistant",
+        content:
+          error instanceof ChatApiError
+            ? `⚠️ Error: ${error.message}`
+            : "⚠️ Failed to get response. Please try again.",
         timestamp: new Date(),
       };
 
@@ -84,14 +107,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
-    
+
     for (const file of fileArray) {
-      const fileId = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
+      const fileId = `upload-${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+
       // Add to upload progress tracking
       setUploadProgress((prev) => [
         ...prev,
-        { fileId, fileName: file.name, progress: 0, status: 'uploading' },
+        { fileId, fileName: file.name, progress: 0, status: "uploading" },
       ]);
 
       try {
@@ -99,7 +124,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           setUploadProgress((prev) =>
             prev.map((item) =>
               item.fileId === fileId
-                ? { ...item, progress, status: progress < 100 ? 'uploading' : 'processing' }
+                ? {
+                    ...item,
+                    progress,
+                    status: progress < 100 ? "uploading" : "processing",
+                  }
                 : item
             )
           );
@@ -108,33 +137,43 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         // Success
         setUploadProgress((prev) =>
           prev.map((item) =>
-            item.fileId === fileId ? { ...item, status: 'completed', progress: 100 } : item
+            item.fileId === fileId
+              ? { ...item, status: "completed", progress: 100 }
+              : item
           )
         );
 
         // Add system message
         const systemMessage: MessageUI = {
           id: `system-${Date.now()}`,
-          role: 'assistant',
+          role: "assistant",
           content: `✅ Successfully uploaded **${file.name}**. You can now ask questions about this document!`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, systemMessage]);
 
+        // Refresh uploaded files list for dynamic prompts
+        loadUploadedFiles();
+
         // Remove from progress after 3 seconds
         setTimeout(() => {
-          setUploadProgress((prev) => prev.filter((item) => item.fileId !== fileId));
+          setUploadProgress((prev) =>
+            prev.filter((item) => item.fileId !== fileId)
+          );
         }, 3000);
       } catch (error) {
-        console.error('Upload failed:', error);
-        
+        console.error("Upload failed:", error);
+
         setUploadProgress((prev) =>
           prev.map((item) =>
             item.fileId === fileId
               ? {
                   ...item,
-                  status: 'error',
-                  error: error instanceof ChatApiError ? error.message : 'Upload failed',
+                  status: "error",
+                  error:
+                    error instanceof ChatApiError
+                      ? error.message
+                      : "Upload failed",
                 }
               : item
           )
@@ -143,9 +182,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         // Add error message
         const errorMessage: MessageUI = {
           id: `error-${Date.now()}`,
-          role: 'assistant',
+          role: "assistant",
           content: `⚠️ Failed to upload **${file.name}**: ${
-            error instanceof ChatApiError ? error.message : 'Unknown error'
+            error instanceof ChatApiError ? error.message : "Unknown error"
           }`,
           timestamp: new Date(),
         };
@@ -155,36 +194,63 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     // Clear file input
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
   const getExamplePrompts = () => {
+    // If files are uploaded, generate specific prompts
+    if (uploadedFiles.length > 0) {
+      const firstFile = uploadedFiles[0].fileName.replace(/\.[^/.]+$/, ""); // Remove extension
+
+      switch (currentMode) {
+        case "study":
+          return [
+            `Explain key concepts from ${firstFile}`,
+            `Summarize ${firstFile} in simple terms`,
+            `What are the main topics in ${firstFile}?`,
+          ];
+        case "plan":
+          return [
+            `Create a study plan from ${firstFile}`,
+            `Generate practice questions from ${firstFile}`,
+            `What should I focus on in ${firstFile}?`,
+          ];
+        case "ideation":
+          return [
+            `Suggest projects based on ${firstFile}`,
+            `How can I apply concepts from ${firstFile}?`,
+            `Connect ideas across my uploaded documents`,
+          ];
+      }
+    }
+
+    // Default prompts if no files
     switch (currentMode) {
-      case 'study':
+      case "study":
         return [
-          'Explain photosynthesis from the uploaded PDF',
-          'Summarize page 5',
-          'What are the key concepts in this document?',
+          "Explain concepts from uploaded documents",
+          "Summarize key points",
+          "What are the main topics?",
         ];
-      case 'plan':
+      case "plan":
         return [
-          'Create a study plan from this material',
-          'What topics should I focus on?',
-          'Generate practice questions',
+          "Create a study plan",
+          "Generate practice questions",
+          "Suggest focus areas",
         ];
-      case 'ideation':
+      case "ideation":
         return [
-          'What projects can I build with this knowledge?',
-          'Connect concepts across documents',
-          'Suggest creative applications',
+          "Suggest project ideas",
+          "How can I apply this knowledge?",
+          "Connect concepts creatively",
         ];
       default:
         return [];
@@ -192,9 +258,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const formatTimestamp = (date: Date): string => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -203,32 +269,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Mode Toggle Header */}
       <div className="bg-orange-100 border-b-2 border-orange-200 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          {(['study', 'plan', 'ideation'] as const).map((mode) => (
+          {(["study", "plan", "ideation"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setCurrentMode(mode)}
               className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full capitalize transition-all font-semibold text-sm shadow-md transform hover:scale-105 ${
                 currentMode === mode
-                  ? 'bg-orange-400 text-white hover:bg-orange-500 shadow-lg'
-                  : 'bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300'
+                  ? "bg-orange-400 text-white hover:bg-orange-500 shadow-lg"
+                  : "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
               }`}
             >
               {mode} Mode
             </button>
           ))}
-          
-          {/* Metadata Toggle */}
-          <button
-            onClick={() => setShowMetadata(!showMetadata)}
-            className={`ml-2 px-3 py-2 rounded-full text-xs font-medium transition-all ${
-              showMetadata
-                ? 'bg-blue-400 text-white'
-                : 'bg-white text-gray-600 border-2 border-gray-200 hover:bg-gray-50'
-            }`}
-            title="Toggle AI metadata"
-          >
-            🤖 Info
-          </button>
         </div>
       </div>
 
@@ -272,19 +325,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <div
                 key={message.id}
                 className={`flex mb-6 ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
+                  message.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
                 <div
                   className={`max-w-[85%] rounded-2xl p-4 shadow-md ${
-                    message.role === 'user'
-                      ? 'bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm'
-                      : 'bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100'
+                    message.role === "user"
+                      ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
+                      : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
                   }`}
                 >
                   {/* Message Content */}
                   <div className="prose prose-sm max-w-none">
-                    {message.role === 'assistant' ? (
+                    {message.role === "assistant" ? (
                       <MarkdownRenderer content={message.content} />
                     ) : (
                       <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
@@ -296,69 +349,57 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   {/* Timestamp */}
                   <div
                     className={`text-xs mt-2 ${
-                      message.role === 'user' ? 'text-orange-100' : 'text-gray-500'
+                      message.role === "user"
+                        ? "text-orange-100"
+                        : "text-gray-500"
                     }`}
                   >
                     {formatTimestamp(message.timestamp)}
                   </div>
 
-                  {/* Source Citations */}
+                  {/* Source Citations - Accordion */}
                   {message.sources && message.sources.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-2">
-                        📚 Sources:
-                      </p>
-                      <div className="space-y-2">
-                        {message.sources.map((source, idx) => (
-                          <div
-                            key={idx}
-                            className="bg-orange-50 rounded-lg p-2 border border-orange-200"
+                    <div className="mt-3">
+                      <Accordion
+                        title="Sources"
+                        icon={
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-orange-700">
-                                {source.pdfName}
-                              </span>
-                              <span className="text-xs text-orange-500">
-                                • Page {source.pageNo}
-                              </span>
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                            />
+                          </svg>
+                        }
+                        badge={message.sources.length}
+                      >
+                        <div className="space-y-2">
+                          {message.sources.map((source, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-orange-50 rounded-lg p-3 border border-orange-200"
+                            >
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-xs font-semibold text-orange-700">
+                                  {source.pdfName}
+                                </span>
+                                <span className="text-xs text-orange-500">
+                                  • Page {source.pageNo}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-700 leading-relaxed">
+                                {source.snippet}
+                              </p>
                             </div>
-                            <p className="text-xs text-gray-600 line-clamp-2">
-                              {source.snippet}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI Metadata */}
-                  {showMetadata && message.metadata && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-2">
-                        🤖 AI Metadata:
-                      </p>
-                      <div className="space-y-1 text-xs text-gray-600">
-                        <div>
-                          <span className="font-medium">Layer:</span>{' '}
-                          <span
-                            className={`px-2 py-0.5 rounded ${
-                              message.metadata.layer === 'LAYER1-GROQ-FAST'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-blue-100 text-blue-700'
-                            }`}
-                          >
-                            {message.metadata.layer}
-                          </span>
+                          ))}
                         </div>
-                        <div>
-                          <span className="font-medium">Response Time:</span>{' '}
-                          {message.metadata.responseTimeMs}ms
-                        </div>
-                        <div>
-                          <span className="font-medium">Reasoning:</span>{' '}
-                          {message.metadata.reasoning}
-                        </div>
-                      </div>
+                      </Accordion>
                     </div>
                   )}
                 </div>
@@ -366,26 +407,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             ))}
 
             {/* Loading Indicator */}
-            {isLoading && (
-              <div className="flex justify-start mb-6">
-                <div className="bg-white rounded-2xl p-4 shadow-md border-2 border-orange-100">
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></div>
-                      <div
-                        className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.1s' }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.2s' }}
-                      ></div>
-                    </div>
-                    <span className="text-sm text-gray-600">AI is thinking...</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            {isLoading && <MessageSkeleton />}
 
             <div ref={messagesEndRef} />
           </>
@@ -412,23 +434,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               </svg>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-gray-700 truncate">{upload.fileName}</span>
+                  <span className="text-gray-700 truncate">
+                    {upload.fileName}
+                  </span>
                   <span className="text-gray-500 ml-2">
-                    {upload.status === 'completed'
-                      ? '✓'
-                      : upload.status === 'error'
-                      ? '✗'
+                    {upload.status === "completed"
+                      ? "✓"
+                      : upload.status === "error"
+                      ? "✗"
                       : `${Math.round(upload.progress)}%`}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
                   <div
                     className={`h-1.5 rounded-full transition-all ${
-                      upload.status === 'completed'
-                        ? 'bg-green-500'
-                        : upload.status === 'error'
-                        ? 'bg-red-500'
-                        : 'bg-orange-500'
+                      upload.status === "completed"
+                        ? "bg-green-500"
+                        : upload.status === "error"
+                        ? "bg-red-500"
+                        : "bg-orange-500"
                     }`}
                     style={{ width: `${upload.progress}%` }}
                   />
@@ -494,8 +518,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             disabled={!inputValue.trim() || isLoading}
             className={`p-3 rounded-xl transition-all flex-shrink-0 ${
               inputValue.trim() && !isLoading
-                ? 'bg-gradient-to-br from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg transform hover:scale-105'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg transform hover:scale-105"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
             <svg
@@ -516,7 +540,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         {/* Example Prompts */}
         <div className="flex flex-wrap items-center gap-2 mt-3">
-          <span className="text-xs text-gray-500 font-medium">Quick prompts:</span>
+          <span className="text-xs text-gray-500 font-medium">
+            Quick prompts:
+          </span>
           {getExamplePrompts().map((prompt, index) => (
             <button
               key={index}

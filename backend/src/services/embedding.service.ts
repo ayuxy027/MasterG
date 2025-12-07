@@ -2,6 +2,8 @@ import axios from "axios";
 import { API_ENDPOINTS } from "../config/constants";
 import env from "../config/env";
 import { EmbeddingResult } from "../types";
+import { cacheService } from "./cache.service";
+import logger from "./logger.service";
 
 export class EmbeddingService {
   private apiKey: string;
@@ -24,9 +26,16 @@ export class EmbeddingService {
   }
 
   /**
-   * Generate embedding for a single text with retry logic
+   * Generate embedding for a single text with retry logic and caching
    */
   async generateEmbedding(text: string, retryCount = 0): Promise<number[]> {
+    // Check cache first
+    const cached = cacheService.getEmbedding(text);
+    if (cached) {
+      logger.debug("✨ Using cached embedding");
+      return cached;
+    }
+
     try {
       const response = await axios.post(
         `${this.apiUrl}?key=${this.apiKey}`,
@@ -49,6 +58,9 @@ export class EmbeddingService {
       if (!embedding || !Array.isArray(embedding)) {
         throw new Error("Invalid embedding response");
       }
+
+      // Cache the embedding
+      cacheService.setEmbedding(text, embedding);
 
       return embedding;
     } catch (error: any) {

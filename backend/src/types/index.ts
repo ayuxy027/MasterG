@@ -1,4 +1,4 @@
-import { LanguageCode } from '../config/constants';
+import { LanguageCode } from "../config/constants";
 
 export interface ChunkMetadata {
   fileName: string;
@@ -25,7 +25,7 @@ export interface EmbeddingResult {
 
 // Chat-related types
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
   sources?: SourceCitation[]; // Sources for assistant messages
@@ -85,8 +85,8 @@ export interface ApiError {
 export interface PresentationRequest {
   topic: string;
   language: LanguageCode;
-  presentationStyle: 'academic' | 'business' | 'storytelling' | 'technical';
-  targetAudience: 'school' | 'college' | 'professional' | 'training';
+  presentationStyle: "academic" | "business" | "storytelling" | "technical";
+  targetAudience: "school" | "college" | "professional" | "training";
   template: string;
   numSlides: number;
   customCriteria?: Array<{ label: string; value: string }>;
@@ -108,8 +108,8 @@ export interface Presentation {
   title: string;
   topic: string;
   language: LanguageCode;
-  presentationStyle: 'academic' | 'business' | 'storytelling' | 'technical';
-  targetAudience: 'school' | 'college' | 'professional' | 'training';
+  presentationStyle: "academic" | "business" | "storytelling" | "technical";
+  targetAudience: "school" | "college" | "professional" | "training";
   template: string;
   slides: Slide[];
   createdAt: Date;
@@ -122,8 +122,8 @@ export interface PresentationResponse {
   title: string;
   topic: string;
   language: LanguageCode;
-  presentationStyle: 'academic' | 'business' | 'storytelling' | 'technical';
-  targetAudience: 'school' | 'college' | 'professional' | 'training';
+  presentationStyle: "academic" | "business" | "storytelling" | "technical";
+  targetAudience: "school" | "college" | "professional" | "training";
   template: string;
   slides: Slide[];
   createdAt: Date;
