@@ -135,12 +135,20 @@ export class UploadController {
         return;
       }
 
-      console.log(`✅ Created ${allChunks.length} chunks total`);
+      console.log(
+        `✅ Created ${allChunks.length} chunks total (1 chunk per page)`
+      );
 
-      // Step 3: Generate embeddings
-      console.log("🔄 Generating embeddings...");
+      // Step 3: Generate embeddings page-wise
+      console.log(
+        `🔄 Generating embeddings page-wise for ${allChunks.length} pages...`
+      );
       const embeddingResults = await embeddingService.generateEmbeddings(
         allChunks.map((chunk) => chunk.content)
+      );
+
+      console.log(
+        `✅ Generated ${embeddingResults.length} embeddings (1 per page) for easier page-wise matching`
       );
 
       // Step 4: Store in chat-specific ChromaDB collection

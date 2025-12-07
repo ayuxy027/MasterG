@@ -380,7 +380,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         badge={message.sources.length}
                       >
                         <div className="space-y-2">
-                          {message.sources.map((source, idx) => (
+                          {[...message.sources].reverse().map((source, idx) => (
                             <div
                               key={idx}
                               className="bg-orange-50 rounded-lg p-3 border border-orange-200"

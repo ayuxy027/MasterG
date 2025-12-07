@@ -100,11 +100,11 @@ export class RetrievalManagerService {
         vectorResults = initialResults;
       }
 
-      // Step 5: Filter and rank vector results
+      // Step 5: Filter and rank vector results (sorted by relevance - lower distance = higher relevance)
       const relevantChunks = this.filterAndRankChunks(vectorResults, language);
 
       logger.info(
-        `✅ Found ${relevantChunks.length} relevant chunks from vector DB`
+        `✅ Found ${relevantChunks.length} relevant chunks from vector DB (sorted by relevance)`
       );
 
       // Step 4: Get full documents from MongoDB (based on fileIds)

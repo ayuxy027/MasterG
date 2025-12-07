@@ -4,6 +4,7 @@ export interface SourceCitation {
   pdfName: string;
   pageNo: number;
   snippet: string;
+  score?: string; // Relevance score (0-1)
 }
 
 export interface QueryMetadata {

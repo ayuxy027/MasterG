@@ -45,15 +45,24 @@ export class GeminiService {
   ): Promise<{ answer: string; strategy: string }> {
     const languageName = SUPPORTED_LANGUAGES[language];
 
-    // Build chat context
+    // Build chat context with source references
     const chatContext =
       chatHistory.length > 0
         ? chatHistory
             .slice(-10)
-            .map(
-              (m) =>
-                `${m.role === "user" ? "Student" : "Assistant"}: ${m.content}`
-            )
+            .map((m) => {
+              let msgText = `${m.role === "user" ? "Student" : "Assistant"}: ${
+                m.content
+              }`;
+              // Add source info to help with context
+              if (m.sources && m.sources.length > 0) {
+                const sourceInfo = m.sources
+                  .map((s) => `${s.pdfName} Page ${s.pageNo}`)
+                  .join(", ");
+                msgText += `\n  [Referenced: ${sourceInfo}]`;
+              }
+              return msgText;
+            })
             .join("\n")
         : "";
 
@@ -71,9 +80,14 @@ ${fullDocumentContent}
 
 ${"=".repeat(80)}
 
-${chatContext ? `Previous conversation:\n${chatContext}\n` : ""}
+${
+  chatContext
+    ? `CONVERSATION HISTORY (use this to understand context and references):
+${chatContext}
 
-Question: ${query}
+`
+    : ""
+}Current Question: ${query}
 
 CRITICAL - DO NOT:
 - Say "Let me search", "Let me analyze", "I'm looking", "Searching"
@@ -81,6 +95,7 @@ CRITICAL - DO NOT:
 - Explain your process
 
 CRITICAL - DO:
+- Use conversation history to understand references (e.g., "that chapter", "upas chapter", "solve exercise")
 - Start IMMEDIATELY with the answer
 - Answer in ${languageName}
 - Cite page numbers when relevant
