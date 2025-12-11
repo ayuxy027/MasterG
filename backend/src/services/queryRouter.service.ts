@@ -1,13 +1,13 @@
-import { groqService } from './groq.service';
-import { embeddingService } from './embedding.service';
-import { vectorDBService } from './vectordb.service';
-import { documentService } from './document.service';
-import { languageService } from './language.service';
-import { geminiService } from './gemini.service';
-import { ChatMessage } from '../types';
-import { LanguageCode, SUPPORTED_LANGUAGES } from '../config/constants';
-import axios from 'axios';
-import env from '../config/env';
+import { groqService } from "./groq.service";
+import { embeddingService } from "./embedding.service";
+import { vectorDBService } from "./vectordb.service";
+import { documentService } from "./document.service";
+import { languageService } from "./language.service";
+import { geminiService } from "./gemini.service";
+import { ChatMessage } from "../types";
+import { LanguageCode, SUPPORTED_LANGUAGES } from "../config/constants";
+import axios from "axios";
+import env from "../config/env";
 
 export interface QueryDecision {
   shouldStopAtLayer1: boolean;
@@ -24,13 +24,19 @@ export class QueryRouterService {
    * LAYER 1: Gate Keeper & Intent Analyzer
    * Decides what gets passed to next layers
    */
-  async analyzeQuery(query: string, chatHistory: ChatMessage[]): Promise<QueryDecision> {
+  async analyzeQuery(
+    query: string,
+    chatHistory: ChatMessage[]
+  ): Promise<QueryDecision> {
     try {
       const prompt = `Analyze this user query and classify it:
 
 Query: "${query}"
 
-Recent Chat: ${chatHistory.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n')}
+Recent Chat: ${chatHistory
+        .slice(-3)
+        .map((m) => `${m.role}: ${m.content}`)
+        .join("\n")}
 
 Classify and extract information (JSON format):
 {
@@ -52,16 +58,20 @@ Examples:
 
 Response (JSON only):`;
 
-      const response = await groqService.chatCompletion([
-        { role: 'user', content: prompt }
-      ], 'json_object');
+      const response = await groqService.chatCompletion(
+        [{ role: "user", content: prompt }],
+        "json_object"
+      );
 
       const analysis = JSON.parse(response);
-      
+
       // Only stop at Layer 1 if it's a greeting/abuse/chat-only AND doesn't need documents
-      const shouldStop = (analysis.isGreeting || analysis.isAbusive || analysis.isChatHistoryOnly) 
-                         && !analysis.needsDocuments;
-      
+      const shouldStop =
+        (analysis.isGreeting ||
+          analysis.isAbusive ||
+          analysis.isChatHistoryOnly) &&
+        !analysis.needsDocuments;
+
       return {
         shouldStopAtLayer1: shouldStop,
         isAbusive: analysis.isAbusive || false,
@@ -69,10 +79,10 @@ Response (JSON only):`;
         hasPageNumber: analysis.hasPageNumber || false,
         pageNumber: analysis.pageNumber || undefined,
         isGreeting: analysis.isGreeting || false,
-        reason: analysis.reason || 'Query analysis complete',
+        reason: analysis.reason || "Query analysis complete",
       };
     } catch (error) {
-      console.error('Query analysis error:', error);
+      console.error("Query analysis error:", error);
       // Safe default - don't stop, proceed to Layer 2/3
       return {
         shouldStopAtLayer1: false,
@@ -80,7 +90,7 @@ Response (JSON only):`;
         isChatHistoryOnly: false,
         hasPageNumber: false,
         isGreeting: false,
-        reason: 'Analysis failed, proceeding to document search',
+        reason: "Analysis failed, proceeding to document search",
       };
     }
   }
@@ -95,16 +105,16 @@ Response (JSON only):`;
     chatHistory: ChatMessage[]
   ): Promise<string> {
     const languageName = SUPPORTED_LANGUAGES[language];
-    
+
     const messages = [
-      ...chatHistory.slice(-5).map(m => ({
+      ...chatHistory.slice(-5).map((m) => ({
         role: m.role,
         content: m.content,
       })),
       {
-        role: 'user' as const,
+        role: "user" as const,
         content: `${query}\n\n[Respond in ${languageName}]`,
-      }
+      },
     ];
 
     const systemPrompt = `You are a helpful multilingual AI assistant. 
@@ -119,8 +129,8 @@ CRITICAL RULES:
 Language: ${languageName}`;
 
     return await groqService.chatCompletion([
-      { role: 'system', content: systemPrompt },
-      ...messages
+      { role: "system", content: systemPrompt },
+      ...messages,
     ]);
   }
 
@@ -153,30 +163,50 @@ Language: ${languageName}`;
         metadata: searchResults.metadatas[idx],
         distance: searchResults.distances[idx],
       }))
-      .filter(r => {
-        const chunkLang = r.metadata.language || 'en';
-        return r.distance < 0.6 && (chunkLang === language || chunkLang === 'en');
+      .filter((r) => {
+        const chunkLang = r.metadata.language || "en";
+        return (
+          r.distance < 0.6 && (chunkLang === language || chunkLang === "en")
+        );
       })
       .slice(0, 3);
 
     if (relevantChunks.length === 0) {
       return {
-        answer: language === 'en' 
-          ? "I couldn't find relevant information in your documents. Could you rephrase your question?"
-          : `मुझे आपके दस्तावेज़ों में प्रासंगिक जानकारी नहीं मिली। क्या आप अपना प्रश्न दोबारा लिख सकते हैं?`,
+        answer:
+          language === "en"
+            ? "I couldn't find relevant information in your documents. Could you rephrase your question?"
+            : `मुझे आपके दस्तावेज़ों में प्रासंगिक जानकारी नहीं मिली। क्या आप अपना प्रश्न दोबारा लिख सकते हैं?`,
         sources: [],
       };
     }
 
     // 4. Build context
-    const documentContext = relevantChunks.map(r => r.document).join('\n\n---\n\n');
-    
-    // 5. Get sources
-    const sources = relevantChunks.map(r => ({
-      pdfName: r.metadata.fileName,
-      pageNo: r.metadata.page || 1,
-      snippet: r.document.substring(0, 100),
-    }));
+    const documentContext = relevantChunks
+      .map((r) => r.document)
+      .join("\n\n---\n\n");
+
+    // 5. Get sources - TOP 3 MOST RELEVANT (reversed order - most relevant last)
+    const sources = relevantChunks
+      .slice(0, 3) // Limit to 3 sources
+      .map((r) => ({
+        pdfName: r.metadata.fileName,
+        pageNo: r.metadata.page || 1,
+        snippet: r.document.substring(0, 100),
+        score: (1 - r.distance).toFixed(2), // Convert distance to similarity score
+      }))
+      .reverse(); // Reverse so most relevant is last
+
+    console.log(
+      `📖 Top 3 Sources (reversed): ${sources
+        .map(
+          (s, i) =>
+            `[${i + 1}] ${s.pdfName} Page ${s.pageNo} (${Math.round(
+              parseFloat(s.score) * 100
+            )}%)`
+        )
+        .join(", ")}`
+    );
 
     // 6. Generate answer with Groq
     const answer = await groqService.generateEducationalAnswer(
@@ -195,7 +225,7 @@ Language: ${languageName}`;
 
   /**
    * LAYER 3 Handler: Gemini Flash (Large Context) - ENHANCED WITH GEMINI-STYLE ORCHESTRATION
-   * 
+   *
    * This now uses the same strategy as Gemini's document handling:
    * - Strategy 1: Full document context (for small docs <100 pages)
    * - Strategy 2: Smart chunking (for medium docs 100-500 pages)
@@ -221,27 +251,39 @@ Language: ${languageName}`;
       );
 
       // 3. Get unique fileIds from search results
-      const fileIds = [...new Set(searchResults.metadatas.map(m => m.fileId))];
-      
+      const fileIds = [
+        ...new Set(searchResults.metadatas.map((m) => m.fileId)),
+      ];
+
       if (fileIds.length === 0) {
         return {
-          answer: language === 'en' 
-            ? "I couldn't find any relevant documents. Please upload documents first."
-            : "मुझे कोई प्रासंगिक दस्तावेज़ नहीं मिला। कृपया पहले दस्तावेज़ अपलोड करें।",
+          answer:
+            language === "en"
+              ? "I couldn't find any relevant documents. Please upload documents first."
+              : "मुझे कोई प्रासंगिक दस्तावेज़ नहीं मिला। कृपया पहले दस्तावेज़ अपलोड करें।",
           sources: [],
-          strategy: 'NO_DOCUMENTS',
+          strategy: "NO_DOCUMENTS",
         };
       }
 
       // 4. Get FULL document content from MongoDB (page-wise)
       const pagesMap = await documentService.getPagesByFileIds(fileIds);
-      
+
       // 5. Decide strategy based on document size and query complexity
-      const totalPages = Array.from(pagesMap.values()).reduce((sum, pages) => sum + pages.length, 0);
+      const totalPages = Array.from(pagesMap.values()).reduce(
+        (sum, pages) => sum + pages.length,
+        0
+      );
       const isComplexQuery = this.isComplexQuery(query);
 
-      console.log(`📊 Document Stats: ${fileIds.length} files, ${totalPages} total pages`);
-      console.log(`🧠 Query Type: ${isComplexQuery ? 'Complex (needs decomposition)' : 'Standard'}`);
+      console.log(
+        `📊 Document Stats: ${fileIds.length} files, ${totalPages} total pages`
+      );
+      console.log(
+        `🧠 Query Type: ${
+          isComplexQuery ? "Complex (needs decomposition)" : "Standard"
+        }`
+      );
 
       let result: { answer: string; strategy: string; pagesUsed?: number[] };
 
@@ -249,11 +291,13 @@ Language: ${languageName}`;
       if (totalPages <= 50 && !isComplexQuery) {
         // STRATEGY 1: Full Document Context (best for small docs)
         console.log(`🎯 Using Strategy 1: FULL DOCUMENT CONTEXT`);
-        
+
         const fullContent = this.combineDocuments(pagesMap);
         const firstFileId = fileIds[0];
-        const firstFileName = searchResults.metadatas.find(m => m.fileId === firstFileId)?.fileName || 'Document';
-        
+        const firstFileName =
+          searchResults.metadatas.find((m) => m.fileId === firstFileId)
+            ?.fileName || "Document";
+
         const geminiResult = await geminiService.queryWithFullDocument(
           query,
           fullContent,
@@ -269,15 +313,16 @@ Language: ${languageName}`;
           answer: geminiResult.answer,
           strategy: geminiResult.strategy,
         };
-
       } else if (isComplexQuery) {
         // STRATEGY 3: Agentic Decomposition (for complex queries)
         console.log(`🎯 Using Strategy 3: AGENTIC DECOMPOSITION`);
-        
+
         // Get pages from first document
         const firstFilePages = Array.from(pagesMap.values())[0];
-        const firstFileName = searchResults.metadatas.find(m => m.fileId === fileIds[0])?.fileName || 'Document';
-        
+        const firstFileName =
+          searchResults.metadatas.find((m) => m.fileId === fileIds[0])
+            ?.fileName || "Document";
+
         const agenticResult = await geminiService.queryWithAgenticDecomposition(
           query,
           firstFilePages,
@@ -291,14 +336,15 @@ Language: ${languageName}`;
           strategy: agenticResult.strategy,
           pagesUsed: agenticResult.pagesUsed,
         };
-
       } else {
         // STRATEGY 2: Smart Chunking (for larger docs)
         console.log(`🎯 Using Strategy 2: SMART CHUNKING`);
-        
+
         const firstFilePages = Array.from(pagesMap.values())[0];
-        const firstFileName = searchResults.metadatas.find(m => m.fileId === fileIds[0])?.fileName || 'Document';
-        
+        const firstFileName =
+          searchResults.metadatas.find((m) => m.fileId === fileIds[0])
+            ?.fileName || "Document";
+
         const chunkingResult = await geminiService.queryWithSmartChunking(
           query,
           firstFilePages,
@@ -314,16 +360,38 @@ Language: ${languageName}`;
         };
       }
 
-      // 6. Build sources from search results
-      let sources = searchResults.documents.slice(0, 5).map((doc, idx) => ({
-        pdfName: searchResults.metadatas[idx].fileName,
-        pageNo: searchResults.metadatas[idx].page || 1,
-        snippet: doc.substring(0, 100),
-      }));
+      // 6. Build sources from search results - TOP 3 MOST RELEVANT (reversed order)
+      // Sort by distance (lower = more relevant) and limit to 3, then reverse
+      const sourcesWithScores = searchResults.documents
+        .map((doc, idx) => ({
+          pdfName: searchResults.metadatas[idx].fileName,
+          pageNo: searchResults.metadatas[idx].page || 1,
+          snippet: doc.substring(0, 100),
+          distance: searchResults.distances[idx],
+          score: (1 - searchResults.distances[idx]).toFixed(2),
+        }))
+        .sort((a, b) => a.distance - b.distance) // Sort by relevance (lower distance = more relevant)
+        .slice(0, 3) // Limit to top 3
+        .reverse(); // Reverse so most relevant is last
+
+      let sources = sourcesWithScores.map(({ distance, ...rest }) => rest);
+
+      console.log(
+        `📖 Top 3 Matched Pages (reversed): ${sources
+          .map(
+            (s, i) =>
+              `[${i + 1}] ${s.pdfName} Page ${s.pageNo} (${Math.round(
+                parseFloat(s.score) * 100
+              )}% match)`
+          )
+          .join(", ")}`
+      );
 
       // 7. Intelligent source filtering: Remove sources if answer indicates "not found in document"
       if (this.isNotFoundInDocument(result.answer)) {
-        console.log(`⚠️  Answer indicates information not in document - removing sources`);
+        console.log(
+          `⚠️  Answer indicates information not in document - removing sources`
+        );
         sources = [];
       }
 
@@ -334,13 +402,17 @@ Language: ${languageName}`;
         sources,
         strategy: result.strategy,
       };
-
     } catch (error: any) {
-      console.error('❌ Complex query handler error:', error.message);
-      
+      console.error("❌ Complex query handler error:", error.message);
+
       // Graceful fallback to Layer 2 (ChromaDB RAG)
-      console.log('🔄 Falling back to Layer 2 (ChromaDB RAG)...');
-      return await this.handleDocumentQuery(query, language, chatHistory, chromaCollectionName);
+      console.log("🔄 Falling back to Layer 2 (ChromaDB RAG)...");
+      return await this.handleDocumentQuery(
+        query,
+        language,
+        chatHistory,
+        chromaCollectionName
+      );
     }
   }
 
@@ -359,7 +431,7 @@ Language: ${languageName}`;
       /first.*then/i,
     ];
 
-    return complexPatterns.some(pattern => pattern.test(query));
+    return complexPatterns.some((pattern) => pattern.test(query));
   }
 
   /**
@@ -381,9 +453,9 @@ Language: ${languageName}`;
 
     let cleaned = answer;
     for (const pattern of intermediatePatterns) {
-      cleaned = cleaned.replace(pattern, '');
+      cleaned = cleaned.replace(pattern, "");
     }
-    
+
     return cleaned.trim();
   }
 
@@ -404,24 +476,26 @@ Language: ${languageName}`;
       /दस्तावेज़ में उल्लेख नहीं/i, // Hindi: not mentioned in document
     ];
 
-    return notFoundPatterns.some(pattern => pattern.test(answer));
+    return notFoundPatterns.some((pattern) => pattern.test(answer));
   }
 
   /**
    * Helper: Combine documents from pagesMap into single string
    */
-  private combineDocuments(pagesMap: Map<string, Array<{ pageNumber: number; content: string }>>): string {
+  private combineDocuments(
+    pagesMap: Map<string, Array<{ pageNumber: number; content: string }>>
+  ): string {
     const allContent: string[] = [];
 
     for (const [fileId, pages] of pagesMap.entries()) {
       const sortedPages = pages.sort((a, b) => a.pageNumber - b.pageNumber);
       const fileContent = sortedPages
-        .map(p => `[Page ${p.pageNumber}]\n${p.content}`)
-        .join('\n\n');
+        .map((p) => `[Page ${p.pageNumber}]\n${p.content}`)
+        .join("\n\n");
       allContent.push(fileContent);
     }
 
-    return allContent.join('\n\n=== DOCUMENT BREAK ===\n\n');
+    return allContent.join("\n\n=== DOCUMENT BREAK ===\n\n");
   }
 
   /**
@@ -431,17 +505,26 @@ Language: ${languageName}`;
     query: string,
     chatHistory: ChatMessage[],
     chromaCollectionName: string
-  ): Promise<{ answer: string; sources: any[]; layer: string; reasoning: string }> {
+  ): Promise<{
+    answer: string;
+    sources: any[];
+    layer: string;
+    reasoning: string;
+  }> {
     // 1. Detect language first
     const detectedLang = languageService.detectLanguage(query);
     const language = detectedLang.languageCode as LanguageCode;
-    
+
     console.log(`🌐 Detected language: ${detectedLang.language} (${language})`);
 
     // 2. Analyze query to decide routing
     const decision = await this.analyzeQuery(query, chatHistory);
-    
-    console.log(`🎯 Routing decision: ${decision.shouldStopAtLayer1 ? 'LAYER1' : 'LAYER2/3'} - ${decision.reason}`);
+
+    console.log(
+      `🎯 Routing decision: ${
+        decision.shouldStopAtLayer1 ? "LAYER1" : "LAYER2/3"
+      } - ${decision.reason}`
+    );
 
     let result: { answer: string; sources: any[] };
     let usedLayer: string;
@@ -449,13 +532,22 @@ Language: ${languageName}`;
     // 3. Route to appropriate layer
     if (decision.shouldStopAtLayer1) {
       // LAYER 1: Simple/fast response
-      const simpleAnswer = await this.handleSimpleQuery(query, language, chatHistory);
+      const simpleAnswer = await this.handleSimpleQuery(
+        query,
+        language,
+        chatHistory
+      );
       result = { answer: simpleAnswer, sources: [] };
-      usedLayer = 'LAYER1-GROQ-FAST';
+      usedLayer = "LAYER1-GROQ-FAST";
     } else {
       // LAYER 2/3: Document search with Gemini
-      result = await this.handleComplexQuery(query, language, chatHistory, chromaCollectionName);
-      usedLayer = 'LAYER3-GEMINI';
+      result = await this.handleComplexQuery(
+        query,
+        language,
+        chatHistory,
+        chromaCollectionName
+      );
+      usedLayer = "LAYER3-GEMINI";
     }
 
     // 4. Clean any intermediate messages (last resort failsafe)

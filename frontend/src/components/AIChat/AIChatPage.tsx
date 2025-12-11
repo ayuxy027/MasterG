@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import ChatInterface from './ChatInterface';
-import SessionSidebar from './SessionSidebar';
-import ResourcesPanel from './ResourcesPanel';
+import React, { useState, useEffect } from "react";
+import ChatInterface from "./ChatInterface";
+import SessionSidebar from "./SessionSidebar";
+import ResourcesPanel from "./ResourcesPanel";
+import ConfirmModal from "../ui/ConfirmModal";
 import {
   getUserId,
   generateSessionId,
   getAllSessions,
   getSessionDetails,
   deleteSession,
+  generateChatName,
   ChatApiError,
-} from '../../services/chatApi';
-import type { MessageUI, SessionListItem } from '../../types/chat';
+} from "../../services/chatApi";
+import type { MessageUI, SessionListItem } from "../../types/chat";
 
-type TabType = 'chat' | 'resources';
+type TabType = "chat" | "resources";
 
 const AIChatPage: React.FC = () => {
   // User & Session Management
@@ -23,11 +25,18 @@ const AIChatPage: React.FC = () => {
 
   // Chat State
   const [messages, setMessages] = useState<MessageUI[]>([]);
-  const [currentMode, setCurrentMode] = useState<'study' | 'plan' | 'ideation'>('study');
-  
+  const [currentMode, setCurrentMode] = useState<"study" | "plan" | "ideation">(
+    "study"
+  );
+
   // UI State
-  const [activeTab, setActiveTab] = useState<TabType>('chat');
+  const [activeTab, setActiveTab] = useState<TabType>("chat");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    sessionId: string | null;
+    sessionName: string;
+  }>({ isOpen: false, sessionId: null, sessionName: "" });
 
   // Load sessions on mount
   useEffect(() => {
@@ -45,11 +54,14 @@ const AIChatPage: React.FC = () => {
     setSessionsLoading(true);
     try {
       const sessionsList = await getAllSessions(userId);
-      setSessions(sessionsList.sort((a, b) => 
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      ));
+      setSessions(
+        sessionsList.sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+      );
     } catch (error) {
-      console.error('Failed to load sessions:', error);
+      console.error("Failed to load sessions:", error);
       if (error instanceof ChatApiError) {
         // Graceful degradation - backend might not have MongoDB
         setSessions([]);
@@ -62,17 +74,19 @@ const AIChatPage: React.FC = () => {
   const loadSessionMessages = async (sessionId: string) => {
     try {
       const sessionDetails = await getSessionDetails(userId, sessionId);
-      const uiMessages: MessageUI[] = sessionDetails.messages.map((msg, idx) => ({
-        id: `${sessionId}-${idx}`,
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp,
-        sources: msg.sources,
-        metadata: msg.metadata,
-      }));
+      const uiMessages: MessageUI[] = sessionDetails.messages.map(
+        (msg, idx) => ({
+          id: `${sessionId}-${idx}`,
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          sources: msg.sources,
+          metadata: msg.metadata,
+        })
+      );
       setMessages(uiMessages);
     } catch (error) {
-      console.error('Failed to load session messages:', error);
+      console.error("Failed to load session messages:", error);
       // Start fresh if session doesn't exist
       setMessages([]);
     }
@@ -82,32 +96,71 @@ const AIChatPage: React.FC = () => {
     const newSessionId = generateSessionId();
     setCurrentSessionId(newSessionId);
     setMessages([]);
-    setActiveTab('chat');
+    setActiveTab("chat");
+    // Trigger immediate session list update
+    setTimeout(() => loadSessions(), 100);
   };
 
   const handleSessionSelect = (sessionId: string) => {
     setCurrentSessionId(sessionId);
-    setActiveTab('chat');
+    setActiveTab("chat");
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
+  const handleDeleteClick = (sessionId: string, sessionName: string) => {
+    setConfirmModal({ isOpen: true, sessionId, sessionName });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmModal.sessionId) return;
+
     try {
-      await deleteSession(userId, sessionId);
-      setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
-      
+      await deleteSession(userId, confirmModal.sessionId);
+      setSessions((prev) =>
+        prev.filter((s) => s.sessionId !== confirmModal.sessionId)
+      );
+
       // If deleted session was active, create new session
-      if (currentSessionId === sessionId) {
+      if (currentSessionId === confirmModal.sessionId) {
         handleNewSession();
       }
     } catch (error) {
-      console.error('Failed to delete session:', error);
-      alert('Failed to delete session. Please try again.');
+      console.error("Failed to delete session:", error);
     }
   };
 
-  const handleSessionUpdate = () => {
+  const handleRenameSession = (sessionId: string, newName: string) => {
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.sessionId === sessionId ? { ...s, chatName: newName } : s
+      )
+    );
+  };
+
+  const handleSessionUpdate = async () => {
     // Reload sessions to get updated message counts
-    loadSessions();
+    await loadSessions();
+
+    // Generate chat name if this is a new session with first message
+    const currentSession = sessions.find(
+      (s) => s.sessionId === currentSessionId
+    );
+    if (
+      currentSession &&
+      !currentSession.chatName &&
+      messages.length === 1 &&
+      messages[0].role === "user"
+    ) {
+      try {
+        const chatName = await generateChatName(messages[0].content);
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.sessionId === currentSessionId ? { ...s, chatName } : s
+          )
+        );
+      } catch (error) {
+        console.error("Failed to generate chat name:", error);
+      }
+    }
   };
 
   // Initialize with a new session if no sessions exist
@@ -135,21 +188,21 @@ const AIChatPage: React.FC = () => {
             {/* Tabs */}
             <div className="flex gap-2 bg-white/80 backdrop-blur-md rounded-lg p-1 border-2 border-orange-100">
               <button
-                onClick={() => setActiveTab('chat')}
+                onClick={() => setActiveTab("chat")}
                 className={`px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                  activeTab === 'chat'
-                    ? 'bg-orange-400 text-white shadow-md'
-                    : 'text-gray-600 hover:bg-orange-50'
+                  activeTab === "chat"
+                    ? "bg-orange-400 text-white shadow-md"
+                    : "text-gray-600 hover:bg-orange-50"
                 }`}
               >
                 Chat
               </button>
               <button
-                onClick={() => setActiveTab('resources')}
+                onClick={() => setActiveTab("resources")}
                 className={`px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                  activeTab === 'resources'
-                    ? 'bg-orange-400 text-white shadow-md'
-                    : 'text-gray-600 hover:bg-orange-50'
+                  activeTab === "resources"
+                    ? "bg-orange-400 text-white shadow-md"
+                    : "text-gray-600 hover:bg-orange-50"
                 }`}
               >
                 Resources
@@ -167,7 +220,8 @@ const AIChatPage: React.FC = () => {
               currentSessionId={currentSessionId}
               onSessionSelect={handleSessionSelect}
               onNewSession={handleNewSession}
-              onDeleteSession={handleDeleteSession}
+              onDeleteSession={handleDeleteClick}
+              onRenameSession={handleRenameSession}
               isLoading={sessionsLoading}
             />
           )}
@@ -176,21 +230,28 @@ const AIChatPage: React.FC = () => {
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="w-6 bg-white/80 hover:bg-orange-50 border-r-2 border-orange-100 flex items-center justify-center transition-colors"
-            title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
           >
             <svg
-              className={`w-4 h-4 text-gray-600 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`}
+              className={`w-4 h-4 text-gray-600 transition-transform ${
+                sidebarCollapsed ? "rotate-180" : ""
+              }`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
 
           {/* Main Content */}
           <div className="flex-1 overflow-hidden">
-            {activeTab === 'chat' && currentSessionId ? (
+            {activeTab === "chat" && currentSessionId ? (
               <ChatInterface
                 userId={userId}
                 sessionId={currentSessionId}
@@ -200,16 +261,23 @@ const AIChatPage: React.FC = () => {
                 setMessages={setMessages}
                 onSessionUpdate={handleSessionUpdate}
               />
-            ) : activeTab === 'resources' && currentSessionId ? (
-              <ResourcesPanel
-                userId={userId}
-                sessionId={currentSessionId}
-              />
+            ) : activeTab === "resources" && currentSessionId ? (
+              <ResourcesPanel userId={userId} sessionId={currentSessionId} />
             ) : (
               <div className="h-full flex items-center justify-center text-gray-500">
                 <div className="text-center">
-                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <svg
+                    className="w-16 h-16 mx-auto mb-4 text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
                   </svg>
                   <p>No active session</p>
                   <button
@@ -224,6 +292,20 @@ const AIChatPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal - Main Screen */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() =>
+          setConfirmModal({ isOpen: false, sessionId: null, sessionName: "" })
+        }
+        onConfirm={handleConfirmDelete}
+        title="Delete Chat Session?"
+        message={`Are you sure you want to delete "${confirmModal.sessionName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

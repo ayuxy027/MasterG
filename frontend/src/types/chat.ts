@@ -4,10 +4,11 @@ export interface SourceCitation {
   pdfName: string;
   pageNo: number;
   snippet: string;
+  score?: string; // Relevance score (0-1)
 }
 
 export interface QueryMetadata {
-  layer: 'LAYER1-GROQ-FAST' | 'LAYER3-GEMINI';
+  layer: "LAYER1-GROQ-FAST" | "LAYER3-GEMINI";
   reasoning: string;
   responseTimeMs: number;
   messageCount: number;
@@ -21,7 +22,7 @@ export interface QueryResponse {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
   sources?: SourceCitation[];
@@ -39,6 +40,7 @@ export interface ChatSession {
 
 export interface SessionListItem {
   sessionId: string;
+  chatName?: string; // AI-generated chat name
   messageCount: number;
   lastMessage: string;
   createdAt: Date;
@@ -86,7 +88,7 @@ export interface FileListItem {
 // UI-specific types
 export interface MessageUI {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: Date;
   sources?: SourceCitation[];
@@ -98,6 +100,6 @@ export interface UploadProgress {
   fileId: string;
   fileName: string;
   progress: number; // 0-100
-  status: 'uploading' | 'processing' | 'completed' | 'error';
+  status: "uploading" | "processing" | "completed" | "error";
   error?: string;
 }

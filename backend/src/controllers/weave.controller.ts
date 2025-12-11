@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
-import { weaveService } from '../services/weave.service';
-import { PresentationRequest, PresentationResponse } from '../types';
+import { Request, Response } from "express";
+import { weaveService } from "../services/weave.service";
+import { pptxService } from "../services/pptx.service";
+import { PresentationRequest, PresentationResponse } from "../types";
 
 export class WeaveController {
   /**
@@ -10,19 +11,19 @@ export class WeaveController {
     try {
       const {
         topic,
-        language = 'en',
-        presentationStyle = 'academic',
-        targetAudience = 'school',
-        template = 'modern',
+        language = "en",
+        presentationStyle = "academic",
+        targetAudience = "school",
+        template = "modern",
         numSlides = 5,
         customCriteria = [],
       } = req.body;
 
       // Validate required fields
-      if (!topic || typeof topic !== 'string' || topic.trim().length === 0) {
+      if (!topic || typeof topic !== "string" || topic.trim().length === 0) {
         res.status(400).json({
           success: false,
-          error: 'Topic is required and must be a non-empty string',
+          error: "Topic is required and must be a non-empty string",
         });
         return;
       }
@@ -31,7 +32,7 @@ export class WeaveController {
       if (numSlides < 3 || numSlides > 20) {
         res.status(400).json({
           success: false,
-          error: 'Number of slides must be between 3 and 20',
+          error: "Number of slides must be between 3 and 20",
         });
         return;
       }
@@ -46,17 +47,22 @@ export class WeaveController {
         customCriteria,
       };
 
-      const result = await weaveService.generatePresentation(presentationRequest);
+      const result = await weaveService.generatePresentation(
+        presentationRequest
+      );
 
       res.status(200).json({
         success: true,
         data: result,
       });
     } catch (error) {
-      console.error('Error generating presentation:', error);
+      console.error("Error generating presentation:", error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate presentation',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate presentation",
       });
     }
   }
@@ -71,7 +77,7 @@ export class WeaveController {
       if (!id) {
         res.status(400).json({
           success: false,
-          error: 'Presentation ID is required',
+          error: "Presentation ID is required",
         });
         return;
       }
@@ -81,7 +87,7 @@ export class WeaveController {
       if (!presentation) {
         res.status(404).json({
           success: false,
-          error: 'Presentation not found',
+          error: "Presentation not found",
         });
         return;
       }
@@ -91,10 +97,13 @@ export class WeaveController {
         data: presentation,
       });
     } catch (error) {
-      console.error('Error getting presentation:', error);
+      console.error("Error getting presentation:", error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to retrieve presentation',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to retrieve presentation",
       });
     }
   }
@@ -109,7 +118,7 @@ export class WeaveController {
       if (!presentation) {
         res.status(400).json({
           success: false,
-          error: 'Presentation data is required',
+          error: "Presentation data is required",
         });
         return;
       }
@@ -117,22 +126,79 @@ export class WeaveController {
       if (!userId) {
         res.status(400).json({
           success: false,
-          error: 'User ID is required',
+          error: "User ID is required",
         });
         return;
       }
 
-      const savedPresentation = await weaveService.savePresentation(presentation, userId);
+      const savedPresentation = await weaveService.savePresentation(
+        presentation,
+        userId
+      );
 
       res.status(200).json({
         success: true,
         data: savedPresentation,
       });
     } catch (error) {
-      console.error('Error saving presentation:', error);
+      console.error("Error saving presentation:", error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to save presentation',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to save presentation",
+      });
+    }
+  }
+
+  /**
+   * Export presentation as PPTX directly from request data (no DB storage needed)
+   */
+  async exportPptxDirect(req: Request, res: Response): Promise<void> {
+    try {
+      const presentationData = req.body as PresentationResponse;
+
+      if (!presentationData || !presentationData.slides) {
+        res.status(400).json({
+          success: false,
+          error: "Presentation data is required",
+        });
+        return;
+      }
+
+      console.log(`📥 Generating PPTX for: ${presentationData.title}`);
+
+      // Generate PPTX buffer
+      const pptxBuffer = await pptxService.generatePptxFromData(
+        presentationData
+      );
+
+      // Set headers for download
+      const filename = `${presentationData.title
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase()}_presentation.pptx`;
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
+      res.setHeader("Content-Length", pptxBuffer.length);
+
+      // Send the buffer
+      res.send(pptxBuffer);
+      console.log(
+        `✅ PPTX download sent: ${filename} (${pptxBuffer.length} bytes)`
+      );
+    } catch (error) {
+      console.error("Error generating PPTX:", error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to generate PPTX",
       });
     }
   }
@@ -147,46 +213,64 @@ export class WeaveController {
       if (!id) {
         res.status(400).json({
           success: false,
-          error: 'Presentation ID is required',
+          error: "Presentation ID is required",
         });
         return;
       }
 
       const lowerCaseFormat = format.toLowerCase();
-      if (!format || !['pdf', 'pptx', 'json'].includes(lowerCaseFormat)) {
+      if (!format || !["pdf", "pptx", "json"].includes(lowerCaseFormat)) {
         res.status(400).json({
           success: false,
-          error: 'Export format must be one of: pdf, pptx, json',
+          error: "Export format must be one of: pdf, pptx, json",
         });
         return;
       }
 
-      const exportData = await weaveService.exportPresentation(id, lowerCaseFormat as 'pdf' | 'pptx' | 'json');
+      const exportData = await weaveService.exportPresentation(
+        id,
+        lowerCaseFormat as "pdf" | "pptx" | "json"
+      );
 
       // Set appropriate content type based on format
       switch (format.toLowerCase()) {
-        case 'pdf':
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename=presentation-${id}.pdf`);
+        case "pdf":
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=presentation-${id}.pdf`
+          );
           break;
-        case 'pptx':
-          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-          res.setHeader('Content-Disposition', `attachment; filename=presentation-${id}.pptx`);
+        case "pptx":
+          res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          );
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=presentation-${id}.pptx`
+          );
           break;
-        case 'json':
-          res.setHeader('Content-Type', 'application/json');
-          res.setHeader('Content-Disposition', `attachment; filename=presentation-${id}.json`);
+        case "json":
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=presentation-${id}.json`
+          );
           break;
         default:
-          res.setHeader('Content-Type', 'application/json');
+          res.setHeader("Content-Type", "application/json");
       }
 
       res.send(exportData);
     } catch (error) {
-      console.error('Error exporting presentation:', error);
+      console.error("Error exporting presentation:", error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to export presentation',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to export presentation",
       });
     }
   }

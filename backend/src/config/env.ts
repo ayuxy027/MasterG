@@ -1,52 +1,51 @@
-import dotenv from "dotenv"
-import path from "path"
+import dotenv from "dotenv";
+import path from "path";
 
 // Load environment variables
-dotenv.config()
+dotenv.config();
 
 interface EnvConfig {
   // Server
-  PORT: number
-  NODE_ENV: string
+  PORT: number;
+  NODE_ENV: string;
 
   // API Keys
-  GEMINI_API_KEY: string
-  GEMMA_API_KEY: string
-  GROQ_API_KEY: string
+  GEMMA_API_KEY: string;
+  GROQ_API_KEY: string;
 
-  // Google Cloud
-  GOOGLE_PROJECT_ID: string
-  GOOGLE_LOCATION_ID: string
+  // Google Cloud (optional - for poster feature)
+  GOOGLE_PROJECT_ID?: string;
+  GOOGLE_LOCATION_ID?: string;
 
   // Groq Configuration
-  GROQ_MODEL: string
+  GROQ_MODEL: string;
 
   // ChromaDB
-  CHROMA_URL: string
-  CHROMA_COLLECTION_NAME: string
+  CHROMA_URL: string;
+  CHROMA_COLLECTION_NAME: string;
 
   // MongoDB
-  MONGODB_URI?: string
+  MONGODB_URI?: string;
 
   // File Storage
-  UPLOAD_DIR: string
-  MAX_FILE_SIZE: number
+  UPLOAD_DIR: string;
+  MAX_FILE_SIZE: number;
 
   // Chunking
-  CHUNK_SIZE: number
-  CHUNK_OVERLAP: number
+  CHUNK_SIZE: number;
+  CHUNK_OVERLAP: number;
 
   // Query Optimization
-  ENABLE_QUERY_OPTIMIZATION: boolean
+  ENABLE_QUERY_OPTIMIZATION: boolean;
 }
 
 const getEnvVariable = (key: string, defaultValue?: string): string => {
-  const value = process.env[key] || defaultValue
+  const value = process.env[key] || defaultValue;
   if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`)
+    throw new Error(`Missing required environment variable: ${key}`);
   }
-  return value
-}
+  return value;
+};
 
 export const env: EnvConfig = {
   // Server
@@ -54,13 +53,12 @@ export const env: EnvConfig = {
   NODE_ENV: getEnvVariable("NODE_ENV", "development"),
 
   // API Keys
-  GEMINI_API_KEY: getEnvVariable("GEMINI_API_KEY"),
   GEMMA_API_KEY: getEnvVariable("GEMMA_API_KEY"),
   GROQ_API_KEY: getEnvVariable("GROQ_API_KEY"),
 
-  // Google Cloud
-  GOOGLE_PROJECT_ID: getEnvVariable("GOOGLE_PROJECT_ID", "temp-472006"),
-  GOOGLE_LOCATION_ID: getEnvVariable("GOOGLE_LOCATION_ID", "us-central1"),
+  // Google Cloud (optional - for poster feature)
+  GOOGLE_PROJECT_ID: process.env.GOOGLE_PROJECT_ID,
+  GOOGLE_LOCATION_ID: process.env.GOOGLE_LOCATION_ID,
 
   // Groq Configuration
   GROQ_MODEL: getEnvVariable("GROQ_MODEL", "llama-3.3-70b-versatile"),
@@ -83,6 +81,6 @@ export const env: EnvConfig = {
   // Query Optimization
   ENABLE_QUERY_OPTIMIZATION:
     getEnvVariable("ENABLE_QUERY_OPTIMIZATION", "true") === "true",
-}
+};
 
-export default env
+export default env;

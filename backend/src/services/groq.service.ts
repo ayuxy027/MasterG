@@ -1,12 +1,12 @@
-import axios from 'axios';
-import { SUPPORTED_LANGUAGES, LanguageCode } from '../config/constants';
-import { ChatMessage, SourceCitation } from '../types';
-import env from '../config/env';
+import axios from "axios";
+import { SUPPORTED_LANGUAGES, LanguageCode } from "../config/constants";
+import { ChatMessage, SourceCitation } from "../types";
+import env from "../config/env";
 
 export class GroqService {
   private apiKey: string;
   private model: string;
-  private apiUrl: string = 'https://api.groq.com/openai/v1/chat/completions';
+  private apiUrl: string = "https://api.groq.com/openai/v1/chat/completions";
 
   constructor() {
     this.apiKey = env.GROQ_API_KEY;
@@ -29,19 +29,36 @@ export class GroqService {
     const hasDocuments = documentContext && documentContext.trim().length > 0;
 
     // Format chat history (last 10 messages for context)
-    const chatContextString = chatHistory.length > 0
-      ? chatHistory.slice(-10).map(msg => {
-          const role = msg.role === 'user' ? 'Student' : 'You';
-          return `${role}: ${msg.content}`;
-        }).join('\n')
-      : '';
+    // Include sources from previous messages to understand references like "that chapter" or "upas chapter"
+    const chatContextString =
+      chatHistory.length > 0
+        ? chatHistory
+            .slice(-10)
+            .map((msg) => {
+              const role = msg.role === "user" ? "Student" : "You";
+              let msgContent = `${role}: ${msg.content}`;
+              // Add source context if available (to help understand document references)
+              if (msg.sources && msg.sources.length > 0) {
+                const sourceInfo = msg.sources
+                  .map((s) => `${s.pdfName} (Page ${s.pageNo})`)
+                  .join(", ");
+                msgContent += `\n  [Referenced: ${sourceInfo}]`;
+              }
+              return msgContent;
+            })
+            .join("\n")
+        : "";
 
     // Format source citations with page references
-    const sourcesString = sources.length > 0
-      ? sources.map((s, idx) => 
-          `[Source ${idx + 1}] "${s.pdfName}" - Page ${s.pageNo}`
-        ).join('\n')
-      : '';
+    const sourcesString =
+      sources.length > 0
+        ? sources
+            .map(
+              (s, idx) =>
+                `[Source ${idx + 1}] "${s.pdfName}" - Page ${s.pageNo}`
+            )
+            .join("\n")
+        : "";
 
     // Build prompt based on whether we have document context
     if (hasDocuments) {
@@ -54,28 +71,46 @@ ${documentContext}
 SOURCES:
 ${sourcesString}
 
-${chatContextString ? `Previous conversation:\n${chatContextString}\n` : ''}
+${
+  chatContextString
+    ? `CONVERSATION HISTORY (use this to understand context and references):
+${chatContextString}
 
-Question: ${question}
+`
+    : ""
+}Current Question: ${question}
 
-DO NOT say: "Let me search", "Let me analyze", "I'm looking", "Searching the document"
-DO: Start IMMEDIATELY with the answer in ${languageName}
-
-Cite sources like: "According to ${sources[0]?.pdfName || 'the document'}, Page X..."
+CRITICAL INSTRUCTIONS:
+- Use the conversation history to understand context (e.g., "that chapter", "upas chapter", "solve exercise")
+- If the student refers to something from previous messages, use that context
+- DO NOT say: "Let me search", "Let me analyze", "I'm looking", "Searching the document"
+- DO: Start IMMEDIATELY with the answer in ${languageName}
+- Cite sources like: "According to ${
+        sources[0]?.pdfName || "the document"
+      }, Page X..."
 
 Start your answer NOW in ${languageName}:`;
     } else {
       // No PDF chunks - provide general educational answer or decline
       return `You are an educational assistant. The student has asked a question but no relevant documents were found.
 
-${chatContextString ? `Previous conversation:\n${chatContextString}\n` : ''}
+${
+  chatContextString
+    ? `CONVERSATION HISTORY:
+${chatContextString}
 
-Question: ${question}
+`
+    : ""
+}Current Question: ${question}
 
-DO NOT say: "Let me", "Searching", "Looking", "Analyzing"
-DO: Answer immediately in ${languageName}
+CRITICAL INSTRUCTIONS:
+- Check the conversation history - the student might be referring to something discussed earlier
+- If they're asking about a specific chapter/exercise mentioned before, acknowledge it
+- DO NOT say: "Let me", "Searching", "Looking", "Analyzing"
+- DO: Answer immediately in ${languageName}
 
 If educational: Provide answer + note "This is general knowledge as it's not in your documents."
+If referring to previous content: Explain you need them to upload the relevant document
 If NOT educational: Politely decline
 
 Answer NOW in ${languageName}:`;
@@ -110,11 +145,12 @@ Answer NOW in ${languageName}:`;
           model: this.model,
           messages: [
             {
-              role: 'system',
-              content: 'You are an expert educational tutor specializing in helping students understand academic materials. You explain concepts clearly, provide examples, and ensure deep comprehension.'
+              role: "system",
+              content:
+                "You are an expert educational tutor specializing in helping students understand academic materials. You explain concepts clearly, provide examples, and ensure deep comprehension.",
             },
             {
-              role: 'user',
+              role: "user",
               content: prompt,
             },
           ],
@@ -124,8 +160,8 @@ Answer NOW in ${languageName}:`;
         },
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
           },
         }
       );
@@ -133,7 +169,7 @@ Answer NOW in ${languageName}:`;
       const answer = response.data.choices[0]?.message?.content;
 
       if (!answer) {
-        throw new Error('No response from Groq API');
+        throw new Error("No response from Groq API");
       }
 
       return {
@@ -142,12 +178,13 @@ Answer NOW in ${languageName}:`;
       };
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.error?.message || error.message;
-        console.error('Groq API error:', errorMessage);
+        const errorMessage =
+          error.response?.data?.error?.message || error.message;
+        console.error("Groq API error:", errorMessage);
         throw new Error(`Groq query failed: ${errorMessage}`);
       }
-      console.error('Groq API error:', error.message || error);
-      throw new Error(`Groq query failed: ${error.message || 'Unknown error'}`);
+      console.error("Groq API error:", error.message || error);
+      throw new Error(`Groq query failed: ${error.message || "Unknown error"}`);
     }
   }
 
@@ -156,7 +193,7 @@ Answer NOW in ${languageName}:`;
    */
   async chatCompletion(
     messages: Array<{ role: string; content: string }>,
-    responseFormat?: 'json_object' | 'text'
+    responseFormat?: "json_object" | "text"
   ): Promise<string> {
     try {
       const requestBody: any = {
@@ -166,35 +203,34 @@ Answer NOW in ${languageName}:`;
         max_tokens: 1000,
       };
 
-      if (responseFormat === 'json_object') {
-        requestBody.response_format = { type: 'json_object' };
+      if (responseFormat === "json_object") {
+        requestBody.response_format = { type: "json_object" };
       }
 
-      const response = await axios.post(
-        this.apiUrl,
-        requestBody,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await axios.post(this.apiUrl, requestBody, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       const answer = response.data.choices[0]?.message?.content;
 
       if (!answer) {
-        throw new Error('No response from Groq API');
+        throw new Error("No response from Groq API");
       }
 
       return answer.trim();
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.error?.message || error.message;
-        console.error('Groq API error:', errorMessage);
+        const errorMessage =
+          error.response?.data?.error?.message || error.message;
+        console.error("Groq API error:", errorMessage);
         throw new Error(`Groq chat completion failed: ${errorMessage}`);
       }
-      throw new Error(`Groq chat completion failed: ${error.message || 'Unknown error'}`);
+      throw new Error(
+        `Groq chat completion failed: ${error.message || "Unknown error"}`
+      );
     }
   }
 
@@ -208,7 +244,13 @@ Answer NOW in ${languageName}:`;
     language: LanguageCode,
     sources: SourceCitation[]
   ): Promise<{ answer: string; reasoning?: string }> {
-    return this.generateEducationalAnswer(documentContext, chatHistory, question, language, sources);
+    return this.generateEducationalAnswer(
+      documentContext,
+      chatHistory,
+      question,
+      language,
+      sources
+    );
   }
 
   /**
@@ -260,39 +302,40 @@ Keywords:`;
       const response = await axios.post(
         this.apiUrl,
         {
-          model: 'llama-3.1-8b-instant', // Fast, lightweight model for extraction
-          messages: [
-            { role: 'user', content: prompt }
-          ],
+          model: "llama-3.1-8b-instant", // Fast, lightweight model for extraction
+          messages: [{ role: "user", content: prompt }],
           temperature: 0.1, // Low temperature for consistent extraction
           max_tokens: 50, // Short response
         },
         {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           timeout: 10000, // 10 second timeout
         }
       );
 
-      const extractedText = response.data.choices[0]?.message?.content?.trim() || 'NONE';
-      
-      if (extractedText === 'NONE' || extractedText.toLowerCase() === 'none') {
+      const extractedText =
+        response.data.choices[0]?.message?.content?.trim() || "NONE";
+
+      if (extractedText === "NONE" || extractedText.toLowerCase() === "none") {
         return [];
       }
 
       // Split by comma and clean
       const keywords = extractedText
-        .split(',')
-        .map(k => k.trim().toLowerCase())
-        .filter(k => k.length > 0);
+        .split(",")
+        .map((k) => k.trim().toLowerCase())
+        .filter((k) => k.length > 0);
 
-      console.log(`🤖 LLM extracted keywords: [${keywords.join(', ')}]`);
+      console.log(`🤖 LLM extracted keywords: [${keywords.join(", ")}]`);
       return keywords;
-
     } catch (error: any) {
-      console.error('⚠️ LLM keyword extraction failed:', error.response?.data || error.message);
+      console.error(
+        "⚠️ LLM keyword extraction failed:",
+        error.response?.data || error.message
+      );
       return []; // Return empty on failure, don't break the flow
     }
   }

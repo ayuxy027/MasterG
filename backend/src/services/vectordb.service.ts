@@ -1,6 +1,6 @@
-import { ChromaClient, Collection } from 'chromadb';
-import { Chunk, ChunkMetadata } from '../types';
-import env from '../config/env';
+import { ChromaClient, Collection } from "chromadb";
+import { Chunk, ChunkMetadata } from "../types";
+import env from "../config/env";
 
 export class VectorDBService {
   private client: ChromaClient;
@@ -8,6 +8,13 @@ export class VectorDBService {
 
   constructor() {
     this.client = new ChromaClient({ path: env.CHROMA_URL });
+  }
+
+  /**
+   * Get ChromaDB collection (public for advanced queries)
+   */
+  async getCollection(collectionName?: string): Promise<Collection> {
+    return this.initCollection(collectionName);
   }
 
   /**
@@ -25,10 +32,10 @@ export class VectorDBService {
       // Create or get collection
       const collection = await this.client.getOrCreateCollection({
         name,
-        metadata: { 
-          description: collectionName 
-            ? `Chat-specific collection: ${collectionName}` 
-            : 'Educational notes and documents' 
+        metadata: {
+          description: collectionName
+            ? `Chat-specific collection: ${collectionName}`
+            : "Educational notes and documents",
         },
       });
 
@@ -38,36 +45,69 @@ export class VectorDBService {
 
       return collection;
     } catch (error) {
-      console.error('Collection initialization error:', error);
-      throw new Error('Failed to initialize vector database collection');
+      console.error("Collection initialization error:", error);
+      throw new Error("Failed to initialize vector database collection");
     }
   }
 
   /**
    * Store chunks with embeddings in specific collection
-   * Note: fullDocumentContent is excluded to avoid payload size issues
+   * Chunks are grouped by PDF for better organization
    */
-  async storeChunks(chunks: Chunk[], embeddings: number[][], collectionName?: string): Promise<void> {
+  async storeChunks(
+    chunks: Chunk[],
+    embeddings: number[][],
+    collectionName?: string
+  ): Promise<void> {
     try {
       const collection = await this.initCollection(collectionName);
 
-      // Filter out fullDocumentContent from metadata to reduce payload size
-      const cleanedMetadatas = chunks.map((chunk) => {
-        const { fullDocumentContent, ...cleanMetadata } = chunk.metadata;
-        return cleanMetadata as any;
-      });
+      // Group chunks by fileId (PDF)
+      const chunksByPdf = chunks.reduce((acc, chunk, index) => {
+        const fileId = chunk.metadata.fileId;
+        if (!acc[fileId]) {
+          acc[fileId] = {
+            chunks: [],
+            embeddings: [],
+            fileName: chunk.metadata.fileName,
+          };
+        }
+        acc[fileId].chunks.push(chunk);
+        acc[fileId].embeddings.push(embeddings[index]);
+        return acc;
+      }, {} as Record<string, { chunks: Chunk[]; embeddings: number[][]; fileName: string }>);
 
-      await collection.add({
-        ids: chunks.map((chunk) => chunk.id),
-        embeddings: embeddings,
-        metadatas: cleanedMetadatas,
-        documents: chunks.map((chunk) => chunk.content),
-      });
+      // Store each PDF group separately
+      for (const [fileId, data] of Object.entries(chunksByPdf)) {
+        const cleanedMetadatas = data.chunks.map((chunk) => {
+          const { fullDocumentContent, ...cleanMetadata } = chunk.metadata;
+          return {
+            ...cleanMetadata,
+            pdfGroup: fileId, // Add PDF grouping identifier
+            totalChunksInPdf: data.chunks.length,
+          } as any;
+        });
 
-      console.log(`✅ Stored ${chunks.length} chunks in collection "${collection.name}"`);
+        await collection.add({
+          ids: data.chunks.map((chunk) => chunk.id),
+          embeddings: data.embeddings,
+          metadatas: cleanedMetadatas,
+          documents: data.chunks.map((chunk) => chunk.content),
+        });
+
+        console.log(
+          `✅ Stored ${data.chunks.length} chunks for PDF "${data.fileName}" (${fileId}) in collection "${collection.name}"`
+        );
+      }
+
+      console.log(
+        `📦 Total: ${chunks.length} chunks from ${
+          Object.keys(chunksByPdf).length
+        } PDF(s)`
+      );
     } catch (error) {
-      console.error('Vector store error:', error);
-      throw new Error('Failed to store chunks in vector database');
+      console.error("Vector store error:", error);
+      throw new Error("Failed to store chunks in vector database");
     }
   }
 
@@ -78,7 +118,11 @@ export class VectorDBService {
     queryEmbedding: number[],
     topK: number = 3,
     collectionName?: string
-  ): Promise<{ documents: string[]; metadatas: ChunkMetadata[]; distances: number[] }> {
+  ): Promise<{
+    documents: string[];
+    metadatas: ChunkMetadata[];
+    distances: number[];
+  }> {
     try {
       const collection = await this.initCollection(collectionName);
 
@@ -88,7 +132,7 @@ export class VectorDBService {
       });
 
       if (!results.documents || !results.metadatas || !results.distances) {
-        throw new Error('Invalid query results');
+        throw new Error("Invalid query results");
       }
 
       return {
@@ -97,8 +141,8 @@ export class VectorDBService {
         distances: results.distances[0] || [],
       };
     } catch (error) {
-      console.error('Vector query error:', error);
-      throw new Error('Failed to query vector database');
+      console.error("Vector query error:", error);
+      throw new Error("Failed to query vector database");
     }
   }
 
@@ -119,10 +163,7 @@ export class VectorDBService {
       if (fileName && pageNo !== undefined) {
         // Both fileName and pageNo
         whereFilter = {
-          $and: [
-            { fileName: { $eq: fileName } },
-            { page: { $eq: pageNo } }
-          ]
+          $and: [{ fileName: { $eq: fileName } }, { page: { $eq: pageNo } }],
         };
       } else if (fileName) {
         // Only fileName
@@ -147,8 +188,35 @@ export class VectorDBService {
         metadatas: (results.metadatas as ChunkMetadata[]) || [],
       };
     } catch (error) {
-      console.error('Query by metadata error:', error);
-      throw new Error('Failed to query by metadata');
+      console.error("Query by metadata error:", error);
+      throw new Error("Failed to query by metadata");
+    }
+  }
+
+  /**
+   * Get chunks grouped by PDF
+   */
+  async getChunksByPdfGroup(
+    fileId: string,
+    collectionName?: string
+  ): Promise<{
+    chunks: any[];
+    metadata: any[];
+  }> {
+    try {
+      const collection = await this.initCollection(collectionName);
+
+      const results = await collection.get({
+        where: { pdfGroup: { $eq: fileId } },
+      });
+
+      return {
+        chunks: results.documents || [],
+        metadata: results.metadatas || [],
+      };
+    } catch (error) {
+      console.error("Get chunks by PDF group error:", error);
+      return { chunks: [], metadata: [] };
     }
   }
 
@@ -158,7 +226,7 @@ export class VectorDBService {
   async deleteByFileId(fileId: string): Promise<void> {
     try {
       const collection = await this.initCollection();
-      
+
       // Query all documents with the fileId
       const results = await collection.get({
         where: { fileId: fileId },
@@ -171,8 +239,8 @@ export class VectorDBService {
         console.log(`Deleted ${results.ids.length} chunks for file ${fileId}`);
       }
     } catch (error) {
-      console.error('Delete chunks error:', error);
-      throw new Error('Failed to delete chunks from vector database');
+      console.error("Delete chunks error:", error);
+      throw new Error("Failed to delete chunks from vector database");
     }
   }
 
@@ -185,15 +253,19 @@ export class VectorDBService {
       const count = await collection.count();
       return { count };
     } catch (error) {
-      console.error('Get stats error:', error);
-      throw new Error('Failed to get collection stats');
+      console.error("Get stats error:", error);
+      throw new Error("Failed to get collection stats");
     }
   }
 
   /**
    * Get all documents with pagination
    */
-  async getAllDocuments(limit: number = 50, offset: number = 0, collectionName?: string): Promise<{
+  async getAllDocuments(
+    limit: number = 50,
+    offset: number = 0,
+    collectionName?: string
+  ): Promise<{
     documents: any[];
     metadatas: ChunkMetadata[];
     ids: string[];
@@ -211,20 +283,24 @@ export class VectorDBService {
 
       return {
         documents: results.documents?.slice(startIndex, endIndex) || [],
-        metadatas: (results.metadatas?.slice(startIndex, endIndex) as ChunkMetadata[]) || [],
+        metadatas:
+          (results.metadatas?.slice(startIndex, endIndex) as ChunkMetadata[]) ||
+          [],
         ids: results.ids?.slice(startIndex, endIndex) || [],
         total,
       };
     } catch (error) {
-      console.error('Get all documents error:', error);
-      throw new Error('Failed to get all documents');
+      console.error("Get all documents error:", error);
+      throw new Error("Failed to get all documents");
     }
   }
 
   /**
    * Get unique files in the collection
    */
-  async getUniqueFiles(collectionName?: string): Promise<{ fileName: string; fileId: string; count: number }[]> {
+  async getUniqueFiles(
+    collectionName?: string
+  ): Promise<{ fileName: string; fileId: string; count: number }[]> {
     try {
       const collection = await this.initCollection(collectionName);
       const results = await collection.get({});
@@ -242,7 +318,7 @@ export class VectorDBService {
             fileMap.get(metadata.fileId)!.count++;
           } else {
             fileMap.set(metadata.fileId, {
-              fileName: metadata.fileName || 'Unknown',
+              fileName: metadata.fileName || "Unknown",
               count: 1,
             });
           }
@@ -255,22 +331,25 @@ export class VectorDBService {
         count: data.count,
       }));
     } catch (error) {
-      console.error('Get unique files error:', error);
-      throw new Error('Failed to get unique files');
+      console.error("Get unique files error:", error);
+      throw new Error("Failed to get unique files");
     }
   }
 
   /**
    * Get documents by file ID
    */
-  async getDocumentsByFileId(fileId: string, collectionName?: string): Promise<{
+  async getDocumentsByFileId(
+    fileId: string,
+    collectionName?: string
+  ): Promise<{
     documents: string[];
     metadatas: ChunkMetadata[];
     ids: string[];
   }> {
     try {
       const collection = await this.initCollection(collectionName);
-      
+
       const results = await collection.get({
         where: { fileId: fileId },
       });
@@ -281,8 +360,8 @@ export class VectorDBService {
         ids: results.ids || [],
       };
     } catch (error) {
-      console.error('Get documents by file error:', error);
-      throw new Error('Failed to get documents by file ID');
+      console.error("Get documents by file error:", error);
+      throw new Error("Failed to get documents by file ID");
     }
   }
 }

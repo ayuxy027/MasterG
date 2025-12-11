@@ -1,7 +1,7 @@
-import { Router } from 'express';
-import { upload } from '../middleware/multer.middleware';
-import { uploadController } from '../controllers/upload.controller';
-import { asyncHandler } from '../middleware/error.middleware';
+import { Router } from "express";
+import { upload } from "../middleware/multer.middleware";
+import { uploadController } from "../controllers/upload.controller";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 
@@ -10,8 +10,8 @@ const router = Router();
  * Upload and process a document
  */
 router.post(
-  '/',
-  upload.single('file'),
+  "/",
+  upload.single("file"),
   asyncHandler(uploadController.uploadFile.bind(uploadController))
 );
 
@@ -20,7 +20,7 @@ router.post(
  * Get upload statistics
  */
 router.get(
-  '/stats',
+  "/stats",
   asyncHandler(uploadController.getStats.bind(uploadController))
 );
 

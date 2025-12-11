@@ -4,22 +4,71 @@
 :root {
   font-family: "Plus Jakarta Sans", sans-serif;
   letter-spacing: -0.03em;
-  
+
   /* Custom color variables */
-  --color-primary: #F97316; /* orange-500 */
-  --color-primary-light: #FB923C; /* orange-400 */
-  --color-primary-dark: #EA580C; /* orange-600 */
-  --color-secondary: #FFEDD5; /* orange-100 */
-  --color-tertiary: #FFFBEB; /* orange-50 */
-  --color-text-dark: #1F2937; /* gray-800 */
-  --color-text-light: #F3F4F6; /* gray-100 */
-  --color-white: #FFFFFF;
+  --color-primary: #f97316; /* orange-500 */
+  --color-primary-light: #fb923c; /* orange-400 */
+  --color-primary-dark: #ea580c; /* orange-600 */
+  --color-secondary: #ffedd5; /* orange-100 */
+  --color-tertiary: #fffbeb; /* orange-50 */
+  --color-text-dark: #1f2937; /* gray-800 */
+  --color-text-light: #f3f4f6; /* gray-100 */
+  --color-white: #ffffff;
   --color-black: #000000;
-  --color-background: linear-gradient(to bottom, var(--color-tertiary), var(--color-white), var(--color-tertiary));
+  --color-background: linear-gradient(
+    to bottom,
+    var(--color-tertiary),
+    var(--color-white),
+    var(--color-tertiary)
+  );
 }
 
 html,
 body {
   font-family: inherit;
   letter-spacing: inherit;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
 }
