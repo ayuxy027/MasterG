@@ -95,30 +95,9 @@ MasterG is an advanced multilingual educational platform that leverages AI to pr
 - Dotted background for visual guidance
 - AI-powered query processing for content generation
 
-### 5. Weave - Personalized Presentation Generator (Planned Feature)
+### 5. Stitch - Coming Soon
 
-**Description:** An intelligent, adaptive, and teacher-friendly presentation generation platform that creates personalized, content-aware, and multimodal slides from natural language prompts.
-
-**Functionality:**
-- **Personalized Content Generation:** Generate complete slide decks from teacher prompts or lesson outlines
-- **Audience Adaptation:** Tailor content depth and style for different audience types (school, college, training, professional)
-- **Language Complexity Adjustment:** Adjust language complexity, tone, and examples to match student proficiency levels
-- **Intelligent Media Integration:** Automatically fetch contextually relevant images, diagrams, and infographics
-- **Adaptive Presentation Structuring:** Organize slides into logical sections (Introduction, Main Content, Examples, Summary)
-- **Template Customization:** Provide multiple presentation styles (academic, storytelling, business pitch, technical briefing)
-- **Real-Time Assistance:** Suggest additional teaching materials (quizzes, case studies, discussion prompts)
-- **Speaker Notes Generation:** Automatically generate speaker notes from slide content
-- **Cultural Sensitivity:** Support for region-specific examples and localization
-
-**Key Features:**
-- Natural language prompt to slide generation
-- Multilingual support across 22+ Indian languages
-- Teacher-friendly interface with full control over presentation style
-- Export compatibility with common formats (PowerPoint, PDF, Google Slides)
-- 3D visualization support for complex concepts (future implementation)
-- Voice prompt support for slide generation (future implementation)
-- Multimodal content integration (text, images, charts, 3D objects)
-- Cultural and linguistic adaptation for regional relevance
+**Description:** A new feature is being developed to replace the previous presentation generator. Details coming soon.
 
 ## Technical Architecture
 
@@ -155,12 +134,12 @@ MasterG is an advanced multilingual educational platform that leverages AI to pr
 - **LMR Tools:** 🔄 In Progress - UI complete, core PDF processing and AI integration in development
 - **Posters:** ✅ Implemented - Category selection and generation interface complete
 - **Whiteboard (Board):** ✅ Highly Advanced - Complete with drawing tools, AI integration, and canvas functionality
-- **Weave (Planned):** 📋 In Development - Presentation generator platform to be implemented
+- **Stitch (Planned):** 📋 In Development - New feature platform to be implemented
 
 ### Navigation Updates (Planned)
 - **Navbar Changes:** Planning to move Posters from main navigation to hero section
-- **New Addition:** Weave will be added to main navigation menu
-- **Feature Prioritization:** Weave as the new primary creation tool for educators
+- **New Addition:** Stitch has been added to main navigation menu
+- **Feature Prioritization:** Stitch as the new primary creation tool for educators
 
 ## Future Enhancements
 
@@ -198,7 +177,7 @@ MasterG is an advanced multilingual educational platform that leverages AI to pr
 - Image generation capabilities
 
 ### Phase 2 (Next)
-- Complete Weave presentation generator implementation
+- Complete Stitch feature implementation
 - Advanced LMR tool functionality (PDF processing, questions)
 - Vector database integration
 - Enhanced whiteboard collaboration features
@@ -217,4 +196,4 @@ MasterG is an advanced multilingual educational platform that leverages AI to pr
 4. **Adaptive Learning:** Sophisticated personalization that changes teaching style based on user profile
 5. **Fast Inference:** Leveraging Groq's hardware for real-time educational assistance
 6. **Comprehensive Toolset:** Integrated learning tools (chat, materials, presentations, whiteboard) in one platform
-7. **Educator-Focused Design:** Specialized tools like Weave presentation generator for teacher efficiency
+7. **Educator-Focused Design:** Specialized tools like Stitch for teacher efficiency

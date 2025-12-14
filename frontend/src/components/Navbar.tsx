@@ -119,7 +119,7 @@ const Navbar: React.FC = () => {
           </a>
           <a
             className="hover:text-orange-600 flex items-center gap-2 transition-colors"
-            href="/weave"
+            href="/stich"
           >
             <svg
               className="w-5 h-5"
@@ -141,7 +141,7 @@ const Navbar: React.FC = () => {
                 d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"
               ></path>
             </svg>
-            Weave
+            Stich
           </a>
           <a
             className="hover:text-orange-600 flex items-center gap-2 transition-colors"
@@ -338,7 +338,7 @@ const Navbar: React.FC = () => {
             </a>
             <a
               className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
-              href="/weave"
+              href="/stich"
               onClick={closeMenu}
             >
               <svg
@@ -361,7 +361,7 @@ const Navbar: React.FC = () => {
                   d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"
                 ></path>
               </svg>
-              Weave
+              Stich
             </a>
             <a
               className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
