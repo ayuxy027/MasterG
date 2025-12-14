@@ -9,11 +9,19 @@ import chatRoutes from "./routes/chat.routes";
 import browseRoutes from "./routes/browse.routes";
 import posterRoutes from "./routes/poster.routes";
 import lmrRoutes from "./routes/lmr.routes";
+import stitchRoutes from "./routes/stitch.routes";
 
 const app = express();
 
 // Middleware
-app.use(cors());
+// CORS - Allow all origins
+app.use(cors({
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  exposedHeaders: ["Content-Type"],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -39,6 +47,7 @@ app.get("/", (req: Request, res: Response) => {
       browse: "/api/browse",
       posters: "/api/posters",
       lmr: "/api/lmr",
+      stitch: "/api/stitch",
       health: "/api/query/health",
       stats: "/api/upload/stats",
     },
@@ -51,6 +60,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/browse", browseRoutes);
 app.use("/api/posters", posterRoutes);
 app.use("/api/lmr", lmrRoutes);
+app.use("/api/stitch", stitchRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
