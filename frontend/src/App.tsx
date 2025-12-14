@@ -35,7 +35,7 @@ const App = () => {
           <BoardPage />
         </Layout>
       } />
-      <Route path="/stich" element={
+      <Route path="/stitch" element={
         <Layout>
           <StitchPage />
         </Layout>

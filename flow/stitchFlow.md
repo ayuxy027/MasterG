@@ -9,7 +9,7 @@ Rural Indian students face barriers accessing quality educational content in nat
 ## User Flow
 
 ### Initial Setup
-User visits `/stich` page —> System checks for Ollama connection status —> If Ollama not connected, displays setup instructions for offline LLM installation —> User selects DeepSeek model from available Ollama models —> System verifies model download and availability (4-8GB RAM check) —> Model ready for offline content generation
+User visits `/stitch` page —> System checks for Ollama connection status —> If Ollama not connected, displays setup instructions for offline LLM installation —> User selects DeepSeek model from available Ollama models —> System verifies model download and availability (4-8GB RAM check) —> Model ready for offline content generation
 
 ### Content Generation Flow
 User selects target language from 22+ Indian languages (Hindi, Bengali, Tamil, Telugu, Kannada, Malayalam, Marathi, Gujarati, Punjabi, Urdu, Odia, Assamese, etc.) —> User selects grade level (Class 3, 8, 12, etc.) for age-appropriate content scaling —> User selects subject/category (Mathematics, Science, Social Studies, Language) —> User enters topic or lesson title (e.g., "Photosynthesis", "Quadratic Equations") —> User selects curriculum board (NCERT, CBSE, State Board) for alignment —> User optionally selects cultural context (Regional festivals, local examples)
