@@ -53,7 +53,7 @@ const getEnvVariable = (key: string, defaultValue?: string): string => {
 
 export const env: EnvConfig = {
   // Server
-  PORT: parseInt(getEnvVariable("PORT", "5000"), 10),
+  PORT: parseInt(getEnvVariable("PORT", "5001"), 10), // Changed from 5000 to avoid AirPlay conflict
   NODE_ENV: getEnvVariable("NODE_ENV", "development"),
 
   // API Keys

@@ -64,9 +64,15 @@ export class StitchController {
 
       // If streaming requested, use SSE
       if (stream) {
+        // Set CORS headers for streaming (allow all origins)
+        res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no"); // Disable buffering for nginx
 
         let thinkingText = "";
         let responseText = "";

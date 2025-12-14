@@ -14,7 +14,14 @@ import stitchRoutes from "./routes/stitch.routes";
 const app = express();
 
 // Middleware
-app.use(cors());
+// CORS - Allow all origins
+app.use(cors({
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  exposedHeaders: ["Content-Type"],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
