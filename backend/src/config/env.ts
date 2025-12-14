@@ -37,6 +37,10 @@ interface EnvConfig {
 
   // Query Optimization
   ENABLE_QUERY_OPTIMIZATION: boolean;
+
+  // Ollama Configuration
+  OLLAMA_URL?: string;
+  OLLAMA_MODEL?: string;
 }
 
 const getEnvVariable = (key: string, defaultValue?: string): string => {
@@ -81,6 +85,10 @@ export const env: EnvConfig = {
   // Query Optimization
   ENABLE_QUERY_OPTIMIZATION:
     getEnvVariable("ENABLE_QUERY_OPTIMIZATION", "true") === "true",
+
+  // Ollama Configuration (optional - defaults in service)
+  OLLAMA_URL: process.env.OLLAMA_URL,
+  OLLAMA_MODEL: process.env.OLLAMA_MODEL,
 };
 
 export default env;
