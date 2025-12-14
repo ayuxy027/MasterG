@@ -80,14 +80,14 @@ const Herobox = () => {
                         </Link>
                     </div>
 
-                    {/* Bottom Card - Weave */}
+                    {/* Bottom Card - Stich */}
                     <div className="relative bg-orange-400 border-2 border-orange-400 rounded-xl p-4 sm:p-5 md:p-6 md:px-8 flex flex-col justify-center h-full hover:shadow-lg transition-all duration-300">
                         <p className="text-lg sm:text-xl font-semibold text-white leading-relaxed mb-2 sm:mb-3">
                             Create Stunning <br />
                             AI-Powered Presentations
                         </p>
-                        <a href="/weave" className="inline-block bg-white text-orange-400 border-2 border-white font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm hover:bg-orange-50 hover:text-orange-500 transition-all duration-300 w-fit">
-                            Try Weave →
+                        <a href="/stich" className="inline-block bg-white text-orange-400 border-2 border-white font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm hover:bg-orange-50 hover:text-orange-500 transition-all duration-300 w-fit">
+                            Try Stich →
                         </a>
                     </div>
                 </div>

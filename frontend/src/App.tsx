@@ -5,7 +5,7 @@ import AIChatPage from "./components/AIChat/AIChatPage";
 import LMRPage from "./components/LMR/LMRPage";
 import PostersPage from "./components/Posters/PostersPage";
 import BoardPage from "./components/Board/BoardPage";
-import WeavePage from "./components/Weave/WeavePage";
+import StitchPage from "./components/Stitch/StitchPage";
 
 const App = () => {
   return (
@@ -35,9 +35,9 @@ const App = () => {
           <BoardPage />
         </Layout>
       } />
-      <Route path="/weave" element={
+      <Route path="/stich" element={
         <Layout>
-          <WeavePage />
+          <StitchPage />
         </Layout>
       } />
     </Routes>

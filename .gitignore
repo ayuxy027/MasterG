@@ -1,0 +1,82 @@
+# macOS
+.DS_Store
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.vercel/
+coverage/
+tmp/
+temp/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Misc
+*.tgz
+*.swp
+*.swo
+
+# Test
+jest-test-results.json
+coverage/
+
+# IDEs
+.idea/
+*.iml
+
+# Other deployment dirs
+.netlify/
+firebase.json
+firebase-debug.log
+
+# System
+*.pid
+*.seed
+
+# Runtime data
+pids/
+*.pid.lock
+
+# Local env
+local.env
+
+# Python cache (just in case)
+__pycache__/
+*.pyc
+*.pyo
+
+# SvelteKit/SolidStart adapters
+.svelte-kit/
+.solid/
+
+# GitHub Codespaces
+.devcontainer/
+
+# Expo
+.expo/
+.expo-shared/

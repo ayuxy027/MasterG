@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+                                                    import express, { Request, Response } from "express";
 import cors from "cors";
 import env from "./config/env";
 import { connectDatabase } from "./config/database";
@@ -6,7 +6,6 @@ import { errorHandler } from "./middleware/error.middleware";
 import uploadRoutes from "./routes/upload.routes";
 import queryRoutes from "./routes/query.routes";
 import chatRoutes from "./routes/chat.routes";
-import weaveRoutes from "./routes/weave.routes";
 import browseRoutes from "./routes/browse.routes";
 import posterRoutes from "./routes/poster.routes";
 import lmrRoutes from "./routes/lmr.routes";
@@ -37,7 +36,6 @@ app.get("/", (req: Request, res: Response) => {
       upload: "/api/upload",
       query: "/api/query",
       chats: "/api/chats",
-      weave: "/api/weave",
       browse: "/api/browse",
       posters: "/api/posters",
       lmr: "/api/lmr",
@@ -50,7 +48,6 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/api/upload", uploadRoutes);
 app.use("/api/query", queryRoutes);
 app.use("/api/chats", chatRoutes);
-app.use("/api/weave", weaveRoutes);
 app.use("/api/browse", browseRoutes);
 app.use("/api/posters", posterRoutes);
 app.use("/api/lmr", lmrRoutes);
