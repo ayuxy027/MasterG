@@ -16,8 +16,10 @@ export interface OllamaGenerateRequest {
 export interface OllamaGenerateResponse {
   model: string;
   created_at: string;
-  response: string;
+  response?: string; // Optional for streaming chunks
+  thinking?: string; // DeepSeek R1 thinking process
   done: boolean;
+  done_reason?: string;
   context?: number[];
   total_duration?: number;
   load_duration?: number;
@@ -44,12 +46,12 @@ export interface OllamaModel {
 
 export class OllamaService {
   private baseUrl: string;
-  private defaultModel: string = "deepseek-r1:7b";
+  private defaultModel: string;
 
   constructor() {
     // Ollama runs locally, default port is 11434
     this.baseUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-    this.defaultModel = process.env.OLLAMA_MODEL || "deepseek-r1:7b";
+    this.defaultModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
   }
 
   /**
@@ -158,6 +160,7 @@ Generate the complete LaTeX document now:`;
 
   /**
    * Stream generation (for real-time updates)
+   * Returns objects with type: 'thinking' | 'response' and content
    */
   async *generateStream(
     prompt: string,
@@ -165,7 +168,7 @@ Generate the complete LaTeX document now:`;
       model?: string;
       temperature?: number;
     }
-  ): AsyncGenerator<string, void, unknown> {
+  ): AsyncGenerator<{ type: "thinking" | "response"; content: string }, void, unknown> {
     try {
       const model = options?.model || this.defaultModel;
       const requestBody: OllamaGenerateRequest = {
@@ -194,9 +197,15 @@ Generate the complete LaTeX document now:`;
         for (const line of lines) {
           try {
             const data = JSON.parse(line);
-            if (data.response) {
-              yield data.response;
+            
+            // DeepSeek R1 has separate thinking and response fields
+            if (data.thinking) {
+              yield { type: "thinking", content: data.thinking };
             }
+            if (data.response) {
+              yield { type: "response", content: data.response };
+            }
+            
             if (data.done) {
               return;
             }

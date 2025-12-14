@@ -159,6 +159,7 @@ const StitchPage: React.FC = () => {
 
       let buffer = "";
       let accumulatedThinking = "";
+      let accumulatedResponse = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -177,8 +178,16 @@ const StitchPage: React.FC = () => {
               if (parsed.type === "thinking") {
                 accumulatedThinking += parsed.content;
                 setThinkingText(accumulatedThinking);
+              } else if (parsed.type === "response") {
+                accumulatedResponse += parsed.content;
+                // Update LaTeX code in real-time as response comes in
+                setLatexCode(accumulatedResponse);
               } else if (parsed.type === "complete") {
-                setLatexCode(parsed.latexCode);
+                // Final result - use provided latexCode or accumulated response
+                setLatexCode(parsed.latexCode || accumulatedResponse);
+                if (parsed.thinkingText) {
+                  setThinkingText(parsed.thinkingText);
+                }
               } else if (parsed.type === "error") {
                 throw new Error(parsed.error);
               }

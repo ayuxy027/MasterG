@@ -69,24 +69,26 @@ export class StitchController {
         res.setHeader("Connection", "keep-alive");
 
         let thinkingText = "";
-        let latexCode = "";
+        let responseText = "";
 
         try {
           for await (const chunk of ollamaService.generateStream(prompt, {
             temperature: 0.7,
           })) {
-            thinkingText += chunk;
-            
-            // Send thinking chunk
-            res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk })}\n\n`);
+            if (chunk.type === "thinking") {
+              thinkingText += chunk.content;
+              // Send thinking chunk to client
+              res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
+            } else if (chunk.type === "response") {
+              responseText += chunk.content;
+              // Send response chunk to client (this is the actual LaTeX output)
+              res.write(`data: ${JSON.stringify({ type: "response", content: chunk.content })}\n\n`);
+            }
           }
 
-          // After streaming, extract LaTeX from thinking text
-          // DeepSeek R1 format: thinking text is marked, final answer is after
-          latexCode = this.extractLatexFromThinking(thinkingText) || thinkingText;
-
-          // Send final result
-          res.write(`data: ${JSON.stringify({ type: "complete", latexCode })}\n\n`);
+          // After streaming completes, send final result with complete LaTeX
+          const latexCode = responseText || this.extractLatexFromThinking(thinkingText);
+          res.write(`data: ${JSON.stringify({ type: "complete", latexCode, thinkingText })}\n\n`);
           res.end();
         } catch (error) {
           res.write(
