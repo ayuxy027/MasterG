@@ -189,6 +189,40 @@ class LanguageService {
     
     return null;
   }
+
+  /**
+   * Map our internal language codes to IndicTrans2 codes
+   * See docs/IndicTrans2.md for the full mapping.
+   */
+  toIndicTrans2Code(code: SupportedLanguageCode): string {
+    const map: Record<SupportedLanguageCode, string> = {
+      hi: "hin_Deva",
+      mr: "mar_Deva",
+      gu: "guj_Gujr",
+      bn: "ben_Beng",
+      ta: "tam_Taml",
+      te: "tel_Telu",
+      kn: "kan_Knda",
+      ml: "mal_Mlym",
+      pa: "pan_Guru",
+      ur: "urd_Arab",
+      or: "ory_Orya",
+      as: "asm_Beng",
+      ks: "kas_Arab",
+      kok: "kok_Deva", // approximate
+      mai: "mai_Deva",
+      mni: "mni_Mtei",
+      ne: "npi_Deva",
+      sa: "san_Deva",
+      sd: "snd_Arab",
+      sat: "sat_Olck",
+      brx: "brx_Deva",
+      doi: "doi_Deva",
+      en: "eng_Latn",
+    };
+
+    return map[code] || "eng_Latn";
+  }
 }
 
 export const languageService = new LanguageService();

@@ -42,5 +42,15 @@ router.post(
   asyncHandler(stitchController.generatePDF.bind(stitchController))
 );
 
+/**
+ * POST /api/stitch/translate
+ * Translate generated content using IndicTrans2
+ * Body: { text, sourceLanguage, targetLanguage }
+ */
+router.post(
+  "/translate",
+  asyncHandler(stitchController.translateContent.bind(stitchController))
+);
+
 export default router;
 

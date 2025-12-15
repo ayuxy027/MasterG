@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import { ollamaService } from "../services/ollama.service";
+import { languageService } from "../services/language.service";
+import { indicTrans2Service } from "../services/indictrans2.service";
+import { env } from "../config/env";
 
 export class StitchController {
   /**
@@ -173,6 +176,66 @@ export class StitchController {
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Failed to list models",
+      });
+    }
+  }
+
+  /**
+   * Translate generated content using IndicTrans2
+   */
+  async translateContent(req: Request, res: Response): Promise<void> {
+    try {
+      if (!env.INDICTRANS2_ENABLED) {
+        res.status(503).json({
+          success: false,
+          error: "IndicTrans2 translation is not enabled. Set INDICTRANS2_ENABLED=true in your environment.",
+        });
+        return;
+      }
+
+      const { text, sourceLanguage, targetLanguage } = req.body as {
+        text?: string;
+        sourceLanguage?: string;
+        targetLanguage?: string;
+      };
+
+      if (!text || !text.trim()) {
+        res.status(400).json({
+          success: false,
+          error: "Text is required for translation",
+        });
+        return;
+      }
+
+      const srcCode =
+        (sourceLanguage as keyof typeof languageService) || "en";
+      const tgtCode =
+        (targetLanguage as keyof typeof languageService) || "hi";
+
+      const srcIndic = languageService.toIndicTrans2Code(
+        srcCode as any
+      );
+      const tgtIndic = languageService.toIndicTrans2Code(
+        tgtCode as any
+      );
+
+      const translated = await indicTrans2Service.translate(text, {
+        srcLang: srcIndic,
+        tgtLang: tgtIndic,
+      });
+
+      res.json({
+        success: true,
+        translated,
+      });
+    } catch (error) {
+      console.error("IndicTrans2 translation error:", error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Translation failed",
       });
     }
   }

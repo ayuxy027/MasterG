@@ -49,6 +49,18 @@ export interface StitchModel {
   };
 }
 
+export interface StitchTranslateRequest {
+  text: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+export interface StitchTranslateResponse {
+  success: boolean;
+  translated?: string;
+  error?: string;
+}
+
 export class StitchApiError extends Error {
   constructor(message: string) {
     super(message);
@@ -147,6 +159,39 @@ class StitchApi {
       }
       throw new StitchApiError(
         error instanceof Error ? error.message : "Failed to generate content"
+      );
+    }
+  }
+
+  /**
+   * Translate generated content using IndicTrans2
+   */
+  async translateContent(
+    request: StitchTranslateRequest
+  ): Promise<StitchTranslateResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stitch/translate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new StitchApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof StitchApiError) {
+        throw error;
+      }
+      throw new StitchApiError(
+        error instanceof Error ? error.message : "Failed to translate content"
       );
     }
   }

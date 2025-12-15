@@ -92,6 +92,8 @@ const StitchPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [generatedContent, setGeneratedContent] = useState("");
+  const [targetLanguageForTranslation, setTargetLanguageForTranslation] =
+    useState("hi");
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ollamaStatus, setOllamaStatus] = useState<{
@@ -523,6 +525,55 @@ const StitchPage: React.FC = () => {
                     />
                   </svg>
                   <h3 className="text-lg font-semibold text-gray-900">Content Preview</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-600">Translate to</label>
+                  <select
+                    value={targetLanguageForTranslation}
+                    onChange={(e) =>
+                      setTargetLanguageForTranslation(e.target.value)
+                    }
+                    className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
+                  >
+                    {INDIAN_LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!generatedContent.trim()}
+                    onClick={async () => {
+                      try {
+                        const resp = await stitchAPI.translateContent({
+                          text: generatedContent,
+                          sourceLanguage: selectedLanguage,
+                          targetLanguage: targetLanguageForTranslation,
+                        });
+                        if (resp.success && resp.translated) {
+                          setGeneratedContent(resp.translated);
+                          setError(null);
+                        } else {
+                          setError(
+                            resp.error ||
+                              "Translation failed. Please try again."
+                          );
+                        }
+                      } catch (err) {
+                        const msg =
+                          err instanceof StitchApiError
+                            ? err.message
+                            : err instanceof Error
+                            ? err.message
+                            : "Translation failed. Please try again.";
+                        setError(msg);
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  >
+                    Translate
+                  </button>
                 </div>
               </div>
               <div className="flex-1 overflow-hidden">
