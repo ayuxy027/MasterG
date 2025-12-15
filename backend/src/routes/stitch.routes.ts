@@ -24,8 +24,8 @@ router.get(
 
 /**
  * POST /api/stitch/generate
- * Generate LaTeX content
- * Body: { topic, language, grade, subject, curriculum, culturalContext }
+ * Generate educational content
+ * Body: { topic, language, grade, subject, curriculum, culturalContext, stream? }
  */
 router.post(
   "/generate",
@@ -34,8 +34,8 @@ router.post(
 
 /**
  * POST /api/stitch/pdf
- * Generate PDF from LaTeX
- * Body: { latexCode }
+ * Generate PDF from content (not yet implemented)
+ * Body: { content }
  */
 router.post(
   "/pdf",

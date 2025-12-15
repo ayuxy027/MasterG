@@ -85,9 +85,9 @@ export class OllamaService {
   }
 
   /**
-   * Generate LaTeX content using Ollama
+   * Generate plain educational content using Ollama
    */
-  async generateLatexContent(
+  async generateTextContent(
     prompt: string,
     options?: {
       model?: string;
@@ -99,7 +99,7 @@ export class OllamaService {
       const model = options?.model || this.defaultModel;
       const requestBody: OllamaGenerateRequest = {
         model,
-        prompt: this.buildLatexPrompt(prompt),
+        prompt,
         stream: false,
         options: {
           temperature: options?.temperature || 0.7,
@@ -136,29 +136,6 @@ export class OllamaService {
   }
 
   /**
-   * Build optimized prompt for LaTeX generation
-   */
-  private buildLatexPrompt(userPrompt: string): string {
-    return `You are an expert educational content generator specializing in creating LaTeX documents for Indian curriculum (NCERT, CBSE, State Boards).
-
-Generate a complete, valid LaTeX document based on the following requirements:
-
-${userPrompt}
-
-Requirements:
-1. Generate ONLY valid LaTeX code - no explanations, no markdown, just LaTeX
-2. Use proper LaTeX packages for multilingual support (babel, polyglossia, fontspec)
-3. Include proper mathematical notation using amsmath, amssymb packages
-4. Structure the document with sections, subsections
-5. Use proper Indian language fonts and encoding
-6. Include proper document structure: \\documentclass, \\begin{document}, \\end{document}
-7. Ensure all mathematical formulas are properly formatted
-8. Use proper LaTeX syntax for tables, lists, and formatting
-
-Generate the complete LaTeX document now:`;
-  }
-
-  /**
    * Stream generation (for real-time updates)
    * Returns objects with type: 'thinking' | 'response' and content
    */
@@ -173,7 +150,7 @@ Generate the complete LaTeX document now:`;
       const model = options?.model || this.defaultModel;
       const requestBody: OllamaGenerateRequest = {
         model,
-        prompt: this.buildLatexPrompt(prompt),
+        prompt,
         stream: true,
         options: {
           temperature: options?.temperature || 0.7,

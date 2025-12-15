@@ -1,10 +1,10 @@
 # Stitch - Offline Multilingual Educational Content Generator
 
 ## Overview
-Stitch resolves the offline content generation crisis by enabling multilingual educational content creation using offline LLM (Ollama with DeepSeek) with LaTeX rendering capabilities. The system generates curriculum-aligned content across 22+ Indian languages and renders it as PDF documents.
+Stitch resolves the offline content generation crisis by enabling multilingual educational content creation using an offline LLM (Ollama with DeepSeek). The system generates curriculum-aligned content across 22+ Indian languages that teachers can directly use as explanations, notes, and lesson material.
 
 ## Core Problem Solved
-Rural Indian students face barriers accessing quality educational content in native languages. Current systems are English-focused and require internet connectivity. Stitch enables offline, multilingual content generation with LaTeX precision for mathematical and scientific notation.
+Rural Indian students face barriers accessing quality educational content in native languages. Current systems are English-focused and require internet connectivity. Stitch enables offline, multilingual content generation with high precision for mathematical and scientific explanations.
 
 ## User Flow
 
@@ -15,35 +15,29 @@ User visits `/stitch` page —> System checks for Ollama connection status —> 
 User selects target language from 22+ Indian languages (Hindi, Bengali, Tamil, Telugu, Kannada, Malayalam, Marathi, Gujarati, Punjabi, Urdu, Odia, Assamese, etc.) —> User selects grade level (Class 3, 8, 12, etc.) for age-appropriate content scaling —> User selects subject/category (Mathematics, Science, Social Studies, Language) —> User enters topic or lesson title (e.g., "Photosynthesis", "Quadratic Equations") —> User selects curriculum board (NCERT, CBSE, State Board) for alignment —> User optionally selects cultural context (Regional festivals, local examples)
 
 ### AI Generation Process
-System constructs prompt with all parameters (language, grade, subject, topic, curriculum, cultural context) —> Prompt sent to offline Ollama API (DeepSeek model) —> Model generates LaTeX-formatted educational content with:
-  - Proper script accuracy for chosen language
-  - Mathematical notation using LaTeX math environments
-  - Age-appropriate vocabulary and depth
-  - Cultural references and local examples
-  - Curriculum-aligned structure and content
-  - Code-mixing support (e.g., Hindi-English scientific terms)
+System constructs prompt with all parameters (language, grade, subject, topic, curriculum, cultural context) —> Prompt sent to offline Ollama API (DeepSeek model) —> Model generates **plain-text educational content** with:
+- Proper script accuracy for chosen language
+- Age-appropriate vocabulary and depth
+- Cultural references and local examples
+- Curriculum-aligned structure and content
+- Code-mixing support (e.g., Hindi-English scientific terms)
 
-### LaTeX Rendering & Preview
-Generated LaTeX code displayed in chat interface preview pane —> Real-time LaTeX rendering using MathJax/KaTeX for preview —> Preview shows formatted content with proper:
-  - Multilingual text rendering (correct script display)
-  - Mathematical equations and formulas
-  - Scientific diagrams (if included in LaTeX)
-  - Tables, lists, and structured content
-  - Cultural elements and local references
+### Content Preview & Thinking View
+Generated content is displayed in the Stitch preview pane in real time —> Users can see the **exact text output** being produced by the model —> Thinking stream is shown separately so users can see how the model reasons.
 
 ### User Interaction & Editing
-User can review preview in chat interface —> User can request edits or modifications via natural language —> User can adjust language complexity or add/remove sections —> System regenerates LaTeX based on feedback —> Preview updates in real-time —> User can iterate until satisfied
+User can review preview in chat interface —> User can request edits or modifications via natural language —> User can adjust language complexity or add/remove sections —> System regenerates content based on feedback —> Preview updates in real-time —> User can iterate until satisfied
 
 ### PDF Generation
-User clicks "Generate PDF" button —> System compiles LaTeX code using local LaTeX compiler (pdflatex/xelatex for multilingual support) —> PDF generated with proper:
-  - Unicode font support for all Indian scripts
-  - Mathematical notation rendering
-  - Professional formatting and layout
-  - Page breaks and structure
-  - Metadata (topic, language, grade, date)
+
+**Current behavior:**
+- PDF generation is not implemented. Teachers can copy content from the preview and paste it into their own document templates (e.g., Word, Google Docs, or any LMS).
+
+**Planned behavior (full version):**
+- System compiles content into nicely formatted PDFs suitable for printing and sharing.
 
 ### Export & Storage
-Generated PDF available for one-click download —> PDF can be saved to user's device for offline access —> LaTeX source code optionally saved for future editing —> Content can be shared with students or other teachers —> Generated content cached locally for faster future access
+Generated content can be easily copied and saved into the teacher's preferred tools —> Future versions may support direct export as PDFs or other formats —> Generated content can be cached locally for faster future access
 
 ## Technical Architecture
 
@@ -53,12 +47,10 @@ Generated PDF available for one-click download —> PDF can be saved to user's d
 - **Memory Management**: Efficient inference for 4-8GB RAM constraints
 - **Model Selection**: User can choose different model sizes based on device capability
 
-### LaTeX Processing
-- **Generation**: LLM generates valid LaTeX code with proper syntax
-- **Preview Engine**: MathJax/KaTeX for browser-based preview
-- **Compilation**: Local pdflatex/xelatex for PDF generation
-- **Font Support**: Comprehensive Unicode font packages for Indian scripts
-- **Math Packages**: amsmath, amssymb for mathematical notation
+### Content Processing
+- **Generation**: LLM generates structured plain-text explanations, examples, and questions
+- **Preview**: Browser-based plain-text preview
+- **Export (planned)**: Future pipeline to format content into PDFs or other distribution formats
 
 ### Multilingual Support
 - **Script Rendering**: Proper display of Devanagari, Bengali, Tamil, Telugu, Kannada, Malayalam, Gurmukhi, Gujarati, Odia scripts
@@ -83,16 +75,17 @@ Generated PDF available for one-click download —> PDF can be saved to user's d
 - **Cultural Context Toggle**: Optional regional customization
 
 ### Chat Interface Preview
-- **Preview Pane**: Real-time LaTeX rendering display
+- **Preview Pane**: Real-time plain-text content display
 - **Edit Controls**: Request modifications via text input
 - **Regenerate Button**: Create new version of content
 - **Scrollable View**: Handle long-form content
 
 ### Action Buttons
-- **Generate PDF**: Compile and download PDF
-- **Save LaTeX**: Download source LaTeX file
-- **Share**: Export options for sharing
-- **Clear**: Start new content generation
+- **Generate Content**: Starts streaming generation with thinking text + content output
+- **Stop Generating**: Cancels the current generation stream
+- *(Future)* **Generate PDF**: Export generated content as a nicely formatted PDF
+- *(Future)* **Share**: Export options for sharing
+- *(Future)* **Clear**: Start new content generation
 
 ## Success Metrics
 - **Offline Operation**: 100% functionality without internet connection
@@ -107,6 +100,6 @@ Generated PDF available for one-click download —> PDF can be saved to user's d
 - **Template Library**: Pre-built templates for common topics
 - **Collaboration**: Share and collaborate on generated content
 - **Batch Generation**: Generate multiple lessons at once
-- **Image Integration**: Include diagrams and illustrations in LaTeX
+- **Image Integration**: Include diagrams and illustrations in the generated content
 - **Interactive Elements**: Add interactive components to PDF (hyperlinks, bookmarks)
 

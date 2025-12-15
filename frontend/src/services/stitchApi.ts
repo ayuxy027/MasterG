@@ -13,7 +13,7 @@ export interface StitchGenerateRequest {
 
 export interface StitchGenerateResponse {
   success: boolean;
-  latexCode?: string;
+  content?: string;
   metadata?: {
     topic: string;
     language: string;
@@ -119,7 +119,7 @@ class StitchApi {
   }
 
   /**
-   * Generate LaTeX content
+   * Generate content
    */
   async generateContent(
     request: StitchGenerateRequest
@@ -151,36 +151,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Generate PDF from LaTeX
-   */
-  async generatePDF(latexCode: string): Promise<Blob> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/stitch/pdf`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ latexCode }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new StitchApiError(
-          errorData.error || `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      return await response.blob();
-    } catch (error) {
-      if (error instanceof StitchApiError) {
-        throw error;
-      }
-      throw new StitchApiError(
-        error instanceof Error ? error.message : "Failed to generate PDF"
-      );
-    }
-  }
 }
 
 export const stitchAPI = new StitchApi();

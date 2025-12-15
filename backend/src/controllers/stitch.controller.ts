@@ -30,7 +30,7 @@ export class StitchController {
   }
 
   /**
-   * Generate LaTeX content with streaming support for thinking text
+   * Generate educational content with streaming support for thinking text
    */
   async generateContent(req: Request, res: Response): Promise<void> {
     try {
@@ -87,14 +87,14 @@ export class StitchController {
               res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
             } else if (chunk.type === "response") {
               responseText += chunk.content;
-              // Send response chunk to client (this is the actual LaTeX output)
+              // Send response chunk to client (this is the actual content output)
               res.write(`data: ${JSON.stringify({ type: "response", content: chunk.content })}\n\n`);
             }
           }
 
-          // After streaming completes, send final result with complete LaTeX
-          const latexCode = responseText || this.extractLatexFromThinking(thinkingText);
-          res.write(`data: ${JSON.stringify({ type: "complete", latexCode, thinkingText })}\n\n`);
+          // After streaming completes, send final result with complete content
+          const content = responseText || thinkingText;
+          res.write(`data: ${JSON.stringify({ type: "complete", content, thinkingText })}\n\n`);
           res.end();
         } catch (error) {
           res.write(
@@ -105,15 +105,15 @@ export class StitchController {
         return;
       }
 
-      // Non-streaming: Generate LaTeX using Ollama
-      const latexCode = await ollamaService.generateLatexContent(prompt, {
+      // Non-streaming: Generate plain text content using Ollama
+      const content = await ollamaService.generateTextContent(prompt, {
         temperature: 0.7,
         maxTokens: 4096,
       });
 
       res.json({
         success: true,
-        latexCode,
+        content,
         metadata: {
           topic,
           language,
@@ -133,41 +133,16 @@ export class StitchController {
   }
 
   /**
-   * Extract LaTeX code from thinking text (DeepSeek R1 format)
-   */
-  private extractLatexFromThinking(thinkingText: string): string {
-    // DeepSeek R1 typically has thinking marked, then final answer
-    // Look for LaTeX document markers
-    const latexStart = thinkingText.indexOf("\\documentclass");
-    if (latexStart !== -1) {
-      return thinkingText.substring(latexStart);
-    }
-    
-    // If no clear marker, return full text (might be pure LaTeX)
-    return thinkingText;
-  }
-
-  /**
-   * Generate PDF from LaTeX
+   * Generate PDF from content (not implemented in current version)
    */
   async generatePDF(req: Request, res: Response): Promise<void> {
     try {
-      const { latexCode } = req.body;
-
-      if (!latexCode) {
-        res.status(400).json({
-          success: false,
-          error: "LaTeX code is required",
-        });
-        return;
-      }
-
       // For now, PDF generation is not implemented to keep the stack simple.
-      // Frontend can still display / copy LaTeX; PDF compile can be added later.
+      // Frontend can still display / copy content; PDF compile can be added later.
       res.status(501).json({
         success: false,
         error:
-          "PDF generation is not yet implemented. LaTeX code is available for manual compilation.",
+          "PDF generation is not yet implemented. Generated content is available for manual formatting/export.",
       });
     } catch (error) {
       console.error("PDF generation error:", error);
@@ -246,7 +221,7 @@ export class StitchController {
     const subjectName = subjectNames[params.subject] || params.subject;
     const curriculumName = curriculumNames[params.curriculum] || params.curriculum;
 
-    let prompt = `Generate educational content in LaTeX format for:
+    let prompt = `Generate educational content for:
 
 Topic: ${params.topic}
 Language: ${languageName}
@@ -264,7 +239,7 @@ Curriculum: ${curriculumName}`;
 - Include mathematical notation if needed (for mathematics/science)
 - Follow ${curriculumName} curriculum standards
 - Structure content with clear sections and subsections
-- Use proper LaTeX formatting for all elements`;
+- Present information clearly so it can be easily copied into lesson plans or worksheets`;
 
     return prompt;
   }

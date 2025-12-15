@@ -38,12 +38,12 @@ const CURRICULUMS = [
   { value: "state", label: "State Board" },
 ];
 
-interface LaTeXPreviewProps {
-  latexCode: string;
+interface ContentPreviewProps {
+  content: string;
 }
 
-const LaTeXPreview: React.FC<LaTeXPreviewProps> = ({ latexCode }) => {
-  if (!latexCode) {
+const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
+  if (!content) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 bg-gray-50 rounded-lg">
         <div className="text-center">
@@ -60,7 +60,7 @@ const LaTeXPreview: React.FC<LaTeXPreviewProps> = ({ latexCode }) => {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <p className="text-sm font-medium">LaTeX preview will appear here</p>
+          <p className="text-sm font-medium">Generated content will appear here</p>
         </div>
       </div>
     );
@@ -71,11 +71,11 @@ const LaTeXPreview: React.FC<LaTeXPreviewProps> = ({ latexCode }) => {
       <div className="prose max-w-none">
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
           <pre className="whitespace-pre-wrap text-xs font-mono text-gray-800 leading-relaxed">
-            {latexCode}
+            {content}
           </pre>
         </div>
         <div className="mt-4 text-xs text-gray-500 italic">
-          Note: LaTeX rendering preview will be implemented with MathJax/KaTeX
+          Note: This is plain generated content from the offline LLM.
         </div>
       </div>
     </div>
@@ -91,7 +91,7 @@ const StitchPage: React.FC = () => {
   const [culturalContext, setCulturalContext] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [latexCode, setLatexCode] = useState("");
+  const [generatedContent, setGeneratedContent] = useState("");
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ollamaStatus, setOllamaStatus] = useState<{
@@ -131,7 +131,7 @@ const StitchPage: React.FC = () => {
     setIsGenerating(true);
     setError(null);
     setThinkingText("");
-    setLatexCode("");
+    setGeneratedContent("");
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -189,11 +189,11 @@ const StitchPage: React.FC = () => {
                 setThinkingText(accumulatedThinking);
               } else if (parsed.type === "response") {
                 accumulatedResponse += parsed.content;
-                // Update LaTeX code in real-time as response comes in
-                setLatexCode(accumulatedResponse);
+                // Update content in real-time as response comes in
+                setGeneratedContent(accumulatedResponse);
               } else if (parsed.type === "complete") {
-                // Final result - use provided latexCode or accumulated response
-                setLatexCode(parsed.latexCode || accumulatedResponse);
+                // Final result - use provided content or accumulated response
+                setGeneratedContent(parsed.content || accumulatedResponse);
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }
@@ -234,32 +234,6 @@ const StitchPage: React.FC = () => {
     }
   };
 
-  const handleGeneratePDF = async () => {
-    if (!latexCode) {
-      setError("No LaTeX code to compile. Please generate content first.");
-      return;
-    }
-
-    try {
-      const blob = await stitchAPI.generatePDF(latexCode);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `stitch-${topic.replace(/\s+/g, "-")}-${Date.now()}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      const errorMessage =
-        err instanceof StitchApiError
-          ? err.message
-          : "PDF generation is not yet implemented. Requires LaTeX compiler setup.";
-      setError(errorMessage);
-    }
-  };
-
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -270,7 +244,7 @@ const StitchPage: React.FC = () => {
           </h1>
           <p className="text-gray-600 text-lg">
             Generate curriculum-aligned educational content in 22+ Indian languages using
-            offline LLM (Ollama + DeepSeek) with LaTeX rendering
+            offline LLM (Ollama + DeepSeek)
           </p>
         </div>
 
@@ -531,7 +505,7 @@ const StitchPage: React.FC = () => {
               </div>
             </div>
 
-            {/* LaTeX Preview */}
+            {/* Content Preview */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex flex-col">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center gap-3">
@@ -548,31 +522,11 @@ const StitchPage: React.FC = () => {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <h3 className="text-lg font-semibold text-gray-900">LaTeX Preview</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Content Preview</h3>
                 </div>
-                <button
-                  onClick={handleGeneratePDF}
-                  disabled={!latexCode}
-                  className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed font-medium flex items-center gap-2"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  Generate PDF
-                </button>
               </div>
               <div className="flex-1 overflow-hidden">
-                <LaTeXPreview latexCode={latexCode} />
+                <ContentPreview content={generatedContent} />
               </div>
             </div>
           </div>
