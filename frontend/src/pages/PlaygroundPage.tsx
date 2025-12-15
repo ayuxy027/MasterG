@@ -68,7 +68,7 @@ const PlaygroundPage: React.FC = () => {
     // Test with a simple translation (very short to be fast)
     try {
       const testResult = await stitchAPI.translateContent({
-        text: "hi",
+        text: "Hello",
         sourceLanguage: "en",
         targetLanguage: "hi",
       });

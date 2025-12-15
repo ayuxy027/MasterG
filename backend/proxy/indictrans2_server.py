@@ -222,10 +222,12 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
     try:
       batch = processor.preprocess_batch([chunk], src_lang=src_lang, tgt_lang=tgt_lang)
       if not batch or len(batch) == 0:
+        sys.stderr.write(f"Warning: Preprocessing returned empty batch for chunk: {chunk[:50]}\n")
         continue
       
       inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=180)
       if inputs is None or "input_ids" not in inputs:
+        sys.stderr.write(f"Warning: Tokenization failed for chunk: {chunk[:50]}\n")
         continue
       
       inputs = {k: v.to(device) for k, v in inputs.items()}
@@ -243,19 +245,24 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
       
       translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
       if not translation or len(translation) == 0:
+        sys.stderr.write(f"Warning: Decoding returned empty result for chunk: {chunk[:50]}\n")
         continue
       
       post = processor.postprocess_batch([translation[0]], lang=tgt_lang)
       if post and len(post) > 0 and post[0].strip():
         translated_chunks.append(post[0].strip())
+      else:
+        sys.stderr.write(f"Warning: Postprocessing returned empty result for chunk: {chunk[:50]}\n")
         
     except Exception as e:
       # Log error but continue with other chunks
-      sys.stderr.write(f"Error translating chunk: {e}\n")
+      sys.stderr.write(f"Error translating chunk '{chunk[:50]}': {e}\n")
+      import traceback
+      sys.stderr.write(traceback.format_exc())
       continue
   
   if not translated_chunks:
-    return {"success": False, "error": "All translation chunks failed"}
+    return {"success": False, "error": "All translation chunks failed. Check server logs for details."}
   
   final_translation = " ".join(translated_chunks)
   return {"success": True, "translated": final_translation}
