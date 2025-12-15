@@ -6,8 +6,8 @@ import type {
   FileListItem,
 } from "../types/chat";
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
+// API Configuration - VITE_API_URL should NOT include /api suffix
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // Utility functions for session management
 export const generateUserId = (): string => {
@@ -398,8 +398,7 @@ export async function generateChatName(firstMessage: string): Promise<string> {
     )}...". Only return the title, nothing else.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${
-        import.meta.env.VITE_GEMINI_API_KEY || ""
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY || ""
       }`,
       {
         method: "POST",
