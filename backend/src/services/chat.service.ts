@@ -350,12 +350,40 @@ export class ChatService {
   }
 
   /**
-   * Delete a chat session
+   * Delete a chat session and all associated files
    */
   async deleteSession(userId: string, sessionId: string): Promise<void> {
     try {
+      // Get session info first (for ChromaDB collection name)
+      const session = await ChatHistoryModel.findOne({ userId, sessionId });
+      const chromaCollectionName = session?.chromaCollectionName;
+
+      // Delete from MongoDB
       await ChatHistoryModel.deleteOne({ userId, sessionId });
-      console.log(`🗑️  Chat session deleted (${userId}/${sessionId})`);
+      console.log(`🗑️  Chat session deleted from MongoDB (${userId}/${sessionId})`);
+
+      // Delete uploaded files from disk
+      try {
+        const { fileStorageService } = await import('./fileStorage.service');
+        await fileStorageService.deleteSessionFiles(userId, sessionId);
+        console.log(`🗑️  Session files deleted from disk (${userId}/${sessionId})`);
+      } catch (fileError) {
+        console.error("Error deleting session files:", fileError);
+        // Don't throw - continue with deletion
+      }
+
+      // Delete ChromaDB collection
+      if (chromaCollectionName) {
+        try {
+          const { vectorDBService } = await import('./vectordb.service');
+          await vectorDBService.deleteCollection(chromaCollectionName);
+          console.log(`🗑️  ChromaDB collection deleted: ${chromaCollectionName}`);
+        } catch (chromaError) {
+          console.error("Error deleting ChromaDB collection:", chromaError);
+          // Don't throw - consider this a warning
+        }
+      }
+
     } catch (error) {
       console.error("Error deleting chat session:", error);
       throw new Error("Failed to delete chat session");

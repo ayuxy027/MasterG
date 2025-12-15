@@ -1,9 +1,22 @@
 import mongoose from "mongoose";
 
+// File info interface for preview
+export interface FileInfo {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  userId: string;
+  sessionId: string;
+  pageCount: number;
+  language?: string;
+  createdAt: Date;
+}
+
 // Page-wise Document Schema - ONE document per PDF with pages array
 const pageDocumentSchema = new mongoose.Schema({
   fileId: { type: String, required: true, unique: true, index: true },
   fileName: { type: String, required: true },
+  mimeType: { type: String, default: 'application/pdf' },
   userId: { type: String, required: true },
   sessionId: { type: String, required: true },
   language: { type: String },
@@ -22,6 +35,7 @@ const PageDocument = mongoose.model("PageDocument", pageDocumentSchema);
 const documentSchema = new mongoose.Schema({
   fileId: { type: String, required: true, unique: true },
   fileName: { type: String, required: true },
+  mimeType: { type: String, default: 'application/pdf' },
   fullContent: { type: String, required: true },
   userId: { type: String, required: true },
   sessionId: { type: String, required: true },
@@ -41,7 +55,8 @@ export class DocumentService {
     pages: Array<{ pageNumber: number; content: string }>,
     userId: string,
     sessionId: string,
-    language?: string
+    language?: string,
+    mimeType?: string
   ): Promise<void> {
     try {
       // Validate: Don't store if no pages or all pages are empty
@@ -69,6 +84,7 @@ export class DocumentService {
       const pageDocument = {
         fileId,
         fileName,
+        mimeType: mimeType || 'application/pdf',
         userId,
         sessionId,
         language,
@@ -174,7 +190,8 @@ export class DocumentService {
     fullContent: string,
     userId: string,
     sessionId: string,
-    language?: string
+    language?: string,
+    mimeType?: string
   ): Promise<void> {
     try {
       // Validate: Don't store if content is empty
@@ -186,6 +203,7 @@ export class DocumentService {
       await Document.create({
         fileId,
         fileName,
+        mimeType: mimeType || 'application/octet-stream',
         fullContent: fullContent.trim(),
         userId,
         sessionId,
@@ -200,6 +218,8 @@ export class DocumentService {
     }
   }
 
+
+
   /**
    * Legacy: Get full document content by fileId
    */
@@ -210,6 +230,62 @@ export class DocumentService {
     } catch (error) {
       console.error("Document retrieval error:", error);
       return null;
+    }
+  }
+
+  /**
+   * Get full content as text for a document (for preview)
+   * Checks both PageDocument and Document collections
+   */
+  async getFullContent(fileId: string): Promise<string | null> {
+    try {
+      // First try PageDocument (page-wise storage)
+      const pageDoc = await PageDocument.findOne({ fileId });
+      if (pageDoc && pageDoc.pages && pageDoc.pages.length > 0) {
+        // Combine all pages into one text
+        const fullText = pageDoc.pages
+          .sort((a, b) => a.pageNumber - b.pageNumber)
+          .map((p) => p.pageContent)
+          .join('\n\n--- Page Break ---\n\n');
+        return fullText;
+      }
+
+      // Fall back to Document (legacy storage)
+      const doc = await Document.findOne({ fileId });
+      if (doc?.fullContent) {
+        return doc.fullContent;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Get full content error:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete document by fileId (from both PageDocument and Document collections)
+   */
+  async deleteDocument(fileId: string): Promise<void> {
+    try {
+      // Delete from PageDocument collection (page-wise storage)
+      const pageResult = await PageDocument.deleteOne({ fileId });
+      if (pageResult.deletedCount > 0) {
+        console.log(`🗑️ Deleted PageDocument for fileId: ${fileId}`);
+      }
+
+      // Delete from Document collection (legacy storage)
+      const docResult = await Document.deleteOne({ fileId });
+      if (docResult.deletedCount > 0) {
+        console.log(`🗑️ Deleted Document for fileId: ${fileId}`);
+      }
+
+      if (pageResult.deletedCount === 0 && docResult.deletedCount === 0) {
+        console.log(`ℹ️ No documents found for fileId: ${fileId}`);
+      }
+    } catch (error) {
+      console.error("Document deletion error:", error);
+      throw new Error("Failed to delete document");
     }
   }
 
@@ -255,6 +331,48 @@ export class DocumentService {
     } catch (error) {
       console.error("Documents retrieval error:", error);
       return new Map();
+    }
+  }
+
+  /**
+   * Get file info by fileId (for preview)
+   */
+  async getFileInfo(fileId: string): Promise<FileInfo | null> {
+    try {
+      // Try page-wise document first
+      const pageDoc = await PageDocument.findOne({ fileId });
+      if (pageDoc) {
+        return {
+          fileId: pageDoc.fileId,
+          fileName: pageDoc.fileName,
+          mimeType: (pageDoc as any).mimeType || 'application/pdf',
+          userId: pageDoc.userId,
+          sessionId: pageDoc.sessionId,
+          pageCount: pageDoc.pages?.length || 1,
+          language: pageDoc.language,
+          createdAt: pageDoc.createdAt,
+        };
+      }
+
+      // Fallback to legacy document
+      const doc = await Document.findOne({ fileId });
+      if (doc) {
+        return {
+          fileId: doc.fileId,
+          fileName: doc.fileName,
+          mimeType: (doc as any).mimeType || 'application/pdf',
+          userId: doc.userId,
+          sessionId: doc.sessionId,
+          pageCount: 1,
+          language: doc.language,
+          createdAt: doc.createdAt,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Get file info error:", error);
+      return null;
     }
   }
 }
