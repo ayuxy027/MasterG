@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
 
 // Supported Indian languages
@@ -90,6 +90,7 @@ const StitchPage: React.FC = () => {
   const [topic, setTopic] = useState("");
   const [culturalContext, setCulturalContext] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [latexCode, setLatexCode] = useState("");
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +121,13 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // Abort any existing generation
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsGenerating(true);
     setError(null);
     setThinkingText("");
@@ -135,6 +143,7 @@ const StitchPage: React.FC = () => {
         headers: {
           "Content-Type": "application/json",
         },
+        signal: controller.signal,
         body: JSON.stringify({
           topic: topic.trim(),
           language: selectedLanguage,
@@ -199,15 +208,29 @@ const StitchPage: React.FC = () => {
         }
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof StitchApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : "Failed to generate content. Please try again.";
-      setError(errorMessage);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Generation stopped.");
+      } else {
+        const errorMessage =
+          err instanceof StitchApiError
+            ? err.message
+            : err instanceof Error
+            ? err.message
+            : "Failed to generate content. Please try again.";
+        setError(errorMessage);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsGenerating(false);
+    }
+  };
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      setThinkingText("Generation stopped.");
     }
   };
 
@@ -420,6 +443,14 @@ const StitchPage: React.FC = () => {
                     "Generate Content"
                   )}
                 </button>
+                {isGenerating && (
+                  <button
+                    onClick={handleStopGeneration}
+                    className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all border border-gray-300"
+                  >
+                    Stop Generating
+                  </button>
+                )}
 
                 {/* Error Display */}
                 {error && (
