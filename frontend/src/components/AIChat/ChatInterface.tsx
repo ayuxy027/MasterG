@@ -9,6 +9,7 @@ import type { MessageUI, UploadProgress, FileListItem } from "../../types/chat";
 import MarkdownRenderer from "../ui/MarkdownRenderer";
 import Accordion from "../ui/Accordion";
 import { MessageSkeleton } from "../ui/Skeleton";
+import MicButton from "../ui/MicButton";
 
 interface ChatInterfaceProps {
   userId: string;
@@ -273,8 +274,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               key={mode}
               onClick={() => setCurrentMode(mode)}
               className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full capitalize transition-all font-semibold text-sm shadow-md transform hover:scale-105 ${currentMode === mode
-                  ? "bg-orange-400 text-white hover:bg-orange-500 shadow-lg"
-                  : "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
+                ? "bg-orange-400 text-white hover:bg-orange-500 shadow-lg"
+                : "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
                 }`}
             >
               {mode} Mode
@@ -327,8 +328,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               >
                 <div
                   className={`max-w-[85%] rounded-2xl p-4 shadow-md ${message.role === "user"
-                      ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
-                      : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
+                    ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
+                    : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
                     }`}
                 >
                   {/* Message Content */}
@@ -345,8 +346,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   {/* Timestamp */}
                   <div
                     className={`text-xs mt-2 ${message.role === "user"
-                        ? "text-orange-100"
-                        : "text-gray-500"
+                      ? "text-orange-100"
+                      : "text-gray-500"
                       }`}
                   >
                     {formatTimestamp(message.timestamp)}
@@ -443,10 +444,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
                   <div
                     className={`h-1.5 rounded-full transition-all ${upload.status === "completed"
-                        ? "bg-green-500"
-                        : upload.status === "error"
-                          ? "bg-red-500"
-                          : "bg-orange-500"
+                      ? "bg-green-500"
+                      : upload.status === "error"
+                        ? "bg-red-500"
+                        : "bg-orange-500"
                       }`}
                     style={{ width: `${upload.progress}%` }}
                   />
@@ -497,7 +498,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
 
         {/* Input & Send */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-end">
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -507,12 +508,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             rows={1}
             disabled={isLoading}
           />
+          {/* Voice Input Button */}
+          <MicButton
+            onTranscript={(text) => {
+              setInputValue((prev) => (prev ? `${prev} ${text}` : text));
+            }}
+            disabled={isLoading}
+          />
+          {/* Send Button */}
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
             className={`p-3 rounded-xl transition-all flex-shrink-0 ${inputValue.trim() && !isLoading
-                ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg transform hover:scale-105"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg transform hover:scale-105"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }`}
           >
             <svg

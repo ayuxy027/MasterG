@@ -84,3 +84,9 @@ __pycache__/
 # Uploaded files (user documents for preview)
 uploads/
 backend/uploads/
+
+# Whisper binaries and models (large files - download separately)
+backend/bin/
+backend/models/
+*.bin
+*.exe

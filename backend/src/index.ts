@@ -11,6 +11,7 @@ import posterRoutes from "./routes/poster.routes";
 import lmrRoutes from "./routes/lmr.routes";
 import stitchRoutes from "./routes/stitch.routes";
 import filesRoutes from "./routes/files.routes";
+import speechRoutes from "./routes/speech.routes";
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.get("/", (req: Request, res: Response) => {
       posters: "/api/posters",
       lmr: "/api/lmr",
       stitch: "/api/stitch",
+      speech: "/api/speech/transcribe",
       health: "/api/query/health",
       stats: "/api/upload/stats",
     },
@@ -66,6 +68,7 @@ app.use("/api/posters", posterRoutes);
 app.use("/api/lmr", lmrRoutes);
 app.use("/api/stitch", stitchRoutes);
 app.use("/api/files", filesRoutes);
+app.use("/api/speech", speechRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
