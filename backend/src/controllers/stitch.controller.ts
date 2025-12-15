@@ -284,27 +284,67 @@ export class StitchController {
     const subjectName = subjectNames[params.subject] || params.subject;
     const curriculumName = curriculumNames[params.curriculum] || params.curriculum;
 
-    let prompt = `Generate educational content for:
+    let prompt = `
+You are an expert Indian educator and curriculum designer.
+
+Generate educational content with the following details:
 
 Topic: ${params.topic}
-Language: ${languageName}
-Grade Level: Class ${params.grade}
 Subject: ${subjectName}
-Curriculum: ${curriculumName}`;
+Grade Level: Class ${params.grade}
+Curriculum: ${curriculumName}
+Target Language: ${languageName}
 
-    if (params.culturalContext) {
-      prompt += `\nInclude cultural context: Yes (add regional examples, festivals, local references)`;
-    }
+Primary Goal:
+Create accurate, age-appropriate, curriculum-aligned educational content that is easy to translate into Indian languages without loss of meaning.
 
-    prompt += `\n\nRequirements:
-- Create age-appropriate content for Class ${params.grade} students
-- Use proper ${languageName} script and fonts
-- Include mathematical notation if needed (for mathematics/science)
-- Follow ${curriculumName} curriculum standards
-- Structure content with clear sections and subsections
-- Present information clearly so it can be easily copied into lesson plans or worksheets`;
+Content Guidelines:
+- Write in clear, simple, and direct sentences.
+- Avoid complex grammar, idioms, metaphors, or poetic language.
+- Prefer short sentences over long or compound sentences.
+- Do NOT use unnecessary conjunctions such as "although", "however", "therefore", or "whereas".
+- Keep factual accuracy extremely high (NCERT-safe).
 
-    return prompt;
+Pedagogical Requirements:
+- Adjust depth, vocabulary, and examples strictly according to Class ${params.grade}.
+- Explain concepts step-by-step.
+- Use definitions, explanations, and examples where appropriate.
+- Maintain a neutral, teacher-friendly tone suitable for textbooks, worksheets, and lesson plans.
+
+Structure Requirements:
+- Use clear section headings.
+- Use bullet points where helpful.
+- Keep paragraphs short (2–4 lines max).
+- Ensure logical flow between sections.
+
+Scientific & Mathematical Accuracy:
+- Use correct scientific and mathematical terminology.
+- Preserve symbols, formulas, units, and notation exactly.
+- Do NOT invent facts or simplify incorrectly.
+
+Translation & Multilingual Safety Rules:
+- Avoid ambiguous pronouns.
+- Repeat key nouns instead of using "it", "this", or "that".
+- Keep terminology consistent throughout the content.
+- Prefer explicit statements over implied meaning.
+
+${params.culturalContext ? `
+Cultural Context Instructions:
+- Include simple, relevant regional or Indian examples (festivals, daily life, local environment).
+- Ensure cultural references support learning and do not distract from the core concept.
+- Keep cultural examples optional and clearly separated from core explanations.
+` : ``}
+
+Output Expectations:
+- Content must be easy to copy into lesson plans or worksheets.
+- Output must be suitable for offline use.
+- Avoid emojis, slang, or informal expressions.
+- Do not include meta explanations about how the content was generated.
+
+Begin generating the content now.
+`;
+
+    return prompt.trim();
   }
 }
 
