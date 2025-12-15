@@ -125,10 +125,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             prev.map((item) =>
               item.fileId === fileId
                 ? {
-                    ...item,
-                    progress,
-                    status: progress < 100 ? "uploading" : "processing",
-                  }
+                  ...item,
+                  progress,
+                  status: progress < 100 ? "uploading" : "processing",
+                }
                 : item
             )
           );
@@ -168,13 +168,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           prev.map((item) =>
             item.fileId === fileId
               ? {
-                  ...item,
-                  status: "error",
-                  error:
-                    error instanceof ChatApiError
-                      ? error.message
-                      : "Upload failed",
-                }
+                ...item,
+                status: "error",
+                error:
+                  error instanceof ChatApiError
+                    ? error.message
+                    : "Upload failed",
+              }
               : item
           )
         );
@@ -183,9 +183,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         const errorMessage: MessageUI = {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: `⚠️ Failed to upload **${file.name}**: ${
-            error instanceof ChatApiError ? error.message : "Unknown error"
-          }`,
+          content: `⚠️ Failed to upload **${file.name}**: ${error instanceof ChatApiError ? error.message : "Unknown error"
+            }`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, errorMessage]);
@@ -273,11 +272,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             <button
               key={mode}
               onClick={() => setCurrentMode(mode)}
-              className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full capitalize transition-all font-semibold text-sm shadow-md transform hover:scale-105 ${
-                currentMode === mode
+              className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full capitalize transition-all font-semibold text-sm shadow-md transform hover:scale-105 ${currentMode === mode
                   ? "bg-orange-400 text-white hover:bg-orange-500 shadow-lg"
                   : "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
-              }`}
+                }`}
             >
               {mode} Mode
             </button>
@@ -324,16 +322,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex mb-6 ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
+                className={`flex mb-6 ${message.role === "user" ? "justify-end" : "justify-start"
+                  }`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl p-4 shadow-md ${
-                    message.role === "user"
+                  className={`max-w-[85%] rounded-2xl p-4 shadow-md ${message.role === "user"
                       ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
                       : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
-                  }`}
+                    }`}
                 >
                   {/* Message Content */}
                   <div className="prose prose-sm max-w-none">
@@ -348,11 +344,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                   {/* Timestamp */}
                   <div
-                    className={`text-xs mt-2 ${
-                      message.role === "user"
+                    className={`text-xs mt-2 ${message.role === "user"
                         ? "text-orange-100"
                         : "text-gray-500"
-                    }`}
+                      }`}
                   >
                     {formatTimestamp(message.timestamp)}
                   </div>
@@ -441,19 +436,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     {upload.status === "completed"
                       ? "✓"
                       : upload.status === "error"
-                      ? "✗"
-                      : `${Math.round(upload.progress)}%`}
+                        ? "✗"
+                        : `${Math.round(upload.progress)}%`}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
                   <div
-                    className={`h-1.5 rounded-full transition-all ${
-                      upload.status === "completed"
+                    className={`h-1.5 rounded-full transition-all ${upload.status === "completed"
                         ? "bg-green-500"
                         : upload.status === "error"
-                        ? "bg-red-500"
-                        : "bg-orange-500"
-                    }`}
+                          ? "bg-red-500"
+                          : "bg-orange-500"
+                      }`}
                     style={{ width: `${upload.progress}%` }}
                   />
                 </div>
@@ -475,7 +469,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             type="file"
             className="hidden"
             onChange={(e) => handleFileUpload(e.target.files)}
-            accept=".pdf,image/*"
+            accept=".pdf,.txt,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,image/*"
             multiple
           />
           <button
@@ -495,10 +489,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            Upload PDF/Image
+            Upload Files
           </button>
           <span className="text-xs text-gray-500">
-            Multiple files supported
+            PDF, TXT, DOC, PPT, Images
           </span>
         </div>
 
@@ -516,11 +510,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className={`p-3 rounded-xl transition-all flex-shrink-0 ${
-              inputValue.trim() && !isLoading
+            className={`p-3 rounded-xl transition-all flex-shrink-0 ${inputValue.trim() && !isLoading
                 ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg transform hover:scale-105"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}
+              }`}
           >
             <svg
               className="w-6 h-6"
