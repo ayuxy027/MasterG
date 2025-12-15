@@ -151,10 +151,11 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
     try:
       outputs = model.generate(
         **inputs,
-        max_length=256,
-        num_beams=3,
+        max_length=512,  # Increased for longer scientific texts
+        num_beams=4,  # Increased beams for better quality
         use_cache=False,  # Disable cache to avoid None past_key_values issues
         early_stopping=True,
+        min_length=10,  # Ensure minimum output length
       )
     except Exception as e:
       # Fallback: try with simpler generation
