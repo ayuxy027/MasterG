@@ -50,33 +50,54 @@ def load_model():
       f"Please run setup_models.py to download the model locally first."
     )
   
-  # Force local_files_only to prevent any Hugging Face Hub calls
-  # IndicTrans2 uses custom tokenizer that needs trust_remote_code
+  # Verify vocabulary files exist
+  vocab_src = INDIC_MODEL_PATH / "dict.SRC.json"
+  vocab_tgt = INDIC_MODEL_PATH / "dict.TGT.json"
+  if not vocab_src.exists() or not vocab_tgt.exists():
+    raise FileNotFoundError(
+      f"Vocabulary files not found. Expected:\n"
+      f"  - {vocab_src}\n"
+      f"  - {vocab_tgt}\n"
+      f"Please ensure the model is properly downloaded."
+    )
+  
+  # Change to model directory so relative paths in tokenizer_config work
+  import os
+  original_cwd = os.getcwd()
+  os.chdir(str(INDIC_MODEL_PATH))
+  
   try:
-    tokenizer = AutoTokenizer.from_pretrained(
-      str(INDIC_MODEL_PATH),
+    # Force local_files_only to prevent any Hugging Face Hub calls
+    # IndicTrans2 uses custom tokenizer that needs trust_remote_code
+    try:
+      tokenizer = AutoTokenizer.from_pretrained(
+        ".",  # Current directory (model directory)
+        trust_remote_code=True,
+        local_files_only=True,  # CRITICAL: Only load from local disk, no network calls
+        use_fast=False,  # Use slow tokenizer to avoid issues with custom tokenization
+      )
+    except Exception as e:
+      # Fallback: try without use_fast if error occurs
+      tokenizer = AutoTokenizer.from_pretrained(
+        ".",
+        trust_remote_code=True,
+        local_files_only=True,
+      )
+  
+    # Load model - force materialization (no meta tensors)
+    # Disable torch compile before loading
+    torch._dynamo.config.disable = True
+    
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+      ".",  # Current directory (model directory)
       trust_remote_code=True,
       local_files_only=True,  # CRITICAL: Only load from local disk, no network calls
-      use_fast=False,  # Use slow tokenizer to avoid issues with custom tokenization
+      low_cpu_mem_usage=False,  # CRITICAL: Disable meta tensors
     )
   except Exception as e:
-    # Fallback: try without use_fast if error occurs
-    tokenizer = AutoTokenizer.from_pretrained(
-      str(INDIC_MODEL_PATH),
-      trust_remote_code=True,
-      local_files_only=True,
-    )
-  
-  # Load model - force materialization (no meta tensors)
-  # Disable torch compile before loading
-  torch._dynamo.config.disable = True
-  
-  model = AutoModelForSeq2SeqLM.from_pretrained(
-    str(INDIC_MODEL_PATH),
-    trust_remote_code=True,
-    local_files_only=True,  # CRITICAL: Only load from local disk, no network calls
-    low_cpu_mem_usage=False,  # CRITICAL: Disable meta tensors
-  )
+    # Restore CWD before raising
+    os.chdir(original_cwd)
+    raise
   
   # Handle meta tensors using to_empty() and proper state dict loading
   has_meta = any(p.device.type == "meta" for p in model.parameters())
@@ -87,7 +108,7 @@ def load_model():
     # Load weights from safetensors
     from safetensors.torch import load_file
     
-    state_dict_path = INDIC_MODEL_PATH / "model.safetensors"
+    state_dict_path = Path("model.safetensors")  # Relative to model directory
     if not state_dict_path.exists():
       raise FileNotFoundError(f"Model weights not found at {state_dict_path}")
     
@@ -116,6 +137,10 @@ def load_model():
   
   model.eval()
   processor = IndicProcessor(inference=True)
+  
+  # Restore original working directory
+  os.chdir(original_cwd)
+  
   return tokenizer, model, processor
 
 
@@ -132,56 +157,114 @@ def read_request() -> Dict[str, Any]:
 def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
   tokenizer, model, processor = load_model()
 
-  # Preprocess text
-  batch = processor.preprocess_batch([text], src_lang=src_lang, tgt_lang=tgt_lang)
-  if not batch or len(batch) == 0:
-    raise ValueError("Preprocessing returned empty batch")
+  # Chunk long texts to handle model's max length limit (256 tokens)
+  # Split by sentences to preserve meaning
+  MAX_CHUNK_LENGTH = 500  # Characters per chunk (safe limit)
   
-  # Tokenize
-  inputs = tokenizer(batch, return_tensors="pt", padding=True)
-  if inputs is None or "input_ids" not in inputs:
-    raise ValueError("Tokenization failed - no input_ids in result")
-  
-  # Move inputs to same device as model
-  device = next(model.parameters()).device
-  inputs = {k: v.to(device) for k, v in inputs.items()}
+  def chunk_text(text: str, max_chars: int) -> list[str]:
+    """Split text into chunks at sentence boundaries for better translation quality"""
+    if len(text) <= max_chars:
+      return [text]
+    
+    import re
+    chunks = []
+    # Split by sentence endings (period, exclamation, question mark followed by space or newline)
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    current_chunk = ""
+    
+    for sentence in sentences:
+      sentence = sentence.strip()
+      if not sentence:
+        continue
+      
+      # If single sentence is too long, split by commas
+      if len(sentence) > max_chars:
+        if current_chunk:
+          chunks.append(current_chunk.strip())
+          current_chunk = ""
+        # Split long sentence by commas
+        parts = sentence.split(', ')
+        for part in parts:
+          if len(current_chunk) + len(part) + 2 <= max_chars:
+            current_chunk += part + ", "
+          else:
+            if current_chunk:
+              chunks.append(current_chunk.rstrip(', ').strip())
+            current_chunk = part + ", "
+        continue
+      
+      if len(current_chunk) + len(sentence) + 1 <= max_chars:
+        current_chunk += sentence + " "
+      else:
+        if current_chunk:
+          chunks.append(current_chunk.strip())
+        current_chunk = sentence + " "
+    
+    if current_chunk:
+      chunks.append(current_chunk.strip())
+    
+    return chunks if chunks else [text]
 
-  # Generate translation using inference_mode to avoid meta tensor issues
-  with torch.inference_mode():  # Use inference_mode instead of no_grad
-    try:
-      outputs = model.generate(
-        **inputs,
-        max_length=2048,  # 20x+ increased for long texts across all 22 languages
-        num_beams=4,  # Increased beams for better quality
-        use_cache=False,  # Disable cache to avoid None past_key_values issues
-        early_stopping=True,
-        min_length=10,  # Ensure minimum output length
-      )
-    except Exception as e:
-      # Fallback: try with simpler generation
-      if "meta" in str(e).lower():
-        # Retry with even simpler generation params
+  # Split text into manageable chunks
+  text_chunks = chunk_text(text, MAX_CHUNK_LENGTH)
+  translated_chunks = []
+
+  for chunk in text_chunks:
+    # Preprocess text
+    batch = processor.preprocess_batch([chunk], src_lang=src_lang, tgt_lang=tgt_lang)
+    if not batch or len(batch) == 0:
+      continue
+    
+    # Tokenize
+    inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=200)
+    if inputs is None or "input_ids" not in inputs:
+      continue
+    
+    # Move inputs to same device as model
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
+    # Generate translation using inference_mode to avoid meta tensor issues
+    with torch.inference_mode():  # Use inference_mode instead of no_grad
+      try:
         outputs = model.generate(
           **inputs,
-          max_length=128,
-          num_beams=1,
-          do_sample=False,
-          use_cache=False,
+          max_length=200,  # Match model's max length (256, but safe at 200)
+          num_beams=3,  # Balanced quality and speed
+          use_cache=False,  # Disable cache to avoid None past_key_values issues
+          early_stopping=True,
+          min_length=5,  # Ensure minimum output length
         )
-      else:
-        raise
+      except Exception as e:
+        # Fallback: try with simpler generation
+        if "meta" in str(e).lower():
+          # Retry with even simpler generation params
+          outputs = model.generate(
+            **inputs,
+            max_length=150,
+            num_beams=1,
+            do_sample=False,
+            use_cache=False,
+          )
+        else:
+          raise
 
-  # Decode
-  translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-  if not translation or len(translation) == 0:
-    raise ValueError("Translation decoding returned empty result")
+    # Decode
+    translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+    if not translation or len(translation) == 0:
+      continue
+    
+    # Postprocess
+    post = processor.postprocess_batch([translation[0]], lang=tgt_lang)
+    if post and len(post) > 0 and post[0].strip():
+      translated_chunks.append(post[0].strip())
+
+  # Combine all translated chunks
+  if not translated_chunks:
+    raise ValueError("All translation chunks failed")
   
-  # Postprocess
-  post = processor.postprocess_batch([translation[0]], lang=tgt_lang)
-  if not post or len(post) == 0:
-    raise ValueError("Postprocessing returned empty result")
-
-  return {"success": True, "translated": post[0]}
+  final_translation = " ".join(translated_chunks)
+  return {"success": True, "translated": final_translation}
 
 
 def main() -> None:

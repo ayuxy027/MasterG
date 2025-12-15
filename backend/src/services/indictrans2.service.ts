@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import path from "path";
+import fs from "fs";
 import { env } from "../config/env";
 
 export interface IndicTrans2TranslateOptions {
@@ -10,6 +11,7 @@ export interface IndicTrans2TranslateOptions {
 export class IndicTrans2Service {
   private scriptPath: string;
   private pythonExecutable: string;
+  private pythonProcess: any = null; // Persistent Python process
 
   constructor() {
     this.scriptPath = path.resolve(
@@ -17,9 +19,9 @@ export class IndicTrans2Service {
       "..",
       "..",
       "proxy",
-      "indictrans2_service.py"
+      "indictrans2_server.py"  // Changed to server version
     );
-    // Use venv python if available, otherwise fallback to system python3
+    // Use venv python - CRITICAL for torch and other dependencies
     const venvPython = path.resolve(
       __dirname,
       "..",
@@ -29,7 +31,53 @@ export class IndicTrans2Service {
       "bin",
       "python"
     );
-    this.pythonExecutable = env.PYTHON_EXECUTABLE || venvPython;
+    // Always prioritize venv python if it exists (has torch and all deps)
+    if (fs.existsSync(venvPython)) {
+      this.pythonExecutable = venvPython;
+      console.log(`✅ Using IndicTrans2 venv Python: ${venvPython}`);
+    } else {
+      this.pythonExecutable = env.PYTHON_EXECUTABLE || "python3";
+      console.warn(`⚠️  IndicTrans2 venv not found at ${venvPython}, using ${this.pythonExecutable}. Translation may fail without proper dependencies.`);
+    }
+    
+    // Start persistent Python server
+    this.startServer();
+  }
+
+  private startServer() {
+    if (this.pythonProcess) {
+      return; // Already running
+    }
+
+    console.log("🚀 Starting IndicTrans2 persistent server...");
+    this.pythonProcess = spawn(this.pythonExecutable, [this.scriptPath], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    this.pythonProcess.stderr.on("data", (data: Buffer) => {
+      const msg = data.toString();
+      // Log server messages to stderr (model loading, etc.)
+      if (msg.includes("Loading") || msg.includes("ready") || msg.includes("error")) {
+        console.log(`[IndicTrans2] ${msg.trim()}`);
+      }
+    });
+
+    this.pythonProcess.on("error", (err: Error) => {
+      console.error("❌ IndicTrans2 server error:", err);
+      this.pythonProcess = null;
+    });
+
+    this.pythonProcess.on("exit", (code: number) => {
+      console.warn(`⚠️  IndicTrans2 server exited with code ${code}`);
+      this.pythonProcess = null;
+      // Attempt to restart after a delay
+      setTimeout(() => {
+        if (!this.pythonProcess) {
+          console.log("🔄 Attempting to restart IndicTrans2 server...");
+          this.startServer();
+        }
+      }, 5000);
+    });
   }
 
   async translate(
@@ -52,72 +100,87 @@ export class IndicTrans2Service {
     options: IndicTrans2TranslateOptions
   ): Promise<{ success: boolean; translated?: string; error?: string }> {
     return new Promise((resolve) => {
-      const child = spawn(this.pythonExecutable, [this.scriptPath], {
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-
-      const payload = JSON.stringify({
-        text,
-        src_lang: options.srcLang,
-        tgt_lang: options.tgtLang,
-      });
-
-      let stdout = "";
-      let stderr = "";
-
-      child.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      child.on("error", (err) => {
-        resolve({
-          success: false,
-          error: `Failed to start IndicTrans2 Python service: ${err.message}`,
-        });
-      });
-
-      child.on("close", (code) => {
-        if (!stdout.trim()) {
-          // Check for common errors
-          if (stderr.includes("FileNotFoundError") || stderr.includes("model not found")) {
+      // Ensure server is running
+      if (!this.pythonProcess) {
+        this.startServer();
+        // Wait a bit for server to start
+        setTimeout(() => {
+          if (!this.pythonProcess) {
             resolve({
               success: false,
-              error: `IndicTrans2 model not found. Please run: cd backend/proxy && source venv/bin/activate && python setup_models.py`,
+              error: "IndicTrans2 server failed to start",
             });
             return;
           }
-          if (stderr.includes("local_files_only") || stderr.includes("not found locally")) {
-            resolve({
-              success: false,
-              error: `Model files missing. Run setup_models.py to download the model locally first.`,
-            });
-            return;
-          }
-          resolve({
-            success: false,
-            error: stderr || "Empty response from IndicTrans2 Python service",
-          });
-          return;
-        }
+          this.sendRequest(text, options, resolve);
+        }, 2000);
+        return;
+      }
+
+      this.sendRequest(text, options, resolve);
+    });
+  }
+
+  private sendRequest(
+    text: string,
+    options: IndicTrans2TranslateOptions,
+    resolve: (value: { success: boolean; translated?: string; error?: string }) => void
+  ) {
+    if (!this.pythonProcess) {
+      resolve({
+        success: false,
+        error: "IndicTrans2 server is not running",
+      });
+      return;
+    }
+
+    const payload = JSON.stringify({
+      text,
+      src_lang: options.srcLang,
+      tgt_lang: options.tgtLang,
+    }) + "\n";
+
+    let stdoutBuffer = "";
+
+    const dataHandler = (data: Buffer) => {
+      stdoutBuffer += data.toString();
+      // Check if we have a complete JSON response (ends with newline)
+      if (stdoutBuffer.includes("\n")) {
+        const lines = stdoutBuffer.split("\n");
+        const responseLine = lines[0];
+        stdoutBuffer = lines.slice(1).join("\n");
+
+        this.pythonProcess.stdout.removeListener("data", dataHandler);
 
         try {
-          const parsed = JSON.parse(stdout);
+          const parsed = JSON.parse(responseLine);
           resolve(parsed);
         } catch (err: any) {
           resolve({
             success: false,
-            error: `Invalid JSON from IndicTrans2 Python service: ${err.message}. Output: ${stdout.substring(0, 200)}`,
+            error: `Invalid JSON from IndicTrans2 server: ${err.message}. Output: ${responseLine.substring(0, 200)}`,
           });
         }
-      });
+      }
+    };
 
-      child.stdin.write(payload);
-      child.stdin.end();
-    });
+    const errorHandler = (data: Buffer) => {
+      const stderr = data.toString();
+      // Only treat as error if it's not just a log message
+      if (stderr.includes("Error") || stderr.includes("Traceback")) {
+        this.pythonProcess.stderr.removeListener("data", errorHandler);
+        resolve({
+          success: false,
+          error: `IndicTrans2 server error: ${stderr.substring(0, 500)}`,
+        });
+      }
+    };
+
+    this.pythonProcess.stdout.on("data", dataHandler);
+    this.pythonProcess.stderr.on("data", errorHandler);
+
+    // Send request
+    this.pythonProcess.stdin.write(payload);
   }
 }
 
