@@ -4,12 +4,14 @@ import { pdfService } from "../services/pdf.service";
 import { ocrService } from "../services/ocr.service";
 import { chunkingService } from "../services/chunking.service";
 import { embeddingService } from "../services/embedding.service";
+import { ollamaEmbeddingService } from "../services/ollamaEmbedding.service";
 import { vectorDBService } from "../services/vectordb.service";
 import { chatService } from "../services/chat.service";
 import { documentService } from "../services/document.service";
 import { languageService } from "../services/language.service";
 import { UploadResponse } from "../types";
 import { SUPPORTED_FILE_TYPES } from "../config/constants";
+import env from "../config/env";
 import fs from "fs/promises";
 
 export class UploadController {
@@ -139,13 +141,25 @@ export class UploadController {
         `✅ Created ${allChunks.length} chunks total (1 chunk per page)`
       );
 
-      // Step 3: Generate embeddings page-wise
+      // Step 3: Generate embeddings page-wise (ONLINE/OFFLINE)
+      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
+      console.log(`🔧 Mode: ${isOfflineMode ? 'OFFLINE (Ollama)' : 'ONLINE (Google)'}`);
       console.log(
         `🔄 Generating embeddings page-wise for ${allChunks.length} pages...`
       );
-      const embeddingResults = await embeddingService.generateEmbeddings(
-        allChunks.map((chunk) => chunk.content)
-      );
+
+      let embeddingResults;
+      if (isOfflineMode) {
+        // Use Ollama for embeddings (offline)
+        embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
+          allChunks.map((chunk) => chunk.content)
+        );
+      } else {
+        // Use Google API for embeddings (online)
+        embeddingResults = await embeddingService.generateEmbeddings(
+          allChunks.map((chunk) => chunk.content)
+        );
+      }
 
       console.log(
         `✅ Generated ${embeddingResults.length} embeddings (1 per page) for easier page-wise matching`

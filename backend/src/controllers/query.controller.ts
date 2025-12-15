@@ -1,8 +1,14 @@
 import { Request, Response } from 'express';
 import { queryRouterService } from '../services/queryRouter.service';
+import { offlineQueryRouterService } from '../services/offlineQueryRouter.service';
+import { serviceFactory } from '../services/serviceFactory';
 import { chatService } from '../services/chat.service';
 import { vectorDBService } from '../services/vectordb.service';
+import { ollamaChatService } from '../services/ollamaChat.service';
+import { ollamaEmbeddingService } from '../services/ollamaEmbedding.service';
 import { QueryRequest, QueryResponse } from '../types';
+import env from '../config/env';
+
 
 export class QueryController {
   /**
@@ -15,8 +21,8 @@ export class QueryController {
    */
   async query(req: Request, res: Response): Promise<void> {
     try {
-      const { 
-        query, 
+      const {
+        query,
         userId = 'default-user',
         sessionId = 'default-session'
       } = req.body as QueryRequest;
@@ -49,14 +55,29 @@ export class QueryController {
         content: query,
       });
 
-      // ========== 🎯 INTELLIGENT 3-LAYER ROUTING ==========
+      // ========== 🎯 INTELLIGENT ROUTING (ONLINE/OFFLINE) ==========
       const startTime = Date.now();
-      
-      const result = await queryRouterService.routeQuery(
-        query,
-        chatHistory,
-        chromaCollectionName
-      );
+      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
+
+      console.log(`🔧 Mode: ${isOfflineMode ? 'OFFLINE (Ollama)' : 'ONLINE (Groq/Gemini)'}`);
+
+      let result: { answer: string; sources: any[]; layer: string; reasoning: string };
+
+      if (isOfflineMode) {
+        // Use Ollama-based offline router
+        result = await offlineQueryRouterService.routeQuery(
+          query,
+          chatHistory,
+          chromaCollectionName
+        );
+      } else {
+        // Use online router (Groq/Gemini)
+        result = await queryRouterService.routeQuery(
+          query,
+          chatHistory,
+          chromaCollectionName
+        );
+      }
 
       const responseTime = Date.now() - startTime;
 
@@ -185,16 +206,35 @@ export class QueryController {
   }
 
   /**
-   * Health check endpoint
+   * Health check endpoint - includes Ollama status
    */
   async health(req: Request, res: Response): Promise<void> {
     try {
       const stats = await vectorDBService.getStats();
+      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
+
+      // Check Ollama status if in offline mode
+      let ollamaStatus = { chat: false, embedding: false };
+      if (isOfflineMode) {
+        try {
+          ollamaStatus.chat = await ollamaChatService.checkConnection();
+          ollamaStatus.embedding = await ollamaEmbeddingService.checkConnection();
+        } catch (e) {
+          console.warn('Ollama health check failed:', e);
+        }
+      }
+
       res.status(200).json({
         success: true,
         status: 'healthy',
+        mode: isOfflineMode ? 'offline' : 'online',
         vectorDB: 'connected',
         documentsIndexed: stats.count,
+        ollama: isOfflineMode ? {
+          available: ollamaStatus.chat && ollamaStatus.embedding,
+          chatModel: ollamaStatus.chat ? env.OLLAMA_CHAT_MODEL : 'not available',
+          embedModel: ollamaStatus.embedding ? env.OLLAMA_EMBED_MODEL : 'not available',
+        } : 'not used (online mode)',
       });
     } catch (error) {
       res.status(500).json({

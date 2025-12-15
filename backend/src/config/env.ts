@@ -39,8 +39,12 @@ interface EnvConfig {
   ENABLE_QUERY_OPTIMIZATION: boolean;
 
   // Ollama Configuration
-  OLLAMA_URL?: string;
-  OLLAMA_MODEL?: string;
+  OLLAMA_URL: string;
+  OLLAMA_CHAT_MODEL: string;
+  OLLAMA_EMBED_MODEL: string;
+
+  // Offline Mode
+  USE_OFFLINE_MODE: string;
 }
 
 const getEnvVariable = (key: string, defaultValue?: string): string => {
@@ -86,9 +90,13 @@ export const env: EnvConfig = {
   ENABLE_QUERY_OPTIMIZATION:
     getEnvVariable("ENABLE_QUERY_OPTIMIZATION", "true") === "true",
 
-  // Ollama Configuration (optional - defaults in service)
-  OLLAMA_URL: process.env.OLLAMA_URL,
-  OLLAMA_MODEL: process.env.OLLAMA_MODEL,
+  // Ollama Configuration
+  OLLAMA_URL: getEnvVariable("OLLAMA_URL", "http://localhost:11434"),
+  OLLAMA_CHAT_MODEL: getEnvVariable("OLLAMA_CHAT_MODEL", "deepseek-r1:1.5b"),
+  OLLAMA_EMBED_MODEL: getEnvVariable("OLLAMA_EMBED_MODEL", "embeddinggemma:latest"),
+
+  // Offline Mode (auto, online, offline)
+  USE_OFFLINE_MODE: getEnvVariable("USE_OFFLINE_MODE", "offline"),
 };
 
 export default env;

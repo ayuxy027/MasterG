@@ -1,0 +1,522 @@
+import axios from "axios";
+import { SUPPORTED_LANGUAGES, LanguageCode } from "../config/constants";
+import { ChatMessage, SourceCitation } from "../types";
+
+/**
+ * Ollama Chat Service
+ * Uses local DeepSeek R1 model for AI responses
+ * Completely offline - replaces Groq and Gemini services
+ */
+export class OllamaChatService {
+    private baseUrl: string;
+    private model: string;
+
+    constructor() {
+        this.baseUrl = process.env.OLLAMA_URL || "http://localhost:11434";
+        this.model = process.env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
+    }
+
+    /**
+     * Check if Ollama is running and the chat model is available
+     */
+    async checkConnection(): Promise<boolean> {
+        try {
+            const response = await axios.get(`${this.baseUrl}/api/tags`, {
+                timeout: 5000,
+            });
+
+            const models = response.data.models || [];
+            const hasChatModel = models.some(
+                (m: any) => m.name === this.model || m.name.startsWith("deepseek-r1")
+            );
+
+            if (!hasChatModel) {
+                console.warn(`⚠️ Chat model "${this.model}" not found in Ollama`);
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.error("Ollama chat connection check failed:", error);
+            return false;
+        }
+    }
+
+    /**
+     * Build educational prompt for student learning
+     * Adapted from Groq service for DeepSeek R1
+     */
+    private buildEducationalPrompt(
+        documentContext: string,
+        chatHistory: ChatMessage[],
+        question: string,
+        language: LanguageCode,
+        sources: SourceCitation[]
+    ): string {
+        const languageName = SUPPORTED_LANGUAGES[language];
+        const hasDocuments = documentContext && documentContext.trim().length > 0;
+
+        // Format chat history (last 10 messages for context)
+        const chatContextString =
+            chatHistory.length > 0
+                ? chatHistory
+                    .slice(-10)
+                    .map((msg) => {
+                        const role = msg.role === "user" ? "Student" : "You";
+                        let msgContent = `${role}: ${msg.content}`;
+                        if (msg.sources && msg.sources.length > 0) {
+                            const sourceInfo = msg.sources
+                                .map((s) => `${s.pdfName} (Page ${s.pageNo})`)
+                                .join(", ");
+                            msgContent += `\n  [Referenced: ${sourceInfo}]`;
+                        }
+                        return msgContent;
+                    })
+                    .join("\n")
+                : "";
+
+        // Format source citations
+        const sourcesString =
+            sources.length > 0
+                ? sources
+                    .map(
+                        (s, idx) =>
+                            `[Source ${idx + 1}] "${s.pdfName}" - Page ${s.pageNo}`
+                    )
+                    .join("\n")
+                : "";
+
+        if (hasDocuments) {
+            return `You are an expert educational tutor. Answer the question directly based on the document content.
+
+DOCUMENT CONTENT:
+${documentContext}
+
+SOURCES:
+${sourcesString}
+
+${chatContextString
+                    ? `CONVERSATION HISTORY (use this to understand context and references):
+${chatContextString}
+
+`
+                    : ""
+                }Current Question: ${question}
+
+CRITICAL INSTRUCTIONS:
+- Use the conversation history to understand context (e.g., "that chapter", "upas chapter", "solve exercise")
+- If the student refers to something from previous messages, use that context
+- DO NOT say: "Let me search", "Let me analyze", "I'm looking", "Searching the document"
+- DO: Start IMMEDIATELY with the answer in ${languageName}
+- Cite sources like: "According to ${sources[0]?.pdfName || "the document"
+                }, Page X..."
+
+Start your answer NOW in ${languageName}:`;
+        } else {
+            return `You are an educational assistant. The student has asked a question but no relevant documents were found.
+
+${chatContextString
+                    ? `CONVERSATION HISTORY:
+${chatContextString}
+
+`
+                    : ""
+                }Current Question: ${question}
+
+CRITICAL INSTRUCTIONS:
+- Check the conversation history - the student might be referring to something discussed earlier
+- If they're asking about a specific chapter/exercise mentioned before, acknowledge it
+- DO NOT say: "Let me", "Searching", "Looking", "Analyzing"
+- DO: Answer immediately in ${languageName}
+
+If educational: Provide answer + note "This is general knowledge as it's not in your documents."
+If referring to previous content: Explain you need them to upload the relevant document
+If NOT educational: Politely decline
+
+Answer NOW in ${languageName}:`;
+        }
+    }
+
+    /**
+     * Generate educational answer using Ollama (DeepSeek R1)
+     * Replaces Groq's generateEducationalAnswer
+     */
+    async generateEducationalAnswer(
+        documentContext: string,
+        chatHistory: ChatMessage[],
+        question: string,
+        language: LanguageCode,
+        sources: SourceCitation[]
+    ): Promise<{ answer: string; reasoning?: string; thinking?: string }> {
+        try {
+            const prompt = this.buildEducationalPrompt(
+                documentContext,
+                chatHistory,
+                question,
+                language,
+                sources
+            );
+
+            console.log(`🤖 Generating educational answer with Ollama (${this.model})`);
+
+            const response = await axios.post(
+                `${this.baseUrl}/api/generate`,
+                {
+                    model: this.model,
+                    prompt: prompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.7,
+                        num_predict: 3000,
+                        top_p: 0.95,
+                    },
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    timeout: 120000, // 2 minutes for generation
+                }
+            );
+
+            if (!response.data.response) {
+                throw new Error("No response from Ollama");
+            }
+
+            const fullResponse = response.data.response.trim();
+
+            // Extract thinking if present (DeepSeek R1 format)
+            const { answer, thinking } = this.parseDeepSeekResponse(fullResponse);
+
+            return {
+                answer,
+                reasoning: thinking,
+                thinking,
+            };
+        } catch (error: any) {
+            if (error.code === "ECONNREFUSED") {
+                throw new Error("Ollama is not running. Please start Ollama service.");
+            }
+            if (error.code === "ETIMEDOUT") {
+                throw new Error("Ollama request timed out. The model may be processing.");
+            }
+            console.error("Ollama chat error:", error.message);
+            throw new Error(`Ollama chat failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Generic chat completion method (for router service)
+     * Replaces Groq's chatCompletion
+     */
+    async chatCompletion(
+        messages: Array<{ role: string; content: string }>,
+        responseFormat?: "json_object" | "text"
+    ): Promise<string> {
+        try {
+            // Convert messages array to a single prompt for Ollama
+            const prompt = messages
+                .map((m) => {
+                    if (m.role === "system") return `System: ${m.content}`;
+                    if (m.role === "user") return `User: ${m.content}`;
+                    return `Assistant: ${m.content}`;
+                })
+                .join("\n\n");
+
+            const fullPrompt = responseFormat === "json_object"
+                ? `${prompt}\n\nRespond with valid JSON only:`
+                : prompt;
+
+            const response = await axios.post(
+                `${this.baseUrl}/api/generate`,
+                {
+                    model: this.model,
+                    prompt: fullPrompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.3,
+                        num_predict: 1000,
+                    },
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    timeout: 60000,
+                }
+            );
+
+            if (!response.data.response) {
+                throw new Error("No response from Ollama");
+            }
+
+            const result = response.data.response.trim();
+
+            // For JSON responses, try to extract just the JSON part
+            if (responseFormat === "json_object") {
+                return this.extractJSON(result);
+            }
+
+            // Remove thinking tags if present
+            const { answer } = this.parseDeepSeekResponse(result);
+            return answer;
+        } catch (error: any) {
+            if (error.code === "ECONNREFUSED") {
+                throw new Error("Ollama is not running. Please start Ollama service.");
+            }
+            console.error("Ollama chat completion error:", error.message);
+            throw new Error(`Ollama chat completion failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Handle simple queries (greetings, basic questions)
+     * Replaces Layer 1 routing
+     */
+    async handleSimpleQuery(
+        query: string,
+        language: LanguageCode,
+        chatHistory: ChatMessage[]
+    ): Promise<string> {
+        const languageName = SUPPORTED_LANGUAGES[language];
+
+        const chatContext = chatHistory
+            .slice(-5)
+            .map((m) => `${m.role === "user" ? "Student" : "Assistant"}: ${m.content}`)
+            .join("\n");
+
+        const prompt = `You are a helpful multilingual AI assistant.
+
+CRITICAL RULES:
+1. Respond ONLY in ${languageName} language
+2. Provide DIRECT answers - NO intermediate messages
+3. For greetings: Be friendly and brief
+4. For invalid questions: Politely explain you need a clear question
+5. Keep responses concise (2-3 sentences max)
+
+${chatContext ? `Previous conversation:\n${chatContext}\n\n` : ""}
+User: ${query}
+
+Respond in ${languageName}:`;
+
+        const response = await axios.post(
+            `${this.baseUrl}/api/generate`,
+            {
+                model: this.model,
+                prompt,
+                stream: false,
+                options: {
+                    temperature: 0.7,
+                    num_predict: 500,
+                },
+            },
+            {
+                timeout: 30000,
+            }
+        );
+
+        const { answer } = this.parseDeepSeekResponse(response.data.response || "");
+        return answer;
+    }
+
+    /**
+     * Query with full document context (Gemini-style)
+     * Replaces Gemini's queryWithFullDocument
+     */
+    async queryWithFullDocument(
+        query: string,
+        fullDocumentContent: string,
+        language: LanguageCode,
+        chatHistory: ChatMessage[],
+        documentMetadata?: {
+            fileName: string;
+            totalPages: number;
+            language?: string;
+        }
+    ): Promise<{ answer: string; strategy: string; thinking?: string }> {
+        const languageName = SUPPORTED_LANGUAGES[language];
+
+        const chatContext =
+            chatHistory.length > 0
+                ? chatHistory
+                    .slice(-10)
+                    .map((m) => {
+                        let msgText = `${m.role === "user" ? "Student" : "Assistant"}: ${m.content}`;
+                        if (m.sources && m.sources.length > 0) {
+                            const sourceInfo = m.sources
+                                .map((s) => `${s.pdfName} Page ${s.pageNo}`)
+                                .join(", ");
+                            msgText += `\n  [Referenced: ${sourceInfo}]`;
+                        }
+                        return msgText;
+                    })
+                    .join("\n")
+                : "";
+
+        const prompt = `You are an expert educational tutor. Answer the question directly based on the complete document provided.
+
+📚 DOCUMENT CONTENT:
+${documentMetadata
+                ? `File: ${documentMetadata.fileName} (${documentMetadata.totalPages} pages)`
+                : ""
+            }
+
+${fullDocumentContent}
+
+${"=".repeat(80)}
+
+${chatContext
+                ? `CONVERSATION HISTORY (use this to understand context and references):
+${chatContext}
+
+`
+                : ""
+            }Current Question: ${query}
+
+CRITICAL - DO NOT:
+- Say "Let me search", "Let me analyze", "I'm looking", "Searching"
+- Provide intermediate thinking steps
+- Explain your process
+
+CRITICAL - DO:
+- Use conversation history to understand references (e.g., "that chapter", "upas chapter", "solve exercise")
+- Start IMMEDIATELY with the answer
+- Answer in ${languageName}
+- Cite page numbers when relevant
+- Be direct and thorough
+
+Start your answer NOW in ${languageName}:`;
+
+        try {
+            const response = await axios.post(
+                `${this.baseUrl}/api/generate`,
+                {
+                    model: this.model,
+                    prompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.7,
+                        num_predict: 4096,
+                        top_p: 0.95,
+                    },
+                },
+                {
+                    timeout: 180000, // 3 minutes for large documents
+                }
+            );
+
+            const { answer, thinking } = this.parseDeepSeekResponse(
+                response.data.response || ""
+            );
+
+            return {
+                answer,
+                strategy: "FULL_DOCUMENT_CONTEXT_OLLAMA",
+                thinking,
+            };
+        } catch (error: any) {
+            console.error("❌ Ollama full document query error:", error.message);
+            throw new Error(`Ollama full document query failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Parse DeepSeek R1 response to extract thinking and answer
+     * DeepSeek R1 may include <think>...</think> tags
+     */
+    private parseDeepSeekResponse(response: string): {
+        answer: string;
+        thinking?: string;
+    } {
+        // Check for <think> tags (DeepSeek R1 format)
+        const thinkMatch = response.match(/<think>([\s\S]*?)<\/think>/);
+
+        if (thinkMatch) {
+            const thinking = thinkMatch[1].trim();
+            const answer = response.replace(/<think>[\s\S]*?<\/think>/, "").trim();
+            return { answer, thinking };
+        }
+
+        // No thinking tags, return as-is
+        return { answer: response.trim() };
+    }
+
+    /**
+     * Extract JSON from response (for structured outputs)
+     */
+    private extractJSON(response: string): string {
+        // Try to find JSON object in the response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                // Validate it's valid JSON
+                JSON.parse(jsonMatch[0]);
+                return jsonMatch[0];
+            } catch {
+                // Invalid JSON, return original
+            }
+        }
+        return response;
+    }
+
+    /**
+     * Validate language code
+     */
+    validateLanguage(language: string): language is LanguageCode {
+        return language in SUPPORTED_LANGUAGES;
+    }
+
+    /**
+     * Extract keywords from query (for RAG optimization)
+     */
+    async extractKeywords(query: string): Promise<string[]> {
+        try {
+            const prompt = `Extract ONLY the technical/educational keywords from this query. Ignore filler words and random content.
+
+Query: "${query}"
+
+Return ONLY a comma-separated list of important keywords (3-5 words max). If no meaningful keywords exist, return "NONE".
+
+Example:
+Query: "explain photosynthesis process"
+Keywords: photosynthesis, process
+
+Keywords:`;
+
+            const response = await axios.post(
+                `${this.baseUrl}/api/generate`,
+                {
+                    model: this.model,
+                    prompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.1,
+                        num_predict: 50,
+                    },
+                },
+                {
+                    timeout: 15000,
+                }
+            );
+
+            const extractedText = response.data.response?.trim() || "NONE";
+
+            if (extractedText === "NONE" || extractedText.toLowerCase() === "none") {
+                return [];
+            }
+
+            const keywords = extractedText
+                .split(",")
+                .map((k: string) => k.trim().toLowerCase())
+                .filter((k: string) => k.length > 0);
+
+            console.log(`🤖 Ollama extracted keywords: [${keywords.join(", ")}]`);
+            return keywords;
+        } catch (error: any) {
+            console.error("⚠️ Ollama keyword extraction failed:", error.message);
+            return [];
+        }
+    }
+}
+
+export const ollamaChatService = new OllamaChatService();
