@@ -80,3 +80,7 @@ __pycache__/
 # Expo
 .expo/
 .expo-shared/
+
+# Uploaded files (user documents for preview)
+uploads/
+backend/uploads/
