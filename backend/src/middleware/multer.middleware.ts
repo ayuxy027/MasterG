@@ -25,11 +25,11 @@ const storage = multer.diskStorage({
 // File filter
 const fileFilter = (req: any, file: any, cb: any) => {
   const allowedMimes = Object.values(SUPPORTED_FILE_TYPES);
-  
+
   if (allowedMimes.includes(file.mimetype as any)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF and images are allowed'));
+    cb(new Error('Invalid file type. Supported: PDF, TXT, DOC, DOCX, PPT, PPTX, and images (JPG, PNG, GIF, WebP)'));
   }
 };
 
