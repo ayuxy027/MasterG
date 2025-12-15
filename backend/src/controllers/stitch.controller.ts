@@ -162,12 +162,12 @@ export class StitchController {
         return;
       }
 
-      // TODO: Implement LaTeX to PDF compilation
-      // This would require a LaTeX compiler like pdflatex or xelatex
-      // For now, return error indicating it's not implemented
+      // For now, PDF generation is not implemented to keep the stack simple.
+      // Frontend can still display / copy LaTeX; PDF compile can be added later.
       res.status(501).json({
         success: false,
-        error: "PDF generation not yet implemented. Requires LaTeX compiler setup.",
+        error:
+          "PDF generation is not yet implemented. LaTeX code is available for manual compilation.",
       });
     } catch (error) {
       console.error("PDF generation error:", error);
