@@ -151,7 +151,7 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
     try:
       outputs = model.generate(
         **inputs,
-        max_length=512,  # Increased for longer scientific texts
+        max_length=2048,  # 20x+ increased for long texts across all 22 languages
         num_beams=4,  # Increased beams for better quality
         use_cache=False,  # Disable cache to avoid None past_key_values issues
         early_stopping=True,
