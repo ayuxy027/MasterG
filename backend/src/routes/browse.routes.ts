@@ -31,4 +31,14 @@ router.get(
   asyncHandler(browseController.getDocumentsByFile.bind(browseController))
 );
 
+/**
+ * DELETE /api/browse/files/:fileId
+ * Delete a file and all associated data
+ * Cleans up: ChromaDB embeddings, MongoDB documents, physical files
+ */
+router.delete(
+  '/files/:fileId',
+  asyncHandler(browseController.deleteFile.bind(browseController))
+);
+
 export default router;
