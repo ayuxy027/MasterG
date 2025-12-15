@@ -1,7 +1,5 @@
 import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
-import { pdfService } from "../services/pdf.service";
-import { ocrService } from "../services/ocr.service";
 import { chunkingService } from "../services/chunking.service";
 import { embeddingService } from "../services/embedding.service";
 import { ollamaEmbeddingService } from "../services/ollamaEmbedding.service";
@@ -9,10 +7,10 @@ import { vectorDBService } from "../services/vectordb.service";
 import { chatService } from "../services/chat.service";
 import { documentService } from "../services/document.service";
 import { languageService } from "../services/language.service";
+import { fileStorageService } from "../services/fileStorage.service";
+import { textExtractorService } from "../services/textExtractor.service";
 import { UploadResponse } from "../types";
-import { SUPPORTED_FILE_TYPES } from "../config/constants";
 import env from "../config/env";
-import fs from "fs/promises";
 
 export class UploadController {
   /**
@@ -47,98 +45,95 @@ export class UploadController {
 
       let allChunks: any[] = [];
 
-      // Step 1: Extract text (page by page for PDFs)
-      if (file.mimetype === SUPPORTED_FILE_TYPES.PDF) {
-        // NEW: Extract text page by page
-        const pages = await pdfService.extractTextByPages(file.path);
+      // Step 1: Extract text using universal text extractor (handles ALL file types)
+      try {
+        const extractionResult = await textExtractorService.extract(file.path, file.mimetype);
         console.log(
-          `📄 Extracted ${pages.length} pages from ${file.originalname}`
+          `📄 Extracted ${extractionResult.pageCount || 1} page(s) from ${file.originalname}`
         );
 
         // Get full document content for language detection
-        const fullDocumentContent = pages.map((p) => p.text).join("\n\n");
+        const fullDocumentContent = extractionResult.text;
 
         // Detect document language from full content
-        const documentLanguageDetection =
-          languageService.detectLanguage(fullDocumentContent);
+        const documentLanguageDetection = languageService.detectLanguage(fullDocumentContent);
         console.log(
           `🌐 Detected document language: ${documentLanguageDetection.language} (${documentLanguageDetection.languageCode})`
         );
 
-        // Store pages individually in MongoDB (NEW: page-wise storage)
-        const pageData = pages.map((page) => ({
-          pageNumber: page.pageNumber,
-          content: page.text,
-        }));
+        // Store in MongoDB based on whether we have page-wise data
+        if (extractionResult.pages && extractionResult.pages.length > 0) {
+          // Page-wise storage for documents with multiple pages (PDF, PPT, etc.)
+          const pageData = extractionResult.pages.map((page) => ({
+            pageNumber: page.pageNumber,
+            content: page.text,
+          }));
 
-        console.log(`💾 Storing ${pageData.length} pages in MongoDB...`);
-        await documentService.storePages(
-          fileId,
-          file.originalname,
-          pageData,
-          userId,
-          sessionId,
-          documentLanguageDetection.languageCode
-        );
-        console.log(`✅ Page-wise storage complete for ${file.originalname}`);
+          console.log(`💾 Storing ${pageData.length} pages in MongoDB...`);
+          await documentService.storePages(
+            fileId,
+            file.originalname,
+            pageData,
+            userId,
+            sessionId,
+            documentLanguageDetection.languageCode,
+            file.mimetype  // Pass mimeType
+          );
+          console.log(`✅ Page-wise storage complete for ${file.originalname}`);
 
-        // Step 2: Create chunks for each page (maintaining page numbers)
-        for (const page of pages) {
-          if (page.text.trim().length === 0) continue;
+          // Create chunks for each page
+          for (const page of extractionResult.pages) {
+            if (page.text.trim().length === 0) continue;
 
-          const pageChunks = await chunkingService.createChunks(
-            page.text,
+            const pageChunks = await chunkingService.createChunks(
+              page.text,
+              file.originalname,
+              fileId,
+              page.pageNumber,
+              userId
+            );
+            allChunks.push(...pageChunks);
+          }
+        } else {
+          // Single document storage (TXT, DOC, single-page images, etc.)
+          console.log(`💾 Storing document content in MongoDB...`);
+          await documentService.storeDocument(
+            fileId,
+            file.originalname,
+            fullDocumentContent,
+            userId,
+            sessionId,
+            documentLanguageDetection.languageCode,
+            file.mimetype  // Pass mimeType
+          );
+
+          const chunks = await chunkingService.createChunks(
+            fullDocumentContent,
             file.originalname,
             fileId,
-            page.pageNumber, // KEY: Pass page number for citations
+            1, // Single page
             userId
-            // fullDocumentContent removed - now stored separately in MongoDB
           );
-          allChunks.push(...pageChunks);
+          allChunks.push(...chunks);
         }
-      } else if (ocrService.isImageFile(file.mimetype)) {
-        // For images, treat as single page
-        const extractedText = await ocrService.extractText(file.path);
-        console.log(
-          `Extracted ${extractedText.length} characters from ${file.originalname}`
-        );
+      } catch (extractError: any) {
+        console.error(`❌ Text extraction failed for ${file.originalname}:`, extractError.message);
 
-        // Detect language from image text
-        const imageLanguageDetection =
-          languageService.detectLanguage(extractedText);
-        console.log(
-          `🌐 Detected image language: ${imageLanguageDetection.language} (${imageLanguageDetection.languageCode})`
-        );
+        // Clean up temp file
+        try {
+          const fs = await import('fs/promises');
+          await fs.unlink(file.path);
+        } catch { }
 
-        // Store full content in MongoDB
-        await documentService.storeDocument(
-          fileId,
-          file.originalname,
-          extractedText,
-          userId,
-          sessionId,
-          imageLanguageDetection.languageCode
-        );
-
-        const chunks = await chunkingService.createChunks(
-          extractedText,
-          file.originalname,
-          fileId,
-          1, // Single page for images
-          userId
-          // fullDocumentContent removed - now stored separately in MongoDB
-        );
-        allChunks.push(...chunks);
-      } else {
         res.status(400).json({
           success: false,
-          error: "Unsupported file type",
+          error: `Failed to extract text: ${extractError.message}`,
         });
         return;
       }
 
       console.log(
-        `✅ Created ${allChunks.length} chunks total (1 chunk per page)`
+        `✅ Created ${allChunks.length} chunks total`
       );
 
       // Step 3: Generate embeddings page-wise (ONLINE/OFFLINE)
@@ -173,8 +168,57 @@ export class UploadController {
         chromaCollectionName // Store in chat-specific collection
       );
 
-      // Step 5: Clean up uploaded file
-      await fs.unlink(file.path);
+      // Step 5: Store file permanently for preview (instead of deleting)
+      console.log("📁 Storing file for preview...");
+      const storedFile = await fileStorageService.storeFile(
+        fileId,  // Pass the same fileId used for MongoDB
+        file.path,
+        userId,
+        sessionId,
+        file.originalname,
+        file.mimetype
+      );
+      console.log(`✅ File stored: ${storedFile.filePath}`);
+
+      // Step 6: Convert PPT/PPTX to PDF for preview (if LibreOffice available)
+      let previewPdfPath: string | null = null;
+      const isPPT = file.mimetype.includes('powerpoint') ||
+        file.mimetype.includes('presentation') ||
+        file.originalname.toLowerCase().endsWith('.pptx') ||
+        file.originalname.toLowerCase().endsWith('.ppt');
+
+      if (isPPT) {
+        console.log('📊 Converting PPT to PDF for preview...');
+        try {
+          const { pptConversionService } = await import('../services/pptConversion.service');
+          const sessionPath = storedFile.filePath.substring(0, storedFile.filePath.lastIndexOf('/')) ||
+            storedFile.filePath.substring(0, storedFile.filePath.lastIndexOf('\\'));
+
+          const result = await pptConversionService.convertAndStore(
+            storedFile.filePath,
+            fileId,
+            sessionPath
+          );
+
+          if (result.pdfPath) {
+            previewPdfPath = result.pdfPath;
+            console.log(`✅ PPT preview PDF ready: ${previewPdfPath}`);
+          } else {
+            console.log('⚠️ PPT conversion skipped (LibreOffice not available), using text preview');
+          }
+        } catch (convError: any) {
+          console.error('PPT conversion error:', convError.message);
+          // Continue without PDF preview
+        }
+      }
+
+      // Clean up temp file (the original is now copied to storage)
+      try {
+        const fs = await import('fs/promises');
+        await fs.unlink(file.path);
+      } catch {
+        // Temp file already cleaned or doesn't exist
+      }
 
       const response: UploadResponse = {
         success: true,
@@ -182,10 +226,16 @@ export class UploadController {
         fileName: file.originalname,
         chunksCreated: allChunks.length,
         message: "File processed successfully",
+        // @ts-ignore - Adding fileUrl for preview
+        fileUrl: `/api/files/${fileId}?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}`,
+        mimeType: file.mimetype,
+        // @ts-ignore - Adding preview info
+        hasPreviewPdf: !!previewPdfPath,
+        previewUrl: previewPdfPath ? `/api/files/${fileId}/preview?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}` : null,
       };
 
       console.log(
-        `\n✅ Upload complete: ${file.originalname} - ${allChunks.length} chunks created\n`
+        `\n✅ Upload complete: ${file.originalname} - ${allChunks.length} chunks created${previewPdfPath ? ' + PDF preview' : ''}\n`
       );
 
       res.status(200).json(response);
@@ -195,6 +245,7 @@ export class UploadController {
       // Clean up uploaded file on error
       if (req.file && req.file.path) {
         try {
+          const fs = await import('fs/promises');
           await fs.unlink(req.file.path);
           console.log("🗑️  Cleaned up uploaded file after error");
         } catch (cleanupError) {
