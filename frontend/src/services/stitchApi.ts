@@ -290,7 +290,7 @@ class StitchApi {
   }
 
   /**
-   * Check NLLB-200 connection status (via translate endpoint test)
+   * Check NLLB-200 connection status
    */
   async checkNLLBStatus(): Promise<{
     success: boolean;
@@ -300,17 +300,11 @@ class StitchApi {
     error?: string;
   }> {
     try {
-      // Use the translate endpoint with a test query to check status
-      const response = await fetch(`${API_BASE_URL}/stitch/translate`, {
-        method: "POST",
+      const response = await fetch(`${API_BASE_URL}/stitch/status/nllb`, {
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          text: "Test",
-          sourceLanguage: "en",
-          targetLanguage: "hi",
-        }),
       });
 
       if (!response.ok) {
@@ -323,13 +317,7 @@ class StitchApi {
         };
       }
 
-      const data = await response.json();
-      return {
-        success: true,
-        connected: data.success === true,
-        enabled: true,
-        message: "NLLB-200 is working",
-      };
+      return await response.json();
     } catch (error) {
       return {
         success: false,
