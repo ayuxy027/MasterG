@@ -112,6 +112,46 @@ export class ChatController {
   }
 
   /**
+   * Update chat name/title
+   */
+  async updateChatName(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.query.userId as string;
+      const sessionId = req.params.sessionId;
+      const { chatName } = req.body;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      if (!chatName || typeof chatName !== "string") {
+        res.status(400).json({
+          success: false,
+          error: "chatName is required",
+        });
+        return;
+      }
+
+      await chatService.updateChatName(userId, sessionId, chatName.trim());
+
+      res.status(200).json({
+        success: true,
+        message: "Chat name updated successfully",
+      });
+    } catch (error: any) {
+      console.error("Update chat name error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to update chat name",
+      });
+    }
+  }
+
+  /**
    * Query chat with async RAG pipeline
    */
   async queryChat(req: Request, res: Response): Promise<void> {

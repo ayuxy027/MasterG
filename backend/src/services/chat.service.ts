@@ -55,6 +55,10 @@ const chatHistorySchema: any = new Schema(
       type: String,
       required: true,
     },
+    chatName: {
+      type: String,
+      default: null,
+    },
     messages: [chatMessageSchema],
   },
   { timestamps: true }
@@ -279,6 +283,7 @@ export class ChatService {
     Array<{
       sessionId: string;
       chromaCollectionName: string;
+      chatName?: string;
       messageCount: number;
       lastMessage?: string;
       createdAt: Date;
@@ -299,6 +304,7 @@ export class ChatService {
       return sessions.map((s: any) => ({
         sessionId: s.sessionId,
         chromaCollectionName: s.chromaCollectionName,
+        chatName: s.chatName || undefined,
         messageCount: s.messages?.length || 0,
         lastMessage: s.messages?.[s.messages.length - 1]?.content?.substring(
           0,
@@ -310,6 +316,34 @@ export class ChatService {
     } catch (error) {
       console.error("Error getting all user sessions:", error);
       return [];
+    }
+  }
+
+  /**
+   * Update chat name for a session
+   */
+  async updateChatName(
+    userId: string,
+    sessionId: string,
+    chatName: string
+  ): Promise<void> {
+    try {
+      // Check if MongoDB is connected
+      if (mongoose.connection.readyState !== 1) {
+        console.warn("MongoDB not connected. Chat name not saved.");
+        return;
+      }
+
+      await ChatHistoryModel.findOneAndUpdate(
+        { userId, sessionId },
+        { $set: { chatName, updatedAt: new Date() } },
+        { upsert: false }
+      );
+
+      console.log(`📝 Chat name updated: "${chatName}" (${userId}/${sessionId})`);
+    } catch (error) {
+      console.error("Error updating chat name:", error);
+      throw new Error("Failed to update chat name");
     }
   }
 
