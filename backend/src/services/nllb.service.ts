@@ -1,17 +1,17 @@
-import { spawn } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import fs from "fs";
 import { env } from "../config/env";
 
-export interface IndicTrans2TranslateOptions {
+export interface NLLBTranslateOptions {
   srcLang: string; // e.g. eng_Latn
   tgtLang: string; // e.g. hin_Deva
 }
 
-export class IndicTrans2Service {
+export class NLLBService {
   private scriptPath: string;
   private pythonExecutable: string;
-  private pythonProcess: any = null; // Persistent Python process
+  private pythonProcess: ChildProcess | null = null; // Persistent Python process
 
   constructor() {
     this.scriptPath = path.resolve(
@@ -19,7 +19,7 @@ export class IndicTrans2Service {
       "..",
       "..",
       "proxy",
-      "indictrans2_server.py"  // Changed to server version
+      "nllb_server.py"
     );
     // Use venv python - CRITICAL for torch and other dependencies
     const venvPython = path.resolve(
@@ -34,14 +34,16 @@ export class IndicTrans2Service {
     // Always prioritize venv python if it exists (has torch and all deps)
     if (fs.existsSync(venvPython)) {
       this.pythonExecutable = venvPython;
-      console.log(`✅ Using IndicTrans2 venv Python: ${venvPython}`);
+      console.log(`✅ Using NLLB venv Python: ${venvPython}`);
     } else {
       this.pythonExecutable = env.PYTHON_EXECUTABLE || "python3";
-      console.warn(`⚠️  IndicTrans2 venv not found at ${venvPython}, using ${this.pythonExecutable}. Translation may fail without proper dependencies.`);
+      console.warn(`⚠️  NLLB venv not found at ${venvPython}, using ${this.pythonExecutable}. Translation may fail without proper dependencies.`);
     }
     
-    // Start persistent Python server
-    this.startServer();
+    // Start persistent Python server only if enabled
+    if (env.NLLB_ENABLED) {
+      this.startServer();
+    }
   }
 
   private startServer() {
@@ -49,7 +51,7 @@ export class IndicTrans2Service {
       return; // Already running
     }
 
-    console.log("🚀 Starting IndicTrans2 persistent server...");
+    console.log("🚀 Starting NLLB-200 persistent server...");
     this.pythonProcess = spawn(this.pythonExecutable, [this.scriptPath], {
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -58,37 +60,43 @@ export class IndicTrans2Service {
       const msg = data.toString();
       // Log server messages to stderr (model loading, etc.)
       if (msg.includes("Loading") || msg.includes("ready") || msg.includes("error")) {
-        console.log(`[IndicTrans2] ${msg.trim()}`);
+        console.log(`[NLLB] ${msg.trim()}`);
       }
     });
 
     this.pythonProcess.on("error", (err: Error) => {
-      console.error("❌ IndicTrans2 server error:", err);
+      console.error("❌ NLLB server error:", err);
       this.pythonProcess = null;
     });
 
     this.pythonProcess.on("exit", (code: number) => {
-      console.warn(`⚠️  IndicTrans2 server exited with code ${code}`);
+      console.warn(`⚠️  NLLB server exited with code ${code}`);
       this.pythonProcess = null;
       // Attempt to restart after a delay
-      setTimeout(() => {
-        if (!this.pythonProcess) {
-          console.log("🔄 Attempting to restart IndicTrans2 server...");
-          this.startServer();
-        }
-      }, 5000);
+      if (env.NLLB_ENABLED) {
+        setTimeout(() => {
+          if (!this.pythonProcess) {
+            console.log("🔄 Attempting to restart NLLB server...");
+            this.startServer();
+          }
+        }, 5000);
+      }
     });
   }
 
   async translate(
     text: string,
-    options: IndicTrans2TranslateOptions
+    options: NLLBTranslateOptions
   ): Promise<string> {
+    if (!env.NLLB_ENABLED) {
+      throw new Error("NLLB-200 is not enabled. Set NLLB_ENABLED=true to enable.");
+    }
+
     const result = await this.runPython(text, options);
 
     if (!result.success || !result.translated) {
       throw new Error(
-        result.error || "IndicTrans2 translation failed for unknown reasons"
+        result.error || "NLLB translation failed for unknown reasons"
       );
     }
 
@@ -103,7 +111,7 @@ export class IndicTrans2Service {
    */
   async streamTranslate(
     text: string,
-    options: IndicTrans2TranslateOptions,
+    options: NLLBTranslateOptions,
     onChunk: (chunk: {
       success: boolean;
       type?: string;
@@ -113,6 +121,15 @@ export class IndicTrans2Service {
       error?: string;
     }) => void
   ): Promise<void> {
+    if (!env.NLLB_ENABLED) {
+      onChunk({
+        success: false,
+        type: "error",
+        error: "NLLB-200 is not enabled. Set NLLB_ENABLED=true to enable.",
+      });
+      return;
+    }
+
     // Ensure server is running
     await new Promise<void>((resolve) => {
       if (!this.pythonProcess) {
@@ -127,7 +144,7 @@ export class IndicTrans2Service {
       onChunk({
         success: false,
         type: "error",
-        error: "IndicTrans2 server is not running",
+        error: "NLLB server is not running",
       });
       return;
     }
@@ -157,7 +174,7 @@ export class IndicTrans2Service {
               onChunk(parsed);
 
               if (parsed.type === "complete" || parsed.type === "error") {
-                this.pythonProcess.stdout.removeListener("data", dataHandler);
+                this.pythonProcess!.stdout.removeListener("data", dataHandler);
                 resolve();
                 return;
               }
@@ -167,10 +184,10 @@ export class IndicTrans2Service {
                 type: "error",
                 error:
                   err instanceof Error
-                    ? `Invalid JSON from IndicTrans2 server: ${err.message}`
-                    : "Invalid JSON from IndicTrans2 server",
+                    ? `Invalid JSON from NLLB server: ${err.message}`
+                    : "Invalid JSON from NLLB server",
               });
-              this.pythonProcess.stdout.removeListener("data", dataHandler);
+              this.pythonProcess!.stdout.removeListener("data", dataHandler);
               resolve();
               return;
             }
@@ -180,16 +197,16 @@ export class IndicTrans2Service {
         }
       };
 
-      this.pythonProcess.stdout.on("data", dataHandler);
+      this.pythonProcess!.stdout.on("data", dataHandler);
 
       // Send request
-      this.pythonProcess.stdin.write(payload);
+      this.pythonProcess!.stdin.write(payload);
     });
   }
 
   private runPython(
     text: string,
-    options: IndicTrans2TranslateOptions
+    options: NLLBTranslateOptions
   ): Promise<{ success: boolean; translated?: string; error?: string }> {
     return new Promise((resolve) => {
       // Ensure server is running
@@ -200,7 +217,7 @@ export class IndicTrans2Service {
           if (!this.pythonProcess) {
             resolve({
               success: false,
-              error: "IndicTrans2 server failed to start",
+              error: "NLLB server failed to start",
             });
             return;
           }
@@ -215,13 +232,13 @@ export class IndicTrans2Service {
 
   private sendRequest(
     text: string,
-    options: IndicTrans2TranslateOptions,
+    options: NLLBTranslateOptions,
     resolve: (value: { success: boolean; translated?: string; error?: string }) => void
   ) {
     if (!this.pythonProcess) {
       resolve({
         success: false,
-        error: "IndicTrans2 server is not running",
+        error: "NLLB server is not running",
       });
       return;
     }
@@ -242,7 +259,7 @@ export class IndicTrans2Service {
         const responseLine = lines[0];
         stdoutBuffer = lines.slice(1).join("\n");
 
-        this.pythonProcess.stdout.removeListener("data", dataHandler);
+        this.pythonProcess!.stdout.removeListener("data", dataHandler);
 
         try {
           const parsed = JSON.parse(responseLine);
@@ -250,7 +267,7 @@ export class IndicTrans2Service {
         } catch (err: any) {
           resolve({
             success: false,
-            error: `Invalid JSON from IndicTrans2 server: ${err.message}. Output: ${responseLine.substring(0, 200)}`,
+            error: `Invalid JSON from NLLB server: ${err.message}. Output: ${responseLine.substring(0, 200)}`,
           });
         }
       }
@@ -261,10 +278,10 @@ export class IndicTrans2Service {
       // Only treat as fatal error if it's a Traceback or Fatal error
       // Ignore "Warning" messages - those are expected and handled gracefully
       if (stderr.includes("Traceback") || stderr.includes("Fatal error") || (stderr.includes("Error") && !stderr.includes("Warning"))) {
-        this.pythonProcess.stderr.removeListener("data", errorHandler);
+        this.pythonProcess!.stderr.removeListener("data", errorHandler);
         resolve({
           success: false,
-          error: `IndicTrans2 server error: ${stderr.substring(0, 500)}`,
+          error: `NLLB server error: ${stderr.substring(0, 500)}`,
         });
       }
     };
@@ -277,6 +294,5 @@ export class IndicTrans2Service {
   }
 }
 
-export const indicTrans2Service = new IndicTrans2Service();
-
+export const nllbService = new NLLBService();
 

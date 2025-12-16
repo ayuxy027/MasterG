@@ -173,7 +173,7 @@ class StitchApi {
   }
 
   /**
-   * Translate generated content using IndicTrans2
+   * Translate generated content using NLLB-200
    */
   async translateContent(
     request: StitchTranslateRequest
@@ -286,6 +286,45 @@ class StitchApi {
 
         sepIndex = buffer.indexOf("\n\n");
       }
+    }
+  }
+
+  /**
+   * Check NLLB-200 connection status
+   */
+  async checkNLLBStatus(): Promise<{
+    success: boolean;
+    connected: boolean;
+    enabled: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stitch/status/nllb`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          connected: false,
+          enabled: true,
+          error: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
+        };
+      }
+
+      return await response.json();
+    } catch (error) {
+      return {
+        success: false,
+        connected: false,
+        enabled: true,
+        error: error instanceof Error ? error.message : "NLLB service unavailable",
+      };
     }
   }
 

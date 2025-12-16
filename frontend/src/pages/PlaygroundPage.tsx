@@ -13,8 +13,8 @@ const PlaygroundPage: React.FC = () => {
     name: "Ollama (DeepSeek R1)",
     status: "checking",
   });
-  const [indicTrans2Status, setIndicTrans2Status] = useState<ServiceStatus>({
-    name: "IndicTrans2",
+  const [nllbStatus, setNllbStatus] = useState<ServiceStatus>({
+    name: "NLLB-200",
     status: "checking",
   });
 
@@ -35,11 +35,11 @@ const PlaygroundPage: React.FC = () => {
   // Check service statuses
   useEffect(() => {
     checkOllamaStatus();
-    checkIndicTrans2Status();
+    checkNllbStatus();
     // Refresh status every 10 seconds
     const interval = setInterval(() => {
       checkOllamaStatus();
-      checkIndicTrans2Status();
+      checkNllbStatus();
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -65,31 +65,27 @@ const PlaygroundPage: React.FC = () => {
     }
   };
 
-  const checkIndicTrans2Status = async () => {
-    // Test with a known MT-safe sentence (not too short, well-formed)
+  const checkNllbStatus = async () => {
     try {
-      const testResult = await stitchAPI.translateContent({
-        text: "Photosynthesis is a biological process that converts light energy into chemical energy.",
-        sourceLanguage: "en",
-        targetLanguage: "hi",
-      });
-      setIndicTrans2Status({
-        name: "IndicTrans2",
-        status: testResult.success ? "connected" : "error",
-        details: testResult.success 
-          ? "Model loaded and ready" 
-          : testResult.error || "Service error",
+      const status = await stitchAPI.checkNLLBStatus();
+      setNllbStatus({
+        name: "NLLB-200",
+        status: status.connected ? "connected" : status.enabled ? "error" : "disconnected",
+        details: status.enabled 
+          ? (status.connected ? "Model loaded and ready" : status.error || "Service error")
+          : "Not enabled (set NLLB_ENABLED=true)",
         lastChecked: new Date(),
       });
     } catch (err) {
-      setIndicTrans2Status({
-        name: "IndicTrans2",
+      setNllbStatus({
+        name: "NLLB-200",
         status: "error",
         details: err instanceof Error ? err.message : "Service unavailable",
         lastChecked: new Date(),
       });
     }
   };
+
 
   const testOllama = async () => {
     setOllamaLoading(true);
@@ -210,7 +206,7 @@ const PlaygroundPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Service Playground</h1>
-        <p className="text-gray-600 mb-6">Test and debug Ollama and IndicTrans2 services</p>
+        <p className="text-gray-600 mb-6">Test and debug Ollama and NLLB-200 translation services</p>
 
         {/* Service Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -234,20 +230,20 @@ const PlaygroundPage: React.FC = () => {
             </button>
           </div>
 
-          {/* IndicTrans2 Status */}
-          <div className={`border-2 rounded-lg p-4 ${getStatusColor(indicTrans2Status.status)}`}>
+          {/* NLLB-200 Status */}
+          <div className={`border-2 rounded-lg p-4 ${getStatusColor(nllbStatus.status)}`}>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-lg">{indicTrans2Status.name}</h3>
-              <span className="text-2xl">{getStatusIcon(indicTrans2Status.status)}</span>
+              <h3 className="font-semibold text-lg">{nllbStatus.name}</h3>
+              <span className="text-2xl">{getStatusIcon(nllbStatus.status)}</span>
             </div>
-            <p className="text-sm opacity-80">{indicTrans2Status.details || "Checking..."}</p>
-            {indicTrans2Status.lastChecked && (
+            <p className="text-sm opacity-80">{nllbStatus.details || "Checking..."}</p>
+            {nllbStatus.lastChecked && (
               <p className="text-xs mt-2 opacity-60">
-                Last checked: {indicTrans2Status.lastChecked.toLocaleTimeString()}
+                Last checked: {nllbStatus.lastChecked.toLocaleTimeString()}
               </p>
             )}
             <button
-              onClick={checkIndicTrans2Status}
+              onClick={checkNllbStatus}
               className="mt-3 text-xs px-3 py-1 bg-white bg-opacity-50 rounded hover:bg-opacity-70"
             >
               Refresh
@@ -310,7 +306,7 @@ const PlaygroundPage: React.FC = () => {
 
           {/* Translation Test */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Test IndicTrans2 (Translation)</h2>
+            <h2 className="text-xl font-semibold mb-4">Test Translation (NLLB-200)</h2>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -409,6 +405,7 @@ const PlaygroundPage: React.FC = () => {
               )}
             </div>
           </div>
+
         </div>
       </div>
     </div>

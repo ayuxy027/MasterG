@@ -550,9 +550,11 @@ const StitchPage: React.FC = () => {
                       setError(null);
                       console.log("🔄 Starting translation...");
                       try {
+                        // Content is always generated in English first (prompt is MT-safe English)
+                        // So sourceLanguage should be "en" (English)
                         const resp = await stitchAPI.translateContent({
                           text: generatedContent,
-                          sourceLanguage: selectedLanguage,
+                          sourceLanguage: "en",
                           targetLanguage: targetLanguageForTranslation,
                         });
                         console.log("✅ Translation response:", resp);
