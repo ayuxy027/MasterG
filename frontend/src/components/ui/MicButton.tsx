@@ -28,21 +28,21 @@ const MicButton: React.FC<MicButtonProps> = ({
 
     const getButtonStyles = (): string => {
         const baseStyles =
-            "relative p-3 rounded-xl transition-all flex-shrink-0 flex items-center justify-center";
+            "relative p-2.5 rounded-xl transition-all flex-shrink-0 flex items-center justify-center border-2";
 
         if (disabled || isProcessing) {
-            return `${baseStyles} bg-gray-200 text-gray-400 cursor-not-allowed`;
+            return `${baseStyles} bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed`;
         }
 
         if (isRecording) {
-            return `${baseStyles} bg-red-500 text-white hover:bg-red-600 shadow-lg animate-pulse`;
+            return `${baseStyles} bg-red-500 text-white border-red-500 hover:bg-red-600 hover:border-red-600 shadow-lg animate-pulse`;
         }
 
         if (isError) {
-            return `${baseStyles} bg-red-100 text-red-600 border-2 border-red-300 hover:bg-red-200`;
+            return `${baseStyles} bg-red-50 text-red-600 border-red-300 hover:bg-red-100`;
         }
 
-        return `${baseStyles} bg-orange-100 text-orange-600 border-2 border-orange-200 hover:bg-orange-200 hover:border-orange-300 hover:shadow-md`;
+        return `${baseStyles} bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100 hover:border-orange-300`;
     };
 
     const getTooltip = (): string => {
@@ -63,13 +63,13 @@ const MicButton: React.FC<MicButtonProps> = ({
             >
                 {/* Mic Icon */}
                 {!isProcessing && !isRecording && (
-                    <MicIcon className="w-6 h-6" />
+                    <MicIcon className="w-5 h-5" />
                 )}
 
                 {/* Recording Icon with Animation */}
                 {isRecording && (
                     <div className="relative">
-                        <MicIcon className="w-6 h-6" />
+                        <MicIcon className="w-5 h-5" />
                         {/* Pulsing ring animation */}
                         <span className="absolute -inset-1 rounded-full bg-white/30 animate-ping" />
                     </div>
@@ -78,7 +78,7 @@ const MicButton: React.FC<MicButtonProps> = ({
                 {/* Processing Spinner */}
                 {isProcessing && (
                     <svg
-                        className="w-6 h-6 animate-spin"
+                        className="w-5 h-5 animate-spin"
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
