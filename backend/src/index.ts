@@ -12,6 +12,7 @@ import lmrRoutes from "./routes/lmr.routes";
 import stitchRoutes from "./routes/stitch.routes";
 import filesRoutes from "./routes/files.routes";
 import speechRoutes from "./routes/speech.routes";
+import analyzeRoutes from "./routes/analyze.routes";
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use("/api/lmr", lmrRoutes);
 app.use("/api/stitch", stitchRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/speech", speechRoutes);
+app.use("/api/analyze", analyzeRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

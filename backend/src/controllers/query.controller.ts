@@ -24,7 +24,8 @@ export class QueryController {
       const {
         query,
         userId = 'default-user',
-        sessionId = 'default-session'
+        sessionId = 'default-session',
+        mentionedFileIds
       } = req.body as QueryRequest;
 
       // Validate inputs
@@ -39,6 +40,9 @@ export class QueryController {
       console.log(`\n${'='.repeat(80)}`);
       console.log(`💬 NEW QUERY: "${query}"`);
       console.log(`👤 User: ${userId} | Session: ${sessionId}`);
+      if (mentionedFileIds && mentionedFileIds.length > 0) {
+        console.log(`📎 @ Mentions: ${mentionedFileIds.length} file(s) targeted`);
+      }
       console.log(`${'='.repeat(80)}\n`);
 
       // ========== GET CHAT-SPECIFIC CHROMADB COLLECTION ==========
@@ -71,11 +75,12 @@ export class QueryController {
           chromaCollectionName
         );
       } else {
-        // Use online router (Groq/Gemini)
+        // Use online router (Groq/Gemini) with optional file filter
         result = await queryRouterService.routeQuery(
           query,
           chatHistory,
-          chromaCollectionName
+          chromaCollectionName,
+          mentionedFileIds  // Pass file filter for @ mentions
         );
       }
 
@@ -118,6 +123,169 @@ export class QueryController {
         answer: '',
         sources: [],
       });
+    }
+  }
+
+  /**
+   * 🚀 STREAMING QUERY HANDLER
+   * Returns real-time Server-Sent Events (SSE) for word-by-word streaming
+   * Supports @ mentions file filtering
+   * Supports both online (Gemini) and offline (Ollama) modes
+   */
+  async streamQuery(req: Request, res: Response): Promise<void> {
+    try {
+      const {
+        query,
+        userId = 'default-user',
+        sessionId = 'default-session',
+        mentionedFileIds
+      } = req.body as QueryRequest;
+
+      // Validate inputs
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        res.status(400).json({ error: 'Query is required' });
+        return;
+      }
+
+      // Check if we're in offline mode
+      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
+
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`🚀 STREAMING QUERY: "${query}"`);
+      console.log(`👤 User: ${userId} | Session: ${sessionId}`);
+      console.log(`🔧 Mode: ${isOfflineMode ? 'OFFLINE (Ollama)' : 'ONLINE (Gemini)'}`);
+      if (mentionedFileIds && mentionedFileIds.length > 0) {
+        console.log(`📎 @ Mentions: ${mentionedFileIds.length} file(s)`);
+      }
+      console.log(`${'='.repeat(80)}\n`);
+
+      // Get collection and history
+      const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
+      const chatHistory = await chatService.getMessages(userId, sessionId);
+
+      // Save user message
+      await chatService.addMessage(userId, sessionId, {
+        role: 'user',
+        content: query,
+      });
+
+      // Send analyzing indicator
+      res.write(`data: ${JSON.stringify({ type: 'layer', layer: 'analyzing' })}\n\n`);
+
+      // Import language service
+      const { languageService } = await import('../services/language.service');
+      const detectedLang = languageService.detectLanguage(query);
+
+      // Generate query embedding - use appropriate service based on mode
+      let queryEmbedding: number[];
+      if (isOfflineMode) {
+        queryEmbedding = await ollamaEmbeddingService.generateEmbedding(query);
+      } else {
+        const { embeddingService } = await import('../services/embedding.service');
+        queryEmbedding = await embeddingService.generateEmbedding(query);
+      }
+
+      // Search with optional file filter
+      const searchResults = await vectorDBService.queryChunksWithFilter(
+        queryEmbedding,
+        5,
+        chromaCollectionName,
+        mentionedFileIds
+      );
+
+      // Build context and sources
+      const context = searchResults.documents.slice(0, 5).join("\n\n---\n\n");
+      const sources = searchResults.metadatas
+        .slice(0, 3)
+        .map((m: any, idx: number) => ({
+          pdfName: m.fileName || "Document",
+          pageNo: m.page || 1,
+          snippet: searchResults.documents[idx]?.substring(0, 100) || ""
+        }))
+        .reverse();
+
+      // Update layer indicator based on mode
+      const layerName = isOfflineMode ? 'OLLAMA-STREAM' : 'LAYER3-GEMINI-STREAM';
+      res.write(`data: ${JSON.stringify({ type: 'layer', layer: layerName })}\n\n`);
+
+      // Stream the response
+      let fullAnswer = '';
+
+      if (isOfflineMode) {
+        // OFFLINE MODE: Use Ollama (non-streaming, simulate chunks)
+        try {
+          const result = await ollamaChatService.generateEducationalAnswer(
+            context,
+            chatHistory,
+            query,
+            detectedLang.languageCode as any,
+            sources
+          );
+
+          // Simulate streaming by sending chunks
+          const words = result.answer.split(' ');
+          for (let i = 0; i < words.length; i += 3) {
+            const chunk = words.slice(i, i + 3).join(' ') + ' ';
+            fullAnswer += chunk;
+            res.write(`data: ${JSON.stringify({ type: 'text', content: chunk })}\n\n`);
+            // Small delay for streaming effect
+            await new Promise(resolve => setTimeout(resolve, 30));
+          }
+        } catch (ollamaError: any) {
+          console.error('Ollama error:', ollamaError);
+          res.write(`data: ${JSON.stringify({ type: 'error', error: ollamaError.message })}\n\n`);
+          res.end();
+          return;
+        }
+      } else {
+        // ONLINE MODE: Use Gemini streaming
+        const { streamingService } = await import('../services/streaming.service');
+
+        for await (const chunk of streamingService.streamWithSources(
+          query,
+          context,
+          sources,
+          chatHistory.map(m => ({ role: m.role, content: m.content }))
+        )) {
+          if (chunk.type === 'text' && chunk.content) {
+            fullAnswer += chunk.content;
+          }
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+          // Add 200ms delay for smoother streaming experience
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+
+      // Send sources after answer
+      for (const source of sources) {
+        res.write(`data: ${JSON.stringify({ type: 'source', source })}\n\n`);
+      }
+
+      // Send done signal
+      res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+
+      // Save complete response to chat history
+      if (fullAnswer) {
+        await chatService.addMessage(userId, sessionId, {
+          role: 'assistant',
+          content: fullAnswer,
+          sources: sources,
+        });
+      }
+
+      console.log(`✅ Streaming complete. Answer length: ${fullAnswer.length} chars`);
+      res.end();
+
+    } catch (error: any) {
+      console.error('❌ Streaming error:', error);
+      res.write(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Streaming failed' })}\n\n`);
+      res.end();
     }
   }
 

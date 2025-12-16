@@ -14,6 +14,16 @@ router.post(
 );
 
 /**
+ * POST /api/query/stream
+ * Process a user query with streaming response (SSE)
+ * Returns Server-Sent Events for real-time word-by-word streaming
+ */
+router.post(
+  '/stream',
+  asyncHandler(queryController.streamQuery.bind(queryController))
+);
+
+/**
  * GET /api/query/health
  * Health check endpoint
  */
@@ -23,3 +33,4 @@ router.get(
 );
 
 export default router;
+
