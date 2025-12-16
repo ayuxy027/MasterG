@@ -1,6 +1,5 @@
 import axios from "axios";
 import { EmbeddingResult } from "../types";
-import { cacheService } from "./cache.service";
 import logger from "./logger.service";
 
 /**
@@ -36,17 +35,17 @@ export class OllamaEmbeddingService {
       const response = await axios.get(`${this.baseUrl}/api/tags`, {
         timeout: 5000,
       });
-      
+
       const models = response.data.models || [];
       const hasEmbeddingModel = models.some(
         (m: any) => m.name === this.model || m.name.startsWith("embeddinggemma")
       );
-      
+
       if (!hasEmbeddingModel) {
         console.warn(`⚠️ Embedding model "${this.model}" not found in Ollama`);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error("Ollama embedding connection check failed:", error);
@@ -58,14 +57,6 @@ export class OllamaEmbeddingService {
    * Generate embedding for a single text using Ollama
    */
   async generateEmbedding(text: string, retryCount = 0): Promise<number[]> {
-    // Check cache first
-    const cacheKey = `ollama_${text}`;
-    const cached = cacheService.getEmbedding(text);
-    if (cached) {
-      logger.debug("✨ Using cached Ollama embedding");
-      return cached;
-    }
-
     try {
       const response = await axios.post(
         `${this.baseUrl}/api/embeddings`,
@@ -86,9 +77,6 @@ export class OllamaEmbeddingService {
       if (!embedding || !Array.isArray(embedding)) {
         throw new Error("Invalid embedding response from Ollama");
       }
-
-      // Cache the embedding
-      cacheService.setEmbedding(text, embedding);
 
       return embedding;
     } catch (error: any) {

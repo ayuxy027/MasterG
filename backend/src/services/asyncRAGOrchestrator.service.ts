@@ -1,7 +1,7 @@
 import { queryPreprocessorService } from "./queryPreprocessor.service";
 import { decisionEngineService } from "./decisionEngine.service";
-import { cacheService } from "./cache.service";
 import { vectorDBService } from "./vectordb.service";
+import { ollamaChatService } from "./ollamaChat.service";
 import { ChatMessage } from "../types";
 import logger from "./logger.service";
 import { v4 as uuidv4 } from "uuid";
@@ -14,19 +14,23 @@ export interface RAGResponse {
     strategy: string;
     language: string;
     queryType: string;
-    cached: boolean;
     duration: number;
     [key: string]: any;
   };
 }
 
 /**
- * Async RAG Orchestrator Service
- * Main entry point for the redesigned RAG architecture
+ * Simplified RAG Orchestrator Service
+ * Uses only Ollama (DeepSeek R1) - Completely Offline
+ * 
+ * Architecture:
+ * 1. Preprocess → Classify query type
+ * 2. Decision → Choose strategy (SIMPLE vs RAG)
+ * 3. Execute → Use Ollama for response
  */
 export class AsyncRAGOrchestratorService {
   /**
-   * Process query through async pipeline
+   * Process query through simplified pipeline
    */
   async processQuery(
     query: string,
@@ -37,103 +41,89 @@ export class AsyncRAGOrchestratorService {
     const startTime = Date.now();
 
     logger.info(
-      `🎬 [${correlationId}] Starting RAG pipeline for query: "${query.substring(
-        0,
-        50
-      )}..."`
+      `🎬 [${correlationId}] Starting RAG pipeline for query: "${query.substring(0, 50)}..."`
     );
 
     try {
-      // PHASE 1: Query Preprocessing
-      logger.info(`📋 [${correlationId}] Phase 1: Preprocessing`);
-      const preprocessResult = await queryPreprocessorService.preprocessQuery(
-        query,
-        chatHistory
+      // PHASE 1: Quick Query Classification (no LLM, just rules)
+      logger.info(`📋 [${correlationId}] Phase 1: Classifying query`);
+      const classification = this.classifyQuery(query);
+
+      logger.info(
+        `🎯 [${correlationId}] Query type: ${classification.type}`
       );
 
-      // Check if query is invalid
-      if (!preprocessResult.validation.isValid) {
-        logger.warn(
-          `⚠️  [${correlationId}] Invalid query: ${preprocessResult.validation.reason}`
-        );
-        return this.buildInvalidResponse(
-          preprocessResult.validation.reason,
-          preprocessResult.languageCode,
-          correlationId,
-          Date.now() - startTime
-        );
-      }
-
-      // Check cache for this exact query
-      const cachedResult = cacheService.getQueryResult(
-        preprocessResult.optimizedQuery,
-        chromaCollectionName
-      );
-
-      if (cachedResult) {
-        logger.info(`✨ [${correlationId}] Returning cached result`);
+      // PHASE 2: Handle based on type
+      if (classification.type === "GREETING") {
+        // Handle greetings directly - no RAG, no sources
+        const greeting = await this.handleGreeting(query, chatHistory);
         return {
-          ...cachedResult,
+          answer: greeting,
+          sources: [],
           metadata: {
-            ...cachedResult.metadata,
             correlationId,
-            cached: true,
+            strategy: "GREETING",
+            language: "en",
+            queryType: "GREETING",
             duration: Date.now() - startTime,
           },
         };
       }
 
-      // PHASE 2: Decision Making
-      logger.info(`🎯 [${correlationId}] Phase 2: Decision Engine`);
+      if (classification.type === "SIMPLE") {
+        // Handle simple questions without RAG
+        const answer = await this.handleSimpleQuery(query, chatHistory);
+        return {
+          answer,
+          sources: [],
+          metadata: {
+            correlationId,
+            strategy: "SIMPLE",
+            language: "en",
+            queryType: "SIMPLE",
+            duration: Date.now() - startTime,
+          },
+        };
+      }
 
-      // Check if documents exist in collection
+      // PHASE 3: RAG Query - Check documents
       const hasDocuments = await this.checkDocumentsExist(chromaCollectionName);
 
-      const decision = await decisionEngineService.makeDecision(
-        preprocessResult.validation.type,
-        hasDocuments,
-        chatHistory.length,
-        preprocessResult.languageCode
-      );
+      if (!hasDocuments) {
+        return {
+          answer: "Please upload some documents first, then ask me questions about them.",
+          sources: [],
+          metadata: {
+            correlationId,
+            strategy: "NO_DOCUMENTS",
+            language: "en",
+            queryType: "RAG",
+            duration: Date.now() - startTime,
+          },
+        };
+      }
 
-      logger.info(
-        `🎯 [${correlationId}] Decision: ${decision.strategy} (confidence: ${decision.confidence})`
-      );
+      // PHASE 4: Execute RAG Strategy
+      logger.info(`🚀 [${correlationId}] Phase 2: Executing RAG strategy`);
 
-      // PHASE 3: Execute Strategy
-      logger.info(
-        `🚀 [${correlationId}] Phase 3: Executing ${decision.strategy}`
-      );
-
-      const result = await decisionEngineService.executeStrategy(
-        decision,
-        preprocessResult.optimizedQuery,
+      const result = await decisionEngineService.handleRAGQuery(
+        query,
         chatHistory,
-        chromaCollectionName,
-        preprocessResult.languageCode
+        chromaCollectionName
       );
 
-      // Build final response
       const response: RAGResponse = {
         answer: result.answer,
         sources: result.sources,
         metadata: {
           correlationId,
-          strategy: decision.strategy,
-          language: preprocessResult.language,
-          queryType: preprocessResult.validation.type,
-          cached: false,
+          strategy: "RAG",
+          language: "en",
+          queryType: "RAG",
           duration: Date.now() - startTime,
           ...result.metadata,
         },
       };
-
-      // Cache the result
-      cacheService.setQueryResult(
-        preprocessResult.optimizedQuery,
-        chromaCollectionName,
-        response
-      );
 
       logger.info(
         `✅ [${correlationId}] RAG pipeline completed in ${response.metadata.duration}ms`
@@ -143,13 +133,86 @@ export class AsyncRAGOrchestratorService {
     } catch (error: any) {
       logger.error(`❌ [${correlationId}] RAG pipeline error:`, error);
 
-      // Graceful degradation
       return this.buildErrorResponse(
         error.message,
-        "en",
         correlationId,
         Date.now() - startTime
       );
+    }
+  }
+
+  /**
+   * Simple rule-based query classification (no LLM needed)
+   */
+  private classifyQuery(query: string): { type: "GREETING" | "SIMPLE" | "RAG" } {
+    const trimmed = query.trim().toLowerCase();
+
+    // Greeting patterns
+    const greetings = [
+      "hi", "hello", "hey", "hola", "namaste", "greetings",
+      "good morning", "good afternoon", "good evening", "good night",
+      "thanks", "thank you", "thx", "bye", "goodbye", "see you",
+      "how are you", "what's up", "wassup", "sup"
+    ];
+
+    if (greetings.some(g => trimmed === g || trimmed.startsWith(g + " ") || trimmed.startsWith(g + "!"))) {
+      return { type: "GREETING" };
+    }
+
+    // Simple questions that don't need documents
+    const simplePatterns = [
+      /^who are you/i,
+      /^what can you do/i,
+      /^help$/i,
+      /^what is your name/i,
+      /^how do you work/i,
+    ];
+
+    if (simplePatterns.some(p => p.test(trimmed))) {
+      return { type: "SIMPLE" };
+    }
+
+    // Default: RAG query (needs documents)
+    return { type: "RAG" };
+  }
+
+  /**
+   * Handle greetings with Ollama
+   */
+  private async handleGreeting(
+    query: string,
+    chatHistory: ChatMessage[]
+  ): Promise<string> {
+    try {
+      const response = await ollamaChatService.handleSimpleQuery(
+        query,
+        "en",
+        chatHistory
+      );
+      return response;
+    } catch (error) {
+      logger.error("Greeting handler error:", error);
+      return "Hello! How can I help you today? Feel free to upload documents and ask me questions about them.";
+    }
+  }
+
+  /**
+   * Handle simple queries with Ollama (no RAG)
+   */
+  private async handleSimpleQuery(
+    query: string,
+    chatHistory: ChatMessage[]
+  ): Promise<string> {
+    try {
+      const response = await ollamaChatService.handleSimpleQuery(
+        query,
+        "en",
+        chatHistory
+      );
+      return response;
+    } catch (error) {
+      logger.error("Simple query handler error:", error);
+      return "I'm an AI assistant that helps you understand your documents. Upload PDFs or images and ask me questions about them!";
     }
   }
 
@@ -162,38 +225,9 @@ export class AsyncRAGOrchestratorService {
       const count = await collection.count();
       return count > 0;
     } catch (error) {
-      logger.warn("Failed to check document count, assuming documents exist");
-      return true;
+      logger.warn("Failed to check document count");
+      return false;
     }
-  }
-
-  /**
-   * Build response for invalid queries
-   */
-  private buildInvalidResponse(
-    reason: string,
-    language: string,
-    correlationId: string,
-    duration: number
-  ): RAGResponse {
-    const messages: Record<string, string> = {
-      en: "Please provide a valid question.",
-      hi: "कृपया एक वैध प्रश्न प्रदान करें।",
-    };
-
-    return {
-      answer: messages[language] || messages.en,
-      sources: [],
-      metadata: {
-        correlationId,
-        strategy: "INVALID",
-        language,
-        queryType: "INVALID",
-        cached: false,
-        duration,
-        reason,
-      },
-    };
   }
 
   /**
@@ -201,24 +235,17 @@ export class AsyncRAGOrchestratorService {
    */
   private buildErrorResponse(
     errorMessage: string,
-    language: string,
     correlationId: string,
     duration: number
   ): RAGResponse {
-    const messages: Record<string, string> = {
-      en: "An error occurred while processing your request. Please try again.",
-      hi: "आपके अनुरोध को संसाधित करते समय एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
-    };
-
     return {
-      answer: messages[language] || messages.en,
+      answer: "I'm having trouble processing your request. Please try again.",
       sources: [],
       metadata: {
         correlationId,
         strategy: "ERROR",
-        language,
+        language: "en",
         queryType: "ERROR",
-        cached: false,
         duration,
         error: errorMessage,
       },
@@ -229,25 +256,13 @@ export class AsyncRAGOrchestratorService {
    * Get system health status
    */
   async getHealthStatus() {
-    const cacheStats = cacheService.getStats();
+    const ollamaStatus = await ollamaChatService.checkConnection();
 
     return {
-      status: "operational",
-      cache: {
-        queryHitRate: this.calculateHitRate(cacheStats.query),
-        embeddingHitRate: this.calculateHitRate(cacheStats.embedding),
-        responseHitRate: this.calculateHitRate(cacheStats.response),
-      },
+      status: ollamaStatus ? "operational" : "degraded",
+      ollama: ollamaStatus,
       timestamp: new Date().toISOString(),
     };
-  }
-
-  /**
-   * Calculate cache hit rate
-   */
-  private calculateHitRate(stats: any): number {
-    const total = stats.hits + stats.misses;
-    return total > 0 ? (stats.hits / total) * 100 : 0;
   }
 }
 

@@ -1,23 +1,102 @@
 import { Request, Response } from 'express';
-import { queryRouterService } from '../services/queryRouter.service';
-import { offlineQueryRouterService } from '../services/offlineQueryRouter.service';
-import { serviceFactory } from '../services/serviceFactory';
 import { chatService } from '../services/chat.service';
 import { vectorDBService } from '../services/vectordb.service';
 import { ollamaChatService } from '../services/ollamaChat.service';
 import { ollamaEmbeddingService } from '../services/ollamaEmbedding.service';
 import { QueryRequest, QueryResponse } from '../types';
-import env from '../config/env';
+import logger from '../services/logger.service';
 
-
+/**
+ * Query Controller with AI-Powered Classification
+ * Uses Ollama (DeepSeek R1) for intelligent query routing
+ * 
+ * LAYER 1: AI Classification - LLM decides query type
+ * LAYER 2: Execute based on classification
+ *   - GREETING/SIMPLE → Direct AI response (NO sources)
+ *   - RAG → Document search + AI response (WITH sources)
+ */
 export class QueryController {
+
   /**
-   * 🎯 OPTIMIZED 3-LAYER QUERY HANDLER
-   * Layer 1: Groq (fast responses for simple queries)
-   * Layer 2: ChromaDB RAG (document-specific queries)
-   * Layer 3: Gemini Flash (complex queries with large context)
-   * 
-   * Multilingual: Detected at Layer 1, maintained throughout all layers
+   * Handle greeting query - quick response
+   */
+  private async handleGreeting(query: string, chatHistory: any[]): Promise<string> {
+    try {
+      return await ollamaChatService.handleSimpleQuery(query, "en", chatHistory);
+    } catch (error) {
+      logger.error("Greeting handler error:", error);
+      return "Hello! How can I help you today? Feel free to upload documents and ask me questions about them.";
+    }
+  }
+
+  /**
+   * Handle simple query (no RAG needed)
+   */
+  private async handleSimple(query: string, chatHistory: any[]): Promise<string> {
+    try {
+      return await ollamaChatService.handleSimpleQuery(query, "en", chatHistory);
+    } catch (error) {
+      logger.error("Simple query handler error:", error);
+      return "I'm an AI assistant that helps you understand your documents. Upload PDFs or images and ask me questions about them!";
+    }
+  }
+
+  /**
+   * Handle RAG query - document search + AI response
+   */
+  private async handleRAG(
+    query: string,
+    chatHistory: any[],
+    chromaCollectionName: string,
+    mentionedFileIds?: string[]
+  ): Promise<{ answer: string; sources: any[] }> {
+
+    // Check for documents first
+    const collection = await vectorDBService.initCollection(chromaCollectionName);
+    const docCount = await collection.count();
+
+    if (docCount === 0) {
+      return {
+        answer: "Please upload some documents first, then ask me questions about them.",
+        sources: []
+      };
+    }
+
+    // Generate embedding and search
+    logger.info("📝 Generating embedding...");
+    const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(query);
+
+    logger.info("🔍 Searching documents...");
+    const searchResults = await vectorDBService.queryChunksWithFilter(
+      queryEmbedding, 8, chromaCollectionName, mentionedFileIds
+    );
+
+    if (searchResults.documents.length === 0) {
+      return {
+        answer: "I couldn't find relevant information in your documents. Try rephrasing your question.",
+        sources: []
+      };
+    }
+
+    // Build context and sources
+    const context = searchResults.documents.slice(0, 5).join("\n\n---\n\n");
+    const sources = searchResults.metadatas.slice(0, 3).map((m: any, idx: number) => ({
+      pdfName: m.fileName || "Document",
+      pageNo: m.page || 1,
+      snippet: searchResults.documents[idx]?.substring(0, 100) || ""
+    }));
+
+    // Generate answer
+    logger.info("🤖 Generating answer...");
+    const result = await ollamaChatService.generateEducationalAnswer(
+      context, chatHistory, query, "en", sources
+    );
+
+    return { answer: result.answer, sources };
+  }
+
+  /**
+   * Non-streaming query handler with AI classification
    */
   async query(req: Request, res: Response): Promise<void> {
     try {
@@ -28,109 +107,80 @@ export class QueryController {
         mentionedFileIds
       } = req.body as QueryRequest;
 
-      // Validate inputs
       if (!query || typeof query !== 'string' || query.trim().length === 0) {
-        res.status(400).json({
-          success: false,
-          error: 'Query is required',
-        });
+        res.status(400).json({ success: false, error: 'Query is required' });
         return;
       }
 
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`💬 NEW QUERY: "${query}"`);
-      console.log(`👤 User: ${userId} | Session: ${sessionId}`);
-      if (mentionedFileIds && mentionedFileIds.length > 0) {
-        console.log(`📎 @ Mentions: ${mentionedFileIds.length} file(s) targeted`);
-      }
-      console.log(`${'='.repeat(80)}\n`);
-
-      // ========== GET CHAT-SPECIFIC CHROMADB COLLECTION ==========
-      const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
-      console.log(`📚 ChromaDB Collection: ${chromaCollectionName}`);
-
-      // ========== GET CHAT HISTORY ==========
-      const chatHistory = await chatService.getMessages(userId, sessionId);
-      console.log(`📜 Chat History: ${chatHistory.length} messages loaded`);
-
-      // ========== SAVE USER MESSAGE ==========
-      await chatService.addMessage(userId, sessionId, {
-        role: 'user',
-        content: query,
-      });
-
-      // ========== 🎯 INTELLIGENT ROUTING (ONLINE/OFFLINE) ==========
       const startTime = Date.now();
-      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
+      logger.info(`\n${'='.repeat(60)}`);
+      logger.info(`💬 Query: "${query}"`);
+      logger.info(`👤 User: ${userId} | Session: ${sessionId}`);
 
-      console.log(`🔧 Mode: ${isOfflineMode ? 'OFFLINE (Ollama)' : 'ONLINE (Groq/Gemini)'}`);
+      // Get chat context
+      const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
+      const chatHistory = await chatService.getMessages(userId, sessionId);
 
-      let result: { answer: string; sources: any[]; layer: string; reasoning: string };
+      // Check document count for classification context
+      const collection = await vectorDBService.initCollection(chromaCollectionName);
+      const docCount = await collection.count();
+      const hasDocuments = docCount > 0;
 
-      if (isOfflineMode) {
-        // Use Ollama-based offline router
-        result = await offlineQueryRouterService.routeQuery(
-          query,
-          chatHistory,
-          chromaCollectionName
-        );
+      // Save user message first
+      await chatService.addMessage(userId, sessionId, { role: 'user', content: query });
+
+      // ========== LAYER 1: AI CLASSIFICATION ==========
+      logger.info(`🧠 Layer 1: AI Classification...`);
+      const classification = await ollamaChatService.classifyQuery(query, hasDocuments, chatHistory);
+      logger.info(`🎯 Classification: ${classification.type} - ${classification.reason}`);
+
+      // ========== LAYER 2: EXECUTE BASED ON TYPE ==========
+      let answer: string;
+      let sources: any[] = [];
+
+      if (classification.type === "GREETING") {
+        logger.info(`💬 Handling as GREETING (no sources)`);
+        answer = await this.handleGreeting(query, chatHistory);
+      } else if (classification.type === "SIMPLE") {
+        logger.info(`💬 Handling as SIMPLE (no sources)`);
+        answer = await this.handleSimple(query, chatHistory);
       } else {
-        // Use online router (Groq/Gemini) with optional file filter
-        result = await queryRouterService.routeQuery(
-          query,
-          chatHistory,
-          chromaCollectionName,
-          mentionedFileIds  // Pass file filter for @ mentions
-        );
+        logger.info(`📚 Handling as RAG (with document search)`);
+        const ragResult = await this.handleRAG(query, chatHistory, chromaCollectionName, mentionedFileIds);
+        answer = ragResult.answer;
+        sources = ragResult.sources;
       }
 
-      const responseTime = Date.now() - startTime;
-
-      console.log(`\n${'─'.repeat(80)}`);
-      console.log(`✅ RESPONSE GENERATED`);
-      console.log(`🔀 Layer Used: ${result.layer.toUpperCase()}`);
-      console.log(`💭 Reasoning: ${result.reasoning}`);
-      console.log(`📊 Sources: ${result.sources.length}`);
-      console.log(`⏱️  Response Time: ${responseTime}ms`);
-      console.log(`${'─'.repeat(80)}\n`);
-
-      // ========== SAVE AI RESPONSE WITH SOURCES ==========
+      // Save response
       await chatService.addMessage(userId, sessionId, {
         role: 'assistant',
-        content: result.answer,
-        sources: result.sources, // Save sources in MongoDB
+        content: answer,
+        sources: sources,
       });
 
-      // ========== SEND RESPONSE ==========
-      const response: QueryResponse = {
+      const responseTime = Date.now() - startTime;
+      logger.info(`✅ Response in ${responseTime}ms | Type: ${classification.type}`);
+      logger.info(`${'='.repeat(60)}\n`);
+
+      res.json({
         success: true,
-        answer: result.answer,
-        sources: result.sources,
+        answer,
+        sources,
         metadata: {
-          layer: result.layer,
-          reasoning: result.reasoning,
-          responseTimeMs: responseTime,
-          messageCount: chatHistory.length + 2, // +2 for user query and AI response
+          layer: classification.type,
+          reason: classification.reason,
+          responseTimeMs: responseTime
         }
-      };
-
-      res.json(response);
-    } catch (error: any) {
-      console.error('❌ Query processing error:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to process query',
-        answer: '',
-        sources: [],
       });
+
+    } catch (error: any) {
+      logger.error('Query error:', error);
+      res.status(500).json({ success: false, error: error.message || 'Query failed' });
     }
   }
 
   /**
-   * 🚀 STREAMING QUERY HANDLER
-   * Returns real-time Server-Sent Events (SSE) for word-by-word streaming
-   * Supports @ mentions file filtering
-   * Supports both online (Gemini) and offline (Ollama) modes
+   * Streaming query handler with AI classification
    */
   async streamQuery(req: Request, res: Response): Promise<void> {
     try {
@@ -141,136 +191,133 @@ export class QueryController {
         mentionedFileIds
       } = req.body as QueryRequest;
 
-      // Validate inputs
       if (!query || typeof query !== 'string' || query.trim().length === 0) {
         res.status(400).json({ error: 'Query is required' });
         return;
       }
 
-      // Check if we're in offline mode
-      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
-
       // Set SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+      res.setHeader('X-Accel-Buffering', 'no');
 
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`🚀 STREAMING QUERY: "${query}"`);
-      console.log(`👤 User: ${userId} | Session: ${sessionId}`);
-      console.log(`🔧 Mode: ${isOfflineMode ? 'OFFLINE (Ollama)' : 'ONLINE (Gemini)'}`);
-      if (mentionedFileIds && mentionedFileIds.length > 0) {
-        console.log(`📎 @ Mentions: ${mentionedFileIds.length} file(s)`);
-      }
-      console.log(`${'='.repeat(80)}\n`);
+      logger.info(`\n${'='.repeat(60)}`);
+      logger.info(`🚀 Stream Query: "${query}"`);
+      logger.info(`👤 User: ${userId}`);
 
-      // Get collection and history
+      // Get chat context
       const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
       const chatHistory = await chatService.getMessages(userId, sessionId);
 
+      // Check document count
+      const collection = await vectorDBService.initCollection(chromaCollectionName);
+      const docCount = await collection.count();
+      const hasDocuments = docCount > 0;
+
       // Save user message
-      await chatService.addMessage(userId, sessionId, {
-        role: 'user',
-        content: query,
-      });
+      await chatService.addMessage(userId, sessionId, { role: 'user', content: query });
 
-      // Send analyzing indicator
-      res.write(`data: ${JSON.stringify({ type: 'layer', layer: 'analyzing' })}\n\n`);
+      // Send "analyzing" status
+      res.write(`data: ${JSON.stringify({ type: 'layer', layer: 'classifying' })}\n\n`);
 
-      // Import language service
-      const { languageService } = await import('../services/language.service');
-      const detectedLang = languageService.detectLanguage(query);
+      // ========== LAYER 1: AI CLASSIFICATION ==========
+      logger.info(`🧠 Layer 1: AI Classification...`);
+      const classification = await ollamaChatService.classifyQuery(query, hasDocuments, chatHistory);
+      logger.info(`🎯 Classification: ${classification.type} - ${classification.reason}`);
 
-      // Generate query embedding - use appropriate service based on mode
-      let queryEmbedding: number[];
-      if (isOfflineMode) {
-        queryEmbedding = await ollamaEmbeddingService.generateEmbedding(query);
-      } else {
-        const { embeddingService } = await import('../services/embedding.service');
-        queryEmbedding = await embeddingService.generateEmbedding(query);
-      }
+      // Send classification result
+      res.write(`data: ${JSON.stringify({ type: 'layer', layer: classification.type })}\n\n`);
 
-      // Search with optional file filter
-      const searchResults = await vectorDBService.queryChunksWithFilter(
-        queryEmbedding,
-        5,
-        chromaCollectionName,
-        mentionedFileIds
-      );
-
-      // Build context and sources
-      const context = searchResults.documents.slice(0, 5).join("\n\n---\n\n");
-      const sources = searchResults.metadatas
-        .slice(0, 3)
-        .map((m: any, idx: number) => ({
-          pdfName: m.fileName || "Document",
-          pageNo: m.page || 1,
-          snippet: searchResults.documents[idx]?.substring(0, 100) || ""
-        }))
-        .reverse();
-
-      // Update layer indicator based on mode
-      const layerName = isOfflineMode ? 'OLLAMA-STREAM' : 'LAYER3-GEMINI-STREAM';
-      res.write(`data: ${JSON.stringify({ type: 'layer', layer: layerName })}\n\n`);
-
-      // Stream the response
       let fullAnswer = '';
+      let sources: any[] = [];
 
-      if (isOfflineMode) {
-        // OFFLINE MODE: Use Ollama (non-streaming, simulate chunks)
+      // ========== LAYER 2: EXECUTE ==========
+      if (classification.type === "GREETING" || classification.type === "SIMPLE") {
+        // Fast path - no document search
         try {
-          const result = await ollamaChatService.generateEducationalAnswer(
-            context,
-            chatHistory,
-            query,
-            detectedLang.languageCode as any,
-            sources
-          );
+          const answer = classification.type === "GREETING"
+            ? await this.handleGreeting(query, chatHistory)
+            : await this.handleSimple(query, chatHistory);
 
-          // Simulate streaming by sending chunks
-          const words = result.answer.split(' ');
-          for (let i = 0; i < words.length; i += 3) {
-            const chunk = words.slice(i, i + 3).join(' ') + ' ';
+          // Stream the answer
+          const words = answer.split(' ');
+          for (let i = 0; i < words.length; i += 2) {
+            const chunk = words.slice(i, i + 2).join(' ') + ' ';
             fullAnswer += chunk;
             res.write(`data: ${JSON.stringify({ type: 'text', content: chunk })}\n\n`);
-            // Small delay for streaming effect
-            await new Promise(resolve => setTimeout(resolve, 30));
+            await new Promise(r => setTimeout(r, 15));
           }
-        } catch (ollamaError: any) {
-          console.error('Ollama error:', ollamaError);
-          res.write(`data: ${JSON.stringify({ type: 'error', error: ollamaError.message })}\n\n`);
-          res.end();
-          return;
+        } catch (error: any) {
+          logger.error('Handler error:', error);
+          fullAnswer = "Hello! How can I help you today?";
+          res.write(`data: ${JSON.stringify({ type: 'text', content: fullAnswer })}\n\n`);
         }
+
+        // NO sources for greetings/simple queries
+        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+
       } else {
-        // ONLINE MODE: Use Gemini streaming
-        const { streamingService } = await import('../services/streaming.service');
+        // RAG path
+        res.write(`data: ${JSON.stringify({ type: 'layer', layer: 'searching' })}\n\n`);
 
-        for await (const chunk of streamingService.streamWithSources(
-          query,
-          context,
-          sources,
-          chatHistory.map(m => ({ role: m.role, content: m.content }))
-        )) {
-          if (chunk.type === 'text' && chunk.content) {
-            fullAnswer += chunk.content;
+        if (!hasDocuments) {
+          fullAnswer = "Please upload some documents first, then ask me questions about them.";
+          res.write(`data: ${JSON.stringify({ type: 'text', content: fullAnswer })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        } else {
+          // Generate embedding and search
+          const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(query);
+          const searchResults = await vectorDBService.queryChunksWithFilter(
+            queryEmbedding, 8, chromaCollectionName, mentionedFileIds
+          );
+
+          if (searchResults.documents.length === 0) {
+            fullAnswer = "I couldn't find relevant information in your documents.";
+            res.write(`data: ${JSON.stringify({ type: 'text', content: fullAnswer })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+          } else {
+            // Build context and sources
+            const context = searchResults.documents.slice(0, 5).join("\n\n---\n\n");
+            sources = searchResults.metadatas.slice(0, 3).map((m: any, idx: number) => ({
+              pdfName: m.fileName || "Document",
+              pageNo: m.page || 1,
+              snippet: searchResults.documents[idx]?.substring(0, 100) || ""
+            }));
+
+            res.write(`data: ${JSON.stringify({ type: 'layer', layer: 'generating' })}\n\n`);
+
+            // Generate answer
+            try {
+              const result = await ollamaChatService.generateEducationalAnswer(
+                context, chatHistory, query, "en", sources
+              );
+
+              // Stream the answer
+              const words = result.answer.split(' ');
+              for (let i = 0; i < words.length; i += 3) {
+                const chunk = words.slice(i, i + 3).join(' ') + ' ';
+                fullAnswer += chunk;
+                res.write(`data: ${JSON.stringify({ type: 'text', content: chunk })}\n\n`);
+                await new Promise(r => setTimeout(r, 20));
+              }
+
+              // Send sources
+              for (const source of sources) {
+                res.write(`data: ${JSON.stringify({ type: 'source', source })}\n\n`);
+              }
+
+              res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+
+            } catch (ollamaError: any) {
+              logger.error('Ollama error:', ollamaError);
+              res.write(`data: ${JSON.stringify({ type: 'error', error: ollamaError.message })}\n\n`);
+            }
           }
-          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-          // Add 200ms delay for smoother streaming experience
-          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
 
-      // Send sources after answer
-      for (const source of sources) {
-        res.write(`data: ${JSON.stringify({ type: 'source', source })}\n\n`);
-      }
-
-      // Send done signal
-      res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
-
-      // Save complete response to chat history
+      // Save response
       if (fullAnswer) {
         await chatService.addMessage(userId, sessionId, {
           role: 'assistant',
@@ -279,137 +326,84 @@ export class QueryController {
         });
       }
 
-      console.log(`✅ Streaming complete. Answer length: ${fullAnswer.length} chars`);
+      logger.info(`✅ Stream complete | Type: ${classification.type} | Length: ${fullAnswer.length}`);
+      logger.info(`${'='.repeat(60)}\n`);
       res.end();
 
     } catch (error: any) {
-      console.error('❌ Streaming error:', error);
+      logger.error('Streaming error:', error);
       res.write(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Streaming failed' })}\n\n`);
       res.end();
     }
   }
 
   /**
-   * Clear chat history for a specific session
+   * Clear chat history
    */
   async clearHistory(req: Request, res: Response): Promise<void> {
     try {
       const { userId = 'default-user', sessionId } = req.body;
-
       if (!sessionId) {
-        res.status(400).json({
-          success: false,
-          error: 'sessionId is required',
-        });
+        res.status(400).json({ success: false, error: 'sessionId is required' });
         return;
       }
-
       await chatService.clearHistory(userId, sessionId);
-
-      console.log(`🗑️  Cleared chat history for user: ${userId}, session: ${sessionId}`);
-
-      res.json({
-        success: true,
-        message: 'Chat history cleared',
-      });
+      res.json({ success: true, message: 'Chat history cleared' });
     } catch (error: any) {
-      console.error('Error clearing chat history:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to clear chat history',
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 
   /**
-   * Get chat sessions for a user
+   * Get sessions for user
    */
   async getSessions(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.query.userId as string || 'default-user';
-
       const sessions = await chatService.getUserSessions(userId);
-
-      res.json({
-        success: true,
-        sessions,
-      });
+      res.json({ success: true, sessions });
     } catch (error: any) {
-      console.error('Error fetching sessions:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to fetch sessions',
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 
   /**
-   * Get messages for a specific session
+   * Get messages for session
    */
   async getMessages(req: Request, res: Response): Promise<void> {
     try {
       const { userId = 'default-user', sessionId } = req.query;
-
       if (!sessionId || typeof sessionId !== 'string') {
-        res.status(400).json({
-          success: false,
-          error: 'sessionId is required',
-        });
+        res.status(400).json({ success: false, error: 'sessionId is required' });
         return;
       }
-
       const messages = await chatService.getMessages(userId as string, sessionId);
-
-      res.json({
-        success: true,
-        messages,
-      });
+      res.json({ success: true, messages });
     } catch (error: any) {
-      console.error('Error fetching messages:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to fetch messages',
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 
   /**
-   * Health check endpoint - includes Ollama status
+   * Health check
    */
   async health(req: Request, res: Response): Promise<void> {
     try {
       const stats = await vectorDBService.getStats();
-      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
+      const ollamaChat = await ollamaChatService.checkConnection();
+      const ollamaEmbed = await ollamaEmbeddingService.checkConnection();
 
-      // Check Ollama status if in offline mode
-      let ollamaStatus = { chat: false, embedding: false };
-      if (isOfflineMode) {
-        try {
-          ollamaStatus.chat = await ollamaChatService.checkConnection();
-          ollamaStatus.embedding = await ollamaEmbeddingService.checkConnection();
-        } catch (e) {
-          console.warn('Ollama health check failed:', e);
-        }
-      }
-
-      res.status(200).json({
+      res.json({
         success: true,
-        status: 'healthy',
-        mode: isOfflineMode ? 'offline' : 'online',
-        vectorDB: 'connected',
-        documentsIndexed: stats.count,
-        ollama: isOfflineMode ? {
-          available: ollamaStatus.chat && ollamaStatus.embedding,
-          chatModel: ollamaStatus.chat ? env.OLLAMA_CHAT_MODEL : 'not available',
-          embedModel: ollamaStatus.embedding ? env.OLLAMA_EMBED_MODEL : 'not available',
-        } : 'not used (online mode)',
+        status: ollamaChat && ollamaEmbed ? 'healthy' : 'degraded',
+        vectorDB: { connected: true, documents: stats.count },
+        ollama: {
+          chat: ollamaChat,
+          embedding: ollamaEmbed,
+        },
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        status: 'unhealthy',
-        error: 'Vector database connection failed',
-      });
+      res.status(500).json({ success: false, status: 'unhealthy' });
     }
   }
 }

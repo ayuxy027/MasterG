@@ -43,6 +43,124 @@ export class OllamaChatService {
     }
 
     /**
+     * 🧠 LAYER 1: AI-Powered Query Classification
+     * Uses LLM to intelligently classify the query type
+     * Returns: GREETING | SIMPLE | RAG
+     */
+    async classifyQuery(
+        query: string,
+        hasDocuments: boolean,
+        chatHistory: ChatMessage[]
+    ): Promise<{ type: "GREETING" | "SIMPLE" | "RAG"; reason: string }> {
+
+        const recentContext = chatHistory
+            .slice(-3)
+            .map(m => `${m.role}: ${m.content.substring(0, 100)}`)
+            .join("\n");
+
+        const prompt = `You are a query classifier. Analyze the user's query and classify it.
+
+CLASSIFICATION TYPES:
+1. GREETING - Simple greetings, thanks, bye (e.g., "hi", "hello", "thanks", "bye")
+2. SIMPLE - General questions that don't need documents (e.g., "who are you", "what can you do", "help")
+3. RAG - Questions that need document context to answer (e.g., "explain chapter 1", "what is photosynthesis", "summarize the text")
+
+CONTEXT:
+- User has documents uploaded: ${hasDocuments ? "YES" : "NO"}
+${recentContext ? `- Recent conversation:\n${recentContext}` : "- No previous conversation"}
+
+USER QUERY: "${query}"
+
+RULES:
+- If it's a greeting or thanks → GREETING
+- If asking about you/your capabilities → SIMPLE  
+- If asking about content/information/explanation → RAG
+- If unclear but seems educational → RAG
+
+Respond with ONLY this JSON format (no other text):
+{"type": "GREETING" or "SIMPLE" or "RAG", "reason": "brief explanation"}`;
+
+        try {
+            const response = await axios.post(
+                `${this.baseUrl}/api/generate`,
+                {
+                    model: this.model,
+                    prompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.1,  // Low temperature for consistent classification
+                        num_predict: 100,  // Short response for speed
+                    },
+                },
+                {
+                    timeout: 15000,  // 15 second timeout
+                }
+            );
+
+            const rawResponse = response.data.response || "";
+
+            // Parse the JSON response
+            const jsonMatch = rawResponse.match(/\{[\s\S]*?\}/);
+            if (jsonMatch) {
+                try {
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    const validTypes = ["GREETING", "SIMPLE", "RAG"];
+                    const type = validTypes.includes(parsed.type?.toUpperCase())
+                        ? parsed.type.toUpperCase()
+                        : "RAG";
+
+                    console.log(`🧠 AI Classification: ${type} - ${parsed.reason || "no reason"}`);
+
+                    return {
+                        type: type as "GREETING" | "SIMPLE" | "RAG",
+                        reason: parsed.reason || "AI classified"
+                    };
+                } catch (parseError) {
+                    console.warn("Failed to parse classification JSON, using fallback");
+                }
+            }
+
+            // Fallback: Check raw response for type keywords
+            const upperResponse = rawResponse.toUpperCase();
+            if (upperResponse.includes("GREETING")) {
+                return { type: "GREETING", reason: "Detected greeting pattern" };
+            }
+            if (upperResponse.includes("SIMPLE")) {
+                return { type: "SIMPLE", reason: "Detected simple query pattern" };
+            }
+
+            // Default to RAG for educational queries
+            return { type: "RAG", reason: "Default to document search" };
+
+        } catch (error: any) {
+            console.error("AI classification error:", error.message);
+            // Fallback to simple rule-based classification if AI fails
+            return this.fallbackClassify(query);
+        }
+    }
+
+    /**
+     * Fallback classification when AI fails
+     */
+    private fallbackClassify(query: string): { type: "GREETING" | "SIMPLE" | "RAG"; reason: string } {
+        const trimmed = query.trim().toLowerCase();
+
+        const greetings = ["hi", "hello", "hey", "thanks", "thank you", "bye", "goodbye"];
+        for (const g of greetings) {
+            if (trimmed === g || trimmed.startsWith(g + " ") || trimmed.startsWith(g + "!")) {
+                return { type: "GREETING", reason: "Fallback: greeting pattern matched" };
+            }
+        }
+
+        const simplePatterns = [/^who are you/i, /^what can you do/i, /^help$/i];
+        if (simplePatterns.some(p => p.test(trimmed))) {
+            return { type: "SIMPLE", reason: "Fallback: simple pattern matched" };
+        }
+
+        return { type: "RAG", reason: "Fallback: default to RAG" };
+    }
+
+    /**
      * Build educational prompt for student learning
      * Adapted from Groq service for DeepSeek R1
      */
@@ -271,52 +389,71 @@ Answer NOW in ${languageName}:`;
 
     /**
      * Handle simple queries (greetings, basic questions)
-     * Replaces Layer 1 routing
+     * Optimized for speed - low token count for fast responses
      */
     async handleSimpleQuery(
         query: string,
         language: LanguageCode,
         chatHistory: ChatMessage[]
     ): Promise<string> {
+        const trimmed = query.trim().toLowerCase();
+
+        // Quick responses for common greetings (no LLM needed)
+        const quickResponses: Record<string, string> = {
+            "hi": "Hello! How can I help you today? Feel free to upload documents and ask me questions about them!",
+            "hello": "Hi there! I'm ready to help you with your documents. What would you like to know?",
+            "hey": "Hey! How can I assist you today?",
+            "good morning": "Good morning! How can I help you today?",
+            "good afternoon": "Good afternoon! What can I do for you?",
+            "good evening": "Good evening! How may I assist you?",
+            "thanks": "You're welcome! Let me know if you need anything else.",
+            "thank you": "You're welcome! Feel free to ask more questions anytime.",
+            "bye": "Goodbye! Have a great day!",
+            "goodbye": "Goodbye! Come back anytime you need help with your documents!",
+        };
+
+        // Check for exact quick response
+        if (quickResponses[trimmed]) {
+            return quickResponses[trimmed];
+        }
+
+        // For other simple queries, use LLM with low token limit for speed
         const languageName = SUPPORTED_LANGUAGES[language];
 
         const chatContext = chatHistory
-            .slice(-5)
-            .map((m) => `${m.role === "user" ? "Student" : "Assistant"}: ${m.content}`)
+            .slice(-3)  // Only last 3 messages for speed
+            .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
             .join("\n");
 
-        const prompt = `You are a helpful multilingual AI assistant.
+        const prompt = `You are a helpful AI assistant. Respond briefly (1-2 sentences max).
 
-CRITICAL RULES:
-1. Respond ONLY in ${languageName} language
-2. Provide DIRECT answers - NO intermediate messages
-3. For greetings: Be friendly and brief
-4. For invalid questions: Politely explain you need a clear question
-5. Keep responses concise (2-3 sentences max)
+${chatContext ? `Recent chat:\n${chatContext}\n\n` : ""}User: ${query}
 
-${chatContext ? `Previous conversation:\n${chatContext}\n\n` : ""}
-User: ${query}
+Brief response in ${languageName}:`;
 
-Respond in ${languageName}:`;
-
-        const response = await axios.post(
-            `${this.baseUrl}/api/generate`,
-            {
-                model: this.model,
-                prompt,
-                stream: false,
-                options: {
-                    temperature: 0.7,
-                    num_predict: 500,
+        try {
+            const response = await axios.post(
+                `${this.baseUrl}/api/generate`,
+                {
+                    model: this.model,
+                    prompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.7,
+                        num_predict: 150,  // Very low for speed
+                    },
                 },
-            },
-            {
-                timeout: 30000,
-            }
-        );
+                {
+                    timeout: 15000,  // 15 second timeout for speed
+                }
+            );
 
-        const { answer } = this.parseDeepSeekResponse(response.data.response || "");
-        return answer;
+            const { answer } = this.parseDeepSeekResponse(response.data.response || "");
+            return answer;
+        } catch (error) {
+            // Fallback response if LLM fails
+            return "Hello! I'm here to help you with your documents. Upload a PDF or image and ask me questions about it!";
+        }
     }
 
     /**
