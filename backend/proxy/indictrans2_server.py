@@ -188,21 +188,33 @@ def post_process_translation(text: str) -> str:
   return text.strip()
 
 
-def split_into_sentences(text: str) -> List[str]:
+def split_into_units(text: str) -> List[str]:
   """
-  Split text into individual sentences.
-  CRITICAL: One sentence per inference call as per model.md requirements.
+  Split text into translation units.
+
+  HARD RULE for Stitch + IndicTrans2:
+  - Prefer ONE LINE == ONE UNIT.
+  - Each non-empty line is treated as an independent query.
+  - Do NOT relate units across lines.
+
+  Fallback:
+  - If there are no newlines (single blob), fall back to sentence-based split.
   """
-  # Split by sentence endings
+  # First preference: newline-based splitting (one line == one unit)
+  if "\n" in text:
+    lines = [ln.strip() for ln in text.splitlines()]
+    units = [ln for ln in lines if ln]
+    if units:
+      return units
+
+  # Fallback: sentence-based splitting for legacy inputs
   sentences = re.split(r'(?<=[.!?])\s+', text)
-  
-  # Clean and filter empty sentences
-  cleaned = []
+  cleaned: List[str] = []
   for sentence in sentences:
     sentence = sentence.strip()
-    if sentence and len(sentence) > 0:
+    if sentence:
       cleaned.append(sentence)
-  
+
   return cleaned if cleaned else [text]
 
 
@@ -221,17 +233,17 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
   # CRITICAL: Extract and replace scientific terms with placeholders
   text_with_placeholders, term_map = extract_and_replace_terms(clean_text)
   
-  # CRITICAL: Split into individual sentences (one per call)
-  sentences = split_into_sentences(text_with_placeholders)
+  # CRITICAL: Split into independent units (lines first, then sentences)
+  units = split_into_units(text_with_placeholders)
   
-  if not sentences:
+  if not units:
     return {"success": False, "error": "No sentences found in input text"}
   
   translated_sentences = []
   device = next(model.parameters()).device
   
   # Process ONE sentence at a time (mandatory per model.md)
-  for sentence in sentences:
+  for sentence in units:
     if not sentence.strip():
       continue
     
@@ -326,9 +338,9 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str) -> None:
   # Extract and replace scientific terms with placeholders
   text_with_placeholders, term_map = extract_and_replace_terms(clean_text)
 
-  # Split into individual sentences (one per call)
-  sentences = split_into_sentences(text_with_placeholders)
-  if not sentences:
+  # Split into independent units (lines first, then sentences)
+  units = split_into_units(text_with_placeholders)
+  if not units:
     sys.stdout.write(
       json.dumps(
         {
@@ -344,9 +356,9 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str) -> None:
 
   translated_sentences: List[str] = []
   device = next(model.parameters()).device
-  total = len(sentences)
+  total = len(units)
 
-  for idx, sentence in enumerate(sentences):
+  for idx, sentence in enumerate(units):
     sentence = sentence.strip()
     if not sentence:
       continue

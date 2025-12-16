@@ -360,11 +360,14 @@ Pedagogical Requirements:
 - Use definitions, explanations, and examples where appropriate.
 - Maintain a neutral, teacher-friendly tone suitable for textbooks, worksheets, and lesson plans.
 
-Structure Requirements:
-- Use clear section headings.
-- Use bullet points where helpful.
-- Keep paragraphs short (2–4 lines max).
-- Ensure logical flow between sections.
+STRICT LINE-BY-LINE OUTPUT FORMAT (VERY IMPORTANT):
+- Output MUST be plain text only. Do NOT use markdown, bullets, numbering, or special formatting.
+- Each logical sentence MUST be written on its own line.
+- Do NOT break one sentence across multiple lines.
+- Do NOT put more than one sentence on the same line.
+- Leave a completely blank line between major sections (like Definition, Raw Materials, Importance).
+- Each line MUST make sense on its own when read independently.
+- Do NOT refer to previous lines using words like "this", "that", or "it" without repeating the noun.
 
 Scientific & Mathematical Accuracy:
 - Use correct scientific and mathematical terminology.
