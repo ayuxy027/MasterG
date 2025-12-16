@@ -115,10 +115,8 @@ export class StitchController {
         content,
         metadata: {
           topic,
-          language,
           grade,
           subject,
-          curriculum,
           generatedAt: new Date().toISOString(),
         },
       });

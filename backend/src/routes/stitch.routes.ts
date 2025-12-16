@@ -24,8 +24,8 @@ router.get(
 
 /**
  * POST /api/stitch/generate
- * Generate educational content
- * Body: { topic, language, grade, subject, curriculum, culturalContext, stream? }
+ * Generate educational content (always in English)
+ * Body: { topic, grade, subject, culturalContext, stream? }
  */
 router.post(
   "/generate",

@@ -4,10 +4,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL
 
 export interface StitchGenerateRequest {
   topic: string;
-  language: string;
   grade: string;
   subject: string;
-  curriculum: string;
   culturalContext?: boolean;
 }
 
@@ -16,10 +14,8 @@ export interface StitchGenerateResponse {
   content?: string;
   metadata?: {
     topic: string;
-    language: string;
     grade: string;
     subject: string;
-    curriculum: string;
     generatedAt: string;
   };
   error?: string;
