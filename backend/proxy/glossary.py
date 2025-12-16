@@ -151,51 +151,25 @@ def extract_and_replace_terms(text: str) -> tuple[str, dict[str, str]]:
 def restore_terms(translated_text: str, term_map: dict[str, str]) -> str:
     """
     Restore scientific terms from placeholders.
-    Handles cases where tokenizer may have split or transliterated placeholders.
+    Conservative restoration:
+    - Only replace explicit placeholder tokens like "SCI0", "SCI1", etc.
+    - Do NOT try to be smart about transliterated or partially split placeholders.
+      (Those heuristics can corrupt otherwise good translations.)
     """
-    import re
     result = translated_text
-    
-    # First, try exact matches (in case placeholders survived)
-    for placeholder, target_term in term_map.items():
-        result = result.replace(placeholder, target_term)
-    
-    # Handle transliterated versions (SCI0 -> एससीआई0, etc.)
-    # IndicTrans2 often transliterates unknown tokens
-    transliteration_map = {
-        'SCI': ['एससीआई', 'एससी', 'सीआई', 'एससी', 'SCI'],
-        'TERM': ['टर्म', 'टीआरएम', 'TERM'],
-    }
-    
-    # Sort by index to restore in order
-    sorted_items = sorted(term_map.items(), key=lambda x: int(re.search(r'(\d+)', x[0]).group(1)) if re.search(r'(\d+)', x[0]) else 999)
-    
-    for placeholder, target_term in sorted_items:
-        # Extract number from placeholder (e.g., "SCI0" -> "0")
-        num_match = re.search(r'(\d+)', placeholder)
-        num = num_match.group(1) if num_match else None
-        
-        # Try exact placeholder first (in case it survived)
+
+    # Sort by numeric index so replacements are deterministic
+    def _index_from_placeholder(ph: str) -> int:
+        import re as _re
+        m = _re.search(r"(\d+)", ph)
+        return int(m.group(1)) if m else 0
+
+    for placeholder, target_term in sorted(
+        term_map.items(), key=lambda kv: _index_from_placeholder(kv[0])
+    ):
+        # Exact placeholder replacement only
         if placeholder in result:
             result = result.replace(placeholder, target_term)
-            continue
-        
-        # Try transliterated "एससीआई" patterns
-        transliterated_patterns = [
-            rf'एससीआई\s*{num}',  # "एससीआई0" or "एससीआई 0"
-            rf'एस\s*सी\s*आई\s*{num}',  # Spaced version
-        ]
-        
-        for pattern in transliterated_patterns:
-            if re.search(pattern, result):
-                result = re.sub(pattern, target_term, result)
-                break
-        else:
-            # If no number-specific pattern found, try generic "एससीआई" (only if no number context)
-            # This handles cases where number was lost in translation
-            if "एससीआई" in result and not any(f"एससीआई{i}" in result for i in range(10) if str(i) != num):
-                # Replace first occurrence only (one-to-one mapping if possible)
-                result = result.replace("एससीआई", target_term, 1)
-    
+
     return result
 

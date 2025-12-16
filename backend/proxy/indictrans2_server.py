@@ -270,14 +270,14 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
       
       inputs = {k: v.to(device) for k, v in inputs.items()}
       
-      # Generate translation (one sentence at a time)
+      # Generate translation (one unit at a time)
       with torch.inference_mode():
         outputs = model.generate(
           **inputs,
-          max_length=180,
-          num_beams=2,
+          max_length=220,
+          num_beams=4,
           use_cache=False,
-          early_stopping=True,
+          early_stopping=False,
           repetition_penalty=1.3,
           length_penalty=0.8,
         )
@@ -445,14 +445,14 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str) -> None:
 
       inputs = {k: v.to(device) for k, v in inputs.items()}
 
-      # Generate translation (one sentence at a time)
+      # Generate translation (one unit at a time)
       with torch.inference_mode():
         outputs = model.generate(
           **inputs,
-          max_length=180,
-          num_beams=2,
+          max_length=220,
+          num_beams=4,
           use_cache=False,
-          early_stopping=True,
+          early_stopping=False,
           repetition_penalty=1.3,
           length_penalty=0.8,
         )
