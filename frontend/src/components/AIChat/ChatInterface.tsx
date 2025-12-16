@@ -1,31 +1,29 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  sendQuery,
+  sendStreamingQuery,
   uploadFile,
   ChatApiError,
   getSessionDocuments,
 } from "../../services/chatApi";
-import type { MessageUI, UploadProgress, FileListItem } from "../../types/chat";
+import type { MessageUI, UploadProgress, FileListItem, MentionedFile, SourceCitation } from "../../types/chat";
 import MarkdownRenderer from "../ui/MarkdownRenderer";
 import Accordion from "../ui/Accordion";
 import { MessageSkeleton } from "../ui/Skeleton";
 import MicButton from "../ui/MicButton";
+import MentionInput from "../ui/MentionInput";
+import StreamingMessage from "../ui/StreamingMessage";
 
 interface ChatInterfaceProps {
   userId: string;
   sessionId: string;
-  currentMode: "study" | "plan" | "ideation";
-  setCurrentMode: (mode: "study" | "plan" | "ideation") => void;
   messages: MessageUI[];
   setMessages: React.Dispatch<React.SetStateAction<MessageUI[]>>;
-  onSessionUpdate: () => void;
+  onSessionUpdate: (firstUserMessage?: string) => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   userId,
   sessionId,
-  currentMode,
-  setCurrentMode,
   messages,
   setMessages,
   onSessionUpdate,
@@ -34,6 +32,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<FileListItem[]>([]);
+  const [selectedMentions, setSelectedMentions] = useState<MentionedFile[]>([]);
+  const [isFirstMessage, setIsFirstMessage] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,10 +43,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [messages]);
 
   // Load uploaded files for dynamic prompt generation
-  // Load uploaded files for dynamic prompt generation
   useEffect(() => {
     loadUploadedFiles();
-  }, [sessionId]);
+    // Check if this is a new session (no messages)
+    setIsFirstMessage(messages.length === 0);
+  }, [sessionId, messages.length]);
 
   const loadUploadedFiles = async () => {
     try {
@@ -60,31 +61,76 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleSendMessage = async () => {
     if (inputValue.trim() === "" || isLoading) return;
 
+    // Get mentioned file IDs for filtering
+    const mentionedFileIds = selectedMentions.map(m => m.fileId);
+    const messageContent = inputValue.trim();
+    const shouldGenerateName = isFirstMessage && messages.length === 0;
+
     const userMessage: MessageUI = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: inputValue.trim(),
+      content: messageContent,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
+    setSelectedMentions([]); // Clear mentions after sending
     setIsLoading(true);
+    setIsFirstMessage(false);
 
     try {
-      const response = await sendQuery(userId, sessionId, userMessage.content);
+      // STREAMING MODE
+      const assistantMessageId = `assistant-${Date.now()}`;
 
-      const assistantMessage: MessageUI = {
-        id: `assistant-${Date.now()}`,
+      // Add placeholder streaming message
+      const streamingMessage: MessageUI = {
+        id: assistantMessageId,
         role: "assistant",
-        content: response.answer,
+        content: "",
         timestamp: new Date(),
-        sources: response.sources,
-        metadata: response.metadata,
+        isStreaming: true,
+        streamingLayer: "analyzing",
+        sources: [],
       };
+      setMessages((prev) => [...prev, streamingMessage]);
 
-      setMessages((prev) => [...prev, assistantMessage]);
-      onSessionUpdate(); // Refresh session list
+      const collectedSources: SourceCitation[] = [];
+
+      await sendStreamingQuery(
+        userId,
+        sessionId,
+        userMessage.content,
+        (chunk) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                  ...msg,
+                  content: chunk.type === "text" && chunk.content
+                    ? msg.content + chunk.content
+                    : msg.content,
+                  streamingLayer: chunk.type === "layer" && chunk.layer
+                    ? chunk.layer
+                    : msg.streamingLayer,
+                  sources: chunk.type === "source" && chunk.source
+                    ? [...(msg.sources || []), chunk.source]
+                    : msg.sources,
+                  isStreaming: chunk.type !== "done" && chunk.type !== "error",
+                }
+                : msg
+            )
+          );
+
+          if (chunk.type === "source" && chunk.source) {
+            collectedSources.push(chunk.source);
+          }
+        },
+        mentionedFileIds.length > 0 ? mentionedFileIds : undefined
+      );
+
+      // Trigger session update with first message for name generation
+      onSessionUpdate(shouldGenerateName ? messageContent : undefined);
     } catch (error) {
       console.error("Failed to send message:", error);
 
@@ -206,55 +252,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const getExamplePrompts = () => {
-    // If files are uploaded, generate specific prompts
+    // Generic content-based prompts (not based on filename)
     if (uploadedFiles.length > 0) {
-      const firstFile = uploadedFiles[0].fileName.replace(/\.[^/.]+$/, ""); // Remove extension
-
-      switch (currentMode) {
-        case "study":
-          return [
-            `Explain key concepts from ${firstFile}`,
-            `Summarize ${firstFile} in simple terms`,
-            `What are the main topics in ${firstFile}?`,
-          ];
-        case "plan":
-          return [
-            `Create a study plan from ${firstFile}`,
-            `Generate practice questions from ${firstFile}`,
-            `What should I focus on in ${firstFile}?`,
-          ];
-        case "ideation":
-          return [
-            `Suggest projects based on ${firstFile}`,
-            `How can I apply concepts from ${firstFile}?`,
-            `Connect ideas across my uploaded documents`,
-          ];
-      }
+      return [
+        "Summarize the key points from the documents",
+        "Explain the main concepts in simple terms",
+        "What are the important topics covered?",
+      ];
     }
 
     // Default prompts if no files
-    switch (currentMode) {
-      case "study":
-        return [
-          "Explain concepts from uploaded documents",
-          "Summarize key points",
-          "What are the main topics?",
-        ];
-      case "plan":
-        return [
-          "Create a study plan",
-          "Generate practice questions",
-          "Suggest focus areas",
-        ];
-      case "ideation":
-        return [
-          "Suggest project ideas",
-          "How can I apply this knowledge?",
-          "Connect concepts creatively",
-        ];
-      default:
-        return [];
-    }
+    return [
+      "Upload a document to get started",
+      "Ask questions about your PDFs",
+      "Get summaries and explanations",
+    ];
   };
 
   const formatTimestamp = (date: Date): string => {
@@ -265,27 +277,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white/50">
-      {/* Mode Toggle Header */}
-      <div className="bg-orange-100 border-b-2 border-orange-200 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          {(["study", "plan", "ideation"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setCurrentMode(mode)}
-              className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full capitalize transition-all font-semibold text-sm shadow-md transform hover:scale-105 ${currentMode === mode
-                ? "bg-orange-400 text-white hover:bg-orange-500 shadow-lg"
-                : "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
-                }`}
-            >
-              {mode} Mode
-            </button>
-          ))}
-        </div>
-      </div>
-
+    <div className="h-full flex flex-col bg-white/50 overflow-hidden">
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gradient-to-b from-white to-orange-50/30">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gradient-to-b from-white to-orange-50/30 min-h-0">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center px-4">
@@ -308,7 +302,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 Start a conversation
               </p>
               <p className="text-sm text-gray-500 mb-4">
-                Upload documents and ask questions in {currentMode} mode
+                Upload documents and ask questions about them
               </p>
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -320,91 +314,98 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         ) : (
           <>
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex mb-6 ${message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl p-4 shadow-md ${message.role === "user"
-                    ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
-                    : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
-                    }`}
-                >
-                  {/* Message Content */}
-                  <div className="prose prose-sm max-w-none">
-                    {message.role === "assistant" ? (
-                      <MarkdownRenderer content={message.content} />
-                    ) : (
-                      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Timestamp */}
-                  <div
-                    className={`text-xs mt-2 ${message.role === "user"
-                      ? "text-orange-100"
-                      : "text-gray-500"
-                      }`}
-                  >
-                    {formatTimestamp(message.timestamp)}
-                  </div>
-
-                  {/* Source Citations - Accordion */}
-                  {message.sources && message.sources.length > 0 && (
-                    <div className="mt-3">
-                      <Accordion
-                        title="Sources"
-                        icon={
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                            />
-                          </svg>
-                        }
-                        badge={message.sources.length}
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div key={message.id}>
+                  {/* Use StreamingMessage for streaming assistant messages */}
+                  {message.role === "assistant" && message.isStreaming ? (
+                    <StreamingMessage
+                      content={message.content}
+                      isStreaming={message.isStreaming}
+                      sources={message.sources || []}
+                      timestamp={message.timestamp}
+                    />
+                  ) : (
+                    <div
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl p-4 shadow-md ${message.role === "user"
+                          ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
+                          : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
+                          }`}
                       >
-                        <div className="space-y-2">
-                          {[...message.sources].reverse().map((source, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-orange-50 rounded-lg p-3 border border-orange-200"
-                            >
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className="text-xs font-semibold text-orange-700">
-                                  {source.pdfName}
-                                </span>
-                                <span className="text-xs text-orange-500">
-                                  • Page {source.pageNo}
-                                </span>
-                              </div>
-                              <p className="text-xs text-gray-700 leading-relaxed">
-                                {source.snippet}
-                              </p>
-                            </div>
-                          ))}
+                        {/* Message Content */}
+                        <div className="prose prose-sm max-w-none">
+                          {message.role === "assistant" ? (
+                            <MarkdownRenderer content={message.content} />
+                          ) : (
+                            <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+                              {message.content}
+                            </p>
+                          )}
                         </div>
-                      </Accordion>
+
+                        {/* Timestamp */}
+                        <div
+                          className={`text-xs mt-2 ${message.role === "user" ? "text-orange-100" : "text-gray-500"}`}
+                        >
+                          {formatTimestamp(message.timestamp)}
+                        </div>
+
+                        {/* Source Citations - Accordion */}
+                        {message.sources && message.sources.length > 0 && !message.isStreaming && (
+                          <div className="mt-3">
+                            <Accordion
+                              title="Sources"
+                              icon={
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                  />
+                                </svg>
+                              }
+                              badge={message.sources.length}
+                            >
+                              <div className="space-y-2">
+                                {[...message.sources].reverse().map((source, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="bg-orange-50 rounded-lg p-3 border border-orange-200"
+                                  >
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span className="text-xs font-semibold text-orange-700">
+                                        {source.pdfName}
+                                      </span>
+                                      <span className="text-xs text-orange-500">
+                                        • Page {source.pageNo}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-700 leading-relaxed">
+                                      {source.snippet}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </Accordion>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {/* Loading Indicator */}
-            {isLoading && <MessageSkeleton />}
-
+              {isLoading && !messages.some(m => m.isStreaming) && <MessageSkeleton />}
+            </div>
             <div ref={messagesEndRef} />
           </>
         )}
@@ -461,24 +462,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
       )}
 
-      {/* Input Area */}
-      <div className="border-t-2 border-orange-200 p-4 bg-white">
-        {/* File Upload Button Row */}
-        <div className="flex items-center gap-2 mb-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => handleFileUpload(e.target.files)}
-            accept=".pdf,.txt,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,image/*"
-            multiple
-          />
+      {/* Compact Input Area - All controls on one line */}
+      <div className="flex-shrink-0 border-t-2 border-orange-200 p-3 bg-white">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => handleFileUpload(e.target.files)}
+          accept=".pdf,.txt,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,image/*"
+          multiple
+        />
+
+        {/* Single Line Input with all controls - centered vertically */}
+        <div className="flex gap-2 items-center">
+          {/* Upload Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-all font-medium border-2 border-orange-200 hover:border-orange-300"
+            className="p-2.5 text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all border-2 border-orange-200 hover:border-orange-300 flex-shrink-0"
+            title="Upload files (PDF, TXT, DOC, PPT, Images)"
           >
             <svg
-              className="w-4 h-4"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -490,24 +495,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            Upload Files
           </button>
-          <span className="text-xs text-gray-500">
-            PDF, TXT, DOC, PPT, Images
-          </span>
-        </div>
 
-        {/* Input & Send */}
-        <div className="flex gap-3 items-end">
-          <textarea
+          {/* Text Input - Takes remaining space */}
+          <MentionInput
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={`Ask anything in ${currentMode} mode...`}
-            className="flex-1 border-2 border-orange-200 rounded-xl p-3 resize-none min-h-[56px] focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all text-sm bg-white"
-            rows={1}
+            onChange={setInputValue}
+            selectedMentions={selectedMentions}
+            onMentionsChange={setSelectedMentions}
+            availableFiles={uploadedFiles}
+            placeholder="Ask anything about your documents..."
             disabled={isLoading}
+            onKeyPress={handleKeyPress}
           />
+
           {/* Voice Input Button */}
           <MicButton
             onTranscript={(text) => {
@@ -515,17 +516,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             }}
             disabled={isLoading}
           />
+
           {/* Send Button */}
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className={`p-3 rounded-xl transition-all flex-shrink-0 ${inputValue.trim() && !isLoading
-              ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg transform hover:scale-105"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            className={`p-2.5 rounded-xl transition-all flex-shrink-0 border-2 ${inputValue.trim() && !isLoading
+              ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white border-orange-400 hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg"
+              : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
               }`}
           >
             <svg
-              className="w-6 h-6"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -540,15 +542,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </button>
         </div>
 
-        {/* Example Prompts */}
-        <div className="flex flex-wrap items-center gap-2 mt-3">
+        {/* Example Prompts - Compact */}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
           <span className="text-xs text-gray-500 font-medium">
-            Quick prompts:
+            Try:
           </span>
           {getExamplePrompts().map((prompt, index) => (
             <button
               key={index}
-              className="text-xs bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full hover:bg-orange-100 hover:text-orange-800 transition-all border border-orange-200 font-medium"
+              className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full hover:bg-orange-100 hover:text-orange-800 transition-all border border-orange-200 font-medium"
               onClick={() => setInputValue(prompt)}
               disabled={isLoading}
             >

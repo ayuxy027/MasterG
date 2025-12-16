@@ -10,16 +10,17 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
     const location = useLocation();
     const isBoardPage = location.pathname === '/board';
+    const isChatPage = location.pathname === '/chat';
 
-    // Don't render regular layout for board page (it has its own minimized navbar)
-    if (isBoardPage) {
+    // Don't render regular layout for board page and chat page (they have their own layouts)
+    if (isBoardPage || isChatPage) {
         return <>{children}</>;
     }
 
     return (
         <div className="text-gray-900">
             {/* Pattern background only for navbar and hero section */}
-            <div className="relative" style={{minHeight: '100vh'}}>
+            <div className="relative" style={{ minHeight: '100vh' }}>
                 <Pattern />
                 <div className="absolute inset-0 z-10">
                     <div className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-6 pb-6">
