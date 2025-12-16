@@ -197,6 +197,7 @@ export class StitchController {
         text?: string;
         sourceLanguage?: string;
         targetLanguage?: string;
+        stream?: boolean;
       };
 
       if (!text || !text.trim()) {
@@ -219,6 +220,54 @@ export class StitchController {
         tgtCode as any
       );
 
+      // If stream flag is set, use Server-Sent Events for sentence-by-sentence streaming
+      if (req.body && (req.body as any).stream) {
+        // Set CORS + SSE headers
+        res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization"
+        );
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+
+        try {
+          await indicTrans2Service.streamTranslate(
+            text,
+            {
+              srcLang: srcIndic,
+              tgtLang: tgtIndic,
+            },
+            (chunk) => {
+              // Forward chunk as SSE event
+              res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            }
+          );
+
+          // End SSE stream
+          res.end();
+        } catch (error) {
+          res.write(
+            `data: ${JSON.stringify({
+              success: false,
+              type: "error",
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Streaming translation failed",
+            })}\n\n`
+          );
+          res.end();
+        }
+
+        return;
+      }
+
+      // Non-streaming: single-shot translation
       const translated = await indicTrans2Service.translate(text, {
         srcLang: srcIndic,
         tgtLang: tgtIndic,

@@ -95,6 +95,98 @@ export class IndicTrans2Service {
     return result.translated;
   }
 
+  /**
+   * Stream translation sentence-by-sentence.
+   *
+   * This expects the Python server to emit one JSON object per line:
+   *  { success, type: "chunk" | "complete" | "error", index?, total?, translated? }
+   */
+  async streamTranslate(
+    text: string,
+    options: IndicTrans2TranslateOptions,
+    onChunk: (chunk: {
+      success: boolean;
+      type?: string;
+      index?: number;
+      total?: number;
+      translated?: string;
+      error?: string;
+    }) => void
+  ): Promise<void> {
+    // Ensure server is running
+    await new Promise<void>((resolve) => {
+      if (!this.pythonProcess) {
+        this.startServer();
+        setTimeout(() => resolve(), 2000);
+      } else {
+        resolve();
+      }
+    });
+
+    if (!this.pythonProcess) {
+      onChunk({
+        success: false,
+        type: "error",
+        error: "IndicTrans2 server is not running",
+      });
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      const payload = JSON.stringify({
+        text,
+        src_lang: options.srcLang,
+        tgt_lang: options.tgtLang,
+        stream: true,
+      }) + "\n";
+
+      let stdoutBuffer = "";
+
+      const dataHandler = (data: Buffer) => {
+        stdoutBuffer += data.toString();
+
+        // Process all complete lines
+        let newlineIndex = stdoutBuffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+          const line = stdoutBuffer.slice(0, newlineIndex).trim();
+          stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+
+          if (line.length > 0) {
+            try {
+              const parsed = JSON.parse(line);
+              onChunk(parsed);
+
+              if (parsed.type === "complete" || parsed.type === "error") {
+                this.pythonProcess.stdout.removeListener("data", dataHandler);
+                resolve();
+                return;
+              }
+            } catch (err) {
+              onChunk({
+                success: false,
+                type: "error",
+                error:
+                  err instanceof Error
+                    ? `Invalid JSON from IndicTrans2 server: ${err.message}`
+                    : "Invalid JSON from IndicTrans2 server",
+              });
+              this.pythonProcess.stdout.removeListener("data", dataHandler);
+              resolve();
+              return;
+            }
+          }
+
+          newlineIndex = stdoutBuffer.indexOf("\n");
+        }
+      };
+
+      this.pythonProcess.stdout.on("data", dataHandler);
+
+      // Send request
+      this.pythonProcess.stdin.write(payload);
+    });
+  }
+
   private runPython(
     text: string,
     options: IndicTrans2TranslateOptions

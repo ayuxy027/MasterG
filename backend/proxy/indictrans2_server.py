@@ -307,6 +307,253 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
   return {"success": True, "translated": final_translation}
 
 
+def translate_stream(text: str, src_lang: str, tgt_lang: str) -> None:
+  """
+  Stream translation sentence-by-sentence over stdout.
+
+  Protocol (one JSON object per line):
+    {"success": true, "type": "chunk", "index": 0, "total": N, "translated": "..."}
+    ...
+    {"success": true, "type": "complete", "total": N, "translated": "..."}
+
+  This keeps the model usage identical to `translate` but exposes
+  intermediate sentence translations for streaming to the client.
+  """
+  tokenizer, model, processor = load_model()
+
+  clean_text = strip_markdown(text)
+
+  # Extract and replace scientific terms with placeholders
+  text_with_placeholders, term_map = extract_and_replace_terms(clean_text)
+
+  # Split into individual sentences (one per call)
+  sentences = split_into_sentences(text_with_placeholders)
+  if not sentences:
+    sys.stdout.write(
+      json.dumps(
+        {
+          "success": False,
+          "type": "error",
+          "error": "No sentences found in input text",
+        }
+      )
+      + "\n"
+    )
+    sys.stdout.flush()
+    return
+
+  translated_sentences: List[str] = []
+  device = next(model.parameters()).device
+  total = len(sentences)
+
+  for idx, sentence in enumerate(sentences):
+    sentence = sentence.strip()
+    if not sentence:
+      continue
+
+    # Skip if sentence is just a placeholder (edge case)
+    if sentence.startswith("SCI") and len(sentence.split()) == 1:
+      translated = restore_terms(sentence, term_map)
+      translated = post_process_translation(translated)
+      translated_sentences.append(translated)
+
+      sys.stdout.write(
+        json.dumps(
+          {
+            "success": True,
+            "type": "chunk",
+            "index": idx,
+            "total": total,
+            "translated": translated,
+          }
+        )
+        + "\n"
+      )
+      sys.stdout.flush()
+      continue
+
+    try:
+      # Preprocess single sentence
+      batch = processor.preprocess_batch(
+        [sentence], src_lang=src_lang, tgt_lang=tgt_lang
+      )
+      if not batch or len(batch) == 0:
+        sys.stderr.write(
+          f"Warning: Preprocessing failed for sentence: {sentence[:50]}\n"
+        )
+        translated = restore_terms(sentence, term_map)
+        translated = post_process_translation(translated)
+        translated_sentences.append(translated)
+
+        sys.stdout.write(
+          json.dumps(
+            {
+              "success": True,
+              "type": "chunk",
+              "index": idx,
+              "total": total,
+              "translated": translated,
+            }
+          )
+          + "\n"
+        )
+        sys.stdout.flush()
+        continue
+
+      # Tokenize
+      inputs = tokenizer(
+        batch,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=180,
+      )
+      if inputs is None or "input_ids" not in inputs:
+        sys.stderr.write(
+          f"Warning: Tokenization failed for sentence: {sentence[:50]}\n"
+        )
+        translated = restore_terms(sentence, term_map)
+        translated = post_process_translation(translated)
+        translated_sentences.append(translated)
+
+        sys.stdout.write(
+          json.dumps(
+            {
+              "success": True,
+              "type": "chunk",
+              "index": idx,
+              "total": total,
+              "translated": translated,
+            }
+          )
+          + "\n"
+        )
+        sys.stdout.flush()
+        continue
+
+      inputs = {k: v.to(device) for k, v in inputs.items()}
+
+      # Generate translation (one sentence at a time)
+      with torch.inference_mode():
+        outputs = model.generate(
+          **inputs,
+          max_length=180,
+          num_beams=2,
+          use_cache=False,
+          early_stopping=True,
+          repetition_penalty=1.3,
+          length_penalty=0.8,
+        )
+
+      # Decode
+      translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+      if not translation or len(translation) == 0:
+        sys.stderr.write(
+          f"Warning: Decoding failed for sentence: {sentence[:50]}\n"
+        )
+        translated = restore_terms(sentence, term_map)
+        translated = post_process_translation(translated)
+        translated_sentences.append(translated)
+
+        sys.stdout.write(
+          json.dumps(
+            {
+              "success": True,
+              "type": "chunk",
+              "index": idx,
+              "total": total,
+              "translated": translated,
+            }
+          )
+          + "\n"
+        )
+        sys.stdout.flush()
+        continue
+
+      # Postprocess (IndicProcessor)
+      post = processor.postprocess_batch([translation[0]], lang=tgt_lang)
+      if post and len(post) > 0 and post[0].strip():
+        translated = post[0].strip()
+      else:
+        sys.stderr.write(
+          f"Warning: Postprocessing failed for sentence: {sentence[:50]}\n"
+        )
+        translated = sentence
+
+      # Restore scientific terms & apply lightweight post-processing
+      translated = restore_terms(translated, term_map)
+      translated = post_process_translation(translated)
+
+      translated_sentences.append(translated)
+
+      # Emit chunk to stdout
+      sys.stdout.write(
+        json.dumps(
+          {
+            "success": True,
+            "type": "chunk",
+            "index": idx,
+            "total": total,
+            "translated": translated,
+          }
+        )
+        + "\n"
+      )
+      sys.stdout.flush()
+
+    except Exception as e:
+      sys.stderr.write(
+        f"Error translating sentence '{sentence[:50]}': {e}\n"
+      )
+      translated = restore_terms(sentence, term_map)
+      translated = post_process_translation(translated)
+      translated_sentences.append(translated)
+
+      sys.stdout.write(
+        json.dumps(
+          {
+            "success": True,
+            "type": "chunk",
+            "index": idx,
+            "total": total,
+            "translated": translated,
+          }
+        )
+        + "\n"
+      )
+      sys.stdout.flush()
+
+  if not translated_sentences:
+    sys.stdout.write(
+      json.dumps(
+        {
+          "success": False,
+          "type": "error",
+          "error": "All translation sentences failed",
+        }
+      )
+      + "\n"
+    )
+    sys.stdout.flush()
+    return
+
+  combined_translation = " ".join(translated_sentences)
+
+  # Final complete event
+  sys.stdout.write(
+    json.dumps(
+      {
+        "success": True,
+        "type": "complete",
+        "total": total,
+        "translated": combined_translation,
+      }
+    )
+    + "\n"
+  )
+  sys.stdout.flush()
+
+
 def main():
   """Server loop: read JSON requests, translate, write JSON responses"""
   try:
@@ -330,15 +577,19 @@ def main():
         text = str(req.get("text") or "").strip()
         src_lang = str(req.get("src_lang") or "eng_Latn")
         tgt_lang = str(req.get("tgt_lang") or "hin_Deva")
+        stream = bool(req.get("stream") or False)
         
         if not text:
           result = {"success": False, "error": "Missing or empty 'text' field"}
         else:
-          result = translate(text, src_lang, tgt_lang)
-        
-        # Write response to stdout
-        sys.stdout.write(json.dumps(result) + "\n")
-        sys.stdout.flush()
+          if stream:
+            # Stream sentence-by-sentence; function writes directly to stdout
+            translate_stream(text, src_lang, tgt_lang)
+          else:
+            result = translate(text, src_lang, tgt_lang)
+            # Write single response to stdout
+            sys.stdout.write(json.dumps(result) + "\n")
+            sys.stdout.flush()
         
       except json.JSONDecodeError as e:
         sys.stdout.write(json.dumps({"success": False, "error": f"Invalid JSON: {e}"}) + "\n")
