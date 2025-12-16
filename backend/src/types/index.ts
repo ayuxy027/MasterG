@@ -50,7 +50,17 @@ export interface QueryRequest {
   topK?: number;
   userId?: string; // For chat context retrieval
   sessionId?: string; // For maintaining conversation threads
+  mentionedFileIds?: string[]; // For @ mentions - filter RAG to specific files
   // language is removed - now auto-detected from query text only
+}
+
+// Streaming response types
+export interface StreamChunk {
+  type: 'layer' | 'text' | 'source' | 'done' | 'error';
+  content?: string;
+  layer?: string;
+  source?: SourceCitation;
+  error?: string;
 }
 
 export interface QueryResponse {
