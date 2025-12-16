@@ -34,9 +34,9 @@ export class QueryRouterService {
 Query: "${query}"
 
 Recent Chat: ${chatHistory
-        .slice(-3)
-        .map((m) => `${m.role}: ${m.content}`)
-        .join("\n")}
+          .slice(-3)
+          .map((m) => `${m.role}: ${m.content}`)
+          .join("\n")}
 
 Classify and extract information (JSON format):
 {
@@ -280,8 +280,7 @@ Language: ${languageName}`;
         `📊 Document Stats: ${fileIds.length} files, ${totalPages} total pages`
       );
       console.log(
-        `🧠 Query Type: ${
-          isComplexQuery ? "Complex (needs decomposition)" : "Standard"
+        `🧠 Query Type: ${isComplexQuery ? "Complex (needs decomposition)" : "Standard"
         }`
       );
 
@@ -500,17 +499,23 @@ Language: ${languageName}`;
 
   /**
    * Main routing method
+   * @param mentionedFileIds - Optional file IDs to filter search (for @ mentions)
    */
   async routeQuery(
     query: string,
     chatHistory: ChatMessage[],
-    chromaCollectionName: string
+    chromaCollectionName: string,
+    mentionedFileIds?: string[]
   ): Promise<{
     answer: string;
     sources: any[];
     layer: string;
     reasoning: string;
   }> {
+    // Log if filtering by specific files
+    if (mentionedFileIds && mentionedFileIds.length > 0) {
+      console.log(`🎯 @ MENTIONS: Filtering to ${mentionedFileIds.length} file(s)`);
+    }
     // 1. Detect language first
     const detectedLang = languageService.detectLanguage(query);
     const language = detectedLang.languageCode as LanguageCode;
@@ -521,8 +526,7 @@ Language: ${languageName}`;
     const decision = await this.analyzeQuery(query, chatHistory);
 
     console.log(
-      `🎯 Routing decision: ${
-        decision.shouldStopAtLayer1 ? "LAYER1" : "LAYER2/3"
+      `🎯 Routing decision: ${decision.shouldStopAtLayer1 ? "LAYER1" : "LAYER2/3"
       } - ${decision.reason}`
     );
 

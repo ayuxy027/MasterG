@@ -146,6 +146,55 @@ export class VectorDBService {
   }
 
   /**
+   * Query similar chunks with optional file filter (for @ mentions)
+   * Filters results to only include chunks from specified files
+   */
+  async queryChunksWithFilter(
+    queryEmbedding: number[],
+    topK: number = 3,
+    collectionName?: string,
+    fileIds?: string[]
+  ): Promise<{
+    documents: string[];
+    metadatas: ChunkMetadata[];
+    distances: number[];
+  }> {
+    try {
+      const collection = await this.initCollection(collectionName);
+
+      // Build where filter if fileIds are provided
+      let whereFilter: any = undefined;
+      if (fileIds && fileIds.length > 0) {
+        if (fileIds.length === 1) {
+          whereFilter = { fileId: { $eq: fileIds[0] } };
+        } else {
+          whereFilter = { fileId: { $in: fileIds } };
+        }
+        console.log(`🎯 Filtering query to files: ${fileIds.join(', ')}`);
+      }
+
+      const results = await collection.query({
+        queryEmbeddings: [queryEmbedding],
+        nResults: topK,
+        where: whereFilter,
+      });
+
+      if (!results.documents || !results.metadatas || !results.distances) {
+        throw new Error("Invalid query results");
+      }
+
+      return {
+        documents: results.documents[0] || [],
+        metadatas: (results.metadatas[0] as ChunkMetadata[]) || [],
+        distances: results.distances[0] || [],
+      };
+    } catch (error) {
+      console.error("Vector query with filter error:", error);
+      throw new Error("Failed to query vector database with filter");
+    }
+  }
+
+  /**
    * Query chunks by metadata (fileName and/or page) from specific collection
    */
   async queryByMetadata(
