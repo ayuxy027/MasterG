@@ -13,10 +13,6 @@ const PlaygroundPage: React.FC = () => {
     name: "Ollama (DeepSeek R1)",
     status: "checking",
   });
-  const [indicTrans2Status, setIndicTrans2Status] = useState<ServiceStatus>({
-    name: "IndicTrans2",
-    status: "checking",
-  });
   const [nllbStatus, setNllbStatus] = useState<ServiceStatus>({
     name: "NLLB-200",
     status: "checking",
@@ -36,24 +32,13 @@ const PlaygroundPage: React.FC = () => {
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [translationStreaming, setTranslationStreaming] = useState(true);
 
-  // Test states for NLLB
-  const [nllbTranslationText, setNllbTranslationText] = useState("Hello world, how are you?");
-  const [nllbTranslationSource, setNllbTranslationSource] = useState("en");
-  const [nllbTranslationTarget, setNllbTranslationTarget] = useState("hi");
-  const [nllbTranslationResult, setNllbTranslationResult] = useState("");
-  const [nllbTranslationLoading, setNllbTranslationLoading] = useState(false);
-  const [nllbTranslationError, setNllbTranslationError] = useState<string | null>(null);
-  const [nllbTranslationStreaming, setNllbTranslationStreaming] = useState(true);
-
   // Check service statuses
   useEffect(() => {
     checkOllamaStatus();
-    checkIndicTrans2Status();
     checkNllbStatus();
     // Refresh status every 10 seconds
     const interval = setInterval(() => {
       checkOllamaStatus();
-      checkIndicTrans2Status();
       checkNllbStatus();
     }, 10000);
     return () => clearInterval(interval);
@@ -75,32 +60,6 @@ const PlaygroundPage: React.FC = () => {
         name: "Ollama (DeepSeek R1)",
         status: "error",
         details: err instanceof Error ? err.message : "Connection failed",
-        lastChecked: new Date(),
-      });
-    }
-  };
-
-  const checkIndicTrans2Status = async () => {
-    // Test with a known MT-safe sentence (not too short, well-formed)
-    try {
-      const testResult = await stitchAPI.translateContent({
-        text: "Photosynthesis is a biological process that converts light energy into chemical energy.",
-        sourceLanguage: "en",
-        targetLanguage: "hi",
-      });
-      setIndicTrans2Status({
-        name: "IndicTrans2",
-        status: testResult.success ? "connected" : "error",
-        details: testResult.success 
-          ? "Model loaded and ready" 
-          : testResult.error || "Service error",
-        lastChecked: new Date(),
-      });
-    } catch (err) {
-      setIndicTrans2Status({
-        name: "IndicTrans2",
-        status: "error",
-        details: err instanceof Error ? err.message : "Service unavailable",
         lastChecked: new Date(),
       });
     }
@@ -300,10 +259,10 @@ const PlaygroundPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Service Playground</h1>
-        <p className="text-gray-600 mb-6">Test and debug Ollama and IndicTrans2 services</p>
+        <p className="text-gray-600 mb-6">Test and debug Ollama and NLLB-200 translation services</p>
 
         {/* Service Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           {/* Ollama Status */}
           <div className={`border-2 rounded-lg p-4 ${getStatusColor(ollamaStatus.status)}`}>
             <div className="flex items-center justify-between mb-2">
@@ -318,26 +277,6 @@ const PlaygroundPage: React.FC = () => {
             )}
             <button
               onClick={checkOllamaStatus}
-              className="mt-3 text-xs px-3 py-1 bg-white bg-opacity-50 rounded hover:bg-opacity-70"
-            >
-              Refresh
-            </button>
-          </div>
-
-          {/* IndicTrans2 Status */}
-          <div className={`border-2 rounded-lg p-4 ${getStatusColor(indicTrans2Status.status)}`}>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-lg">{indicTrans2Status.name}</h3>
-              <span className="text-2xl">{getStatusIcon(indicTrans2Status.status)}</span>
-            </div>
-            <p className="text-sm opacity-80">{indicTrans2Status.details || "Checking..."}</p>
-            {indicTrans2Status.lastChecked && (
-              <p className="text-xs mt-2 opacity-60">
-                Last checked: {indicTrans2Status.lastChecked.toLocaleTimeString()}
-              </p>
-            )}
-            <button
-              onClick={checkIndicTrans2Status}
               className="mt-3 text-xs px-3 py-1 bg-white bg-opacity-50 rounded hover:bg-opacity-70"
             >
               Refresh
@@ -366,7 +305,7 @@ const PlaygroundPage: React.FC = () => {
         </div>
 
         {/* Test Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Ollama Test */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Test Ollama (LLM)</h2>
@@ -420,7 +359,7 @@ const PlaygroundPage: React.FC = () => {
 
           {/* Translation Test */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Test IndicTrans2 (Translation)</h2>
+            <h2 className="text-xl font-semibold mb-4">Test Translation (NLLB-200)</h2>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -520,107 +459,6 @@ const PlaygroundPage: React.FC = () => {
             </div>
           </div>
 
-          {/* NLLB Translation Test */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Test NLLB-200 (Translation)</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300"
-                    checked={nllbTranslationStreaming}
-                    onChange={(e) => setNllbTranslationStreaming(e.target.checked)}
-                  />
-                  Enable streaming (sentence-by-sentence)
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Source Language
-                </label>
-                <select
-                  value={nllbTranslationSource}
-                  onChange={(e) => setNllbTranslationSource(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-                >
-                  <option value="en">English</option>
-                  <option value="hi">Hindi</option>
-                  <option value="bn">Bengali</option>
-                  <option value="ta">Tamil</option>
-                  <option value="te">Telugu</option>
-                  <option value="kn">Kannada</option>
-                  <option value="ml">Malayalam</option>
-                  <option value="mr">Marathi</option>
-                  <option value="gu">Gujarati</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Language
-                </label>
-                <select
-                  value={nllbTranslationTarget}
-                  onChange={(e) => setNllbTranslationTarget(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-                >
-                  <option value="hi">Hindi</option>
-                  <option value="en">English</option>
-                  <option value="bn">Bengali</option>
-                  <option value="ta">Tamil</option>
-                  <option value="te">Telugu</option>
-                  <option value="kn">Kannada</option>
-                  <option value="ml">Malayalam</option>
-                  <option value="mr">Marathi</option>
-                  <option value="gu">Gujarati</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Text to Translate
-                </label>
-                <textarea
-                  value={nllbTranslationText}
-                  onChange={(e) => setNllbTranslationText(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-3 text-sm"
-                  rows={4}
-                  placeholder="Enter text to translate..."
-                />
-              </div>
-              <button
-                onClick={testNllbTranslation}
-                disabled={nllbTranslationLoading || !nllbTranslationText.trim()}
-                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {nllbTranslationLoading ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Translating...
-                  </>
-                ) : (
-                  "Translate (NLLB)"
-                )}
-              </button>
-              {nllbTranslationError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                  {nllbTranslationError}
-                </div>
-              )}
-              {nllbTranslationResult && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Translation
-                  </label>
-                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 text-sm whitespace-pre-wrap max-h-96 overflow-auto">
-                    {nllbTranslationResult}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -26,53 +26,7 @@ import torch  # type: ignore
 
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"
-INDICTRANS2_PATH = MODELS_DIR / "indictrans2-en-indic"
 NLLB_MODEL_NAME = "facebook/nllb-200-distilled-600M"
-
-
-def setup_indictrans2() -> None:
-  """Download IndicTrans2 model if not already present"""
-  if INDICTRANS2_PATH.exists():
-    print(f"✅ IndicTrans2 model already exists at {INDICTRANS2_PATH}")
-    return
-
-  print("Setting up IndicTrans2 for MasterG...")
-  print("⚠️  ONE-TIME DOWNLOAD: This requires internet connection.")
-  print("   After download, the model runs completely offline.")
-  print()
-  
-  indic_model_name = "ai4bharat/indictrans2-en-indic-dist-200M"
-
-  print(f"Downloading IndicTrans2 model: {indic_model_name}")
-  print("   This may take a few minutes (~2GB download)...")
-  
-  try:
-    # Download model (requires internet - this is the ONLY time)
-    model = AutoModelForSeq2SeqLM.from_pretrained(
-      indic_model_name,
-      trust_remote_code=True,
-      torch_dtype=torch.float16,
-    )
-    model.save_pretrained(str(INDICTRANS2_PATH))
-
-    # Download tokenizer (requires internet - this is the ONLY time)
-    tokenizer = AutoTokenizer.from_pretrained(
-      indic_model_name,
-      trust_remote_code=True,
-    )
-    tokenizer.save_pretrained(str(INDICTRANS2_PATH))
-    
-    print(f"✅ IndicTrans2 model saved to: {INDICTRANS2_PATH}")
-    
-  except Exception as e:
-    print()
-    print(f"❌ IndicTrans2 download failed: {e}")
-    print()
-    print("Troubleshooting:")
-    print("1. Check internet connection")
-    print("2. For gated models, run: huggingface-cli login")
-    print("3. Request access at: https://huggingface.co/ai4bharat/indictrans2-en-indic-dist-200M")
-    raise
 
 
 def setup_nllb() -> None:
@@ -122,22 +76,15 @@ def setup_nllb() -> None:
 
 
 def setup_models() -> None:
-  """Download all translation models"""
+  """Download NLLB-200 translation model"""
   MODELS_DIR.mkdir(parents=True, exist_ok=True)
   
   print("=" * 60)
-  print("MasterG Translation Models Setup")
+  print("MasterG Translation Model Setup (NLLB-200)")
   print("=" * 60)
   print()
   
-  # Setup IndicTrans2 (optional, for compatibility)
-  try:
-    setup_indictrans2()
-  except Exception as e:
-    print(f"⚠️  IndicTrans2 setup skipped due to error: {e}")
-    print("   You can set it up later if needed.")
-  
-  # Setup NLLB-200 (default model)
+  # Setup NLLB-200 (only translation model)
   try:
     setup_nllb()
   except Exception as e:
@@ -149,8 +96,8 @@ def setup_models() -> None:
   print("✅ MasterG model setup complete!")
   print("=" * 60)
   print()
-  print("Models are now cached and will run offline.")
-  print("NLLB-200 is the default translation model.")
+  print("NLLB-200 is now cached and will run offline.")
+  print("This is the only translation model used by MasterG.")
 
 
 if __name__ == "__main__":

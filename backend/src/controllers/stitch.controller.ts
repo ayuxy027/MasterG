@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { ollamaService } from "../services/ollama.service";
 import { languageService } from "../services/language.service";
-import { indicTrans2Service } from "../services/indictrans2.service";
 import { nllbService } from "../services/nllb.service";
 import { env } from "../config/env";
 
@@ -182,18 +181,14 @@ export class StitchController {
   }
 
   /**
-   * Translate generated content (default: uses NLLB-200, fallback to IndicTrans2)
+   * Translate generated content using NLLB-200 (only translation service)
    */
   async translateContent(req: Request, res: Response): Promise<void> {
     try {
-      // Default to NLLB-200, fallback to IndicTrans2 if NLLB is disabled
-      const useNLLB = env.NLLB_ENABLED;
-      const useIndicTrans2 = env.INDICTRANS2_ENABLED && !useNLLB;
-
-      if (!useNLLB && !useIndicTrans2) {
+      if (!env.NLLB_ENABLED) {
         res.status(503).json({
           success: false,
-          error: "No translation service enabled. Set NLLB_ENABLED=true or INDICTRANS2_ENABLED=true in your environment.",
+          error: "NLLB-200 translation is not enabled. Set NLLB_ENABLED=true in your environment.",
         });
         return;
       }
@@ -218,10 +213,11 @@ export class StitchController {
       const tgtCode =
         (targetLanguage as keyof typeof languageService) || "hi";
 
-      const srcLang = languageService.toIndicTrans2Code(
+      // NLLB uses FLORES-200 language code format (eng_Latn, hin_Deva, etc.)
+      const srcLang = languageService.toNLLBCode(
         srcCode as any
       );
-      const tgtLang = languageService.toIndicTrans2Code(
+      const tgtLang = languageService.toNLLBCode(
         tgtCode as any
       );
 
@@ -241,31 +237,17 @@ export class StitchController {
         res.setHeader("X-Accel-Buffering", "no");
 
         try {
-          if (useNLLB) {
-            await nllbService.streamTranslate(
-              text,
-              {
-                srcLang: srcLang,
-                tgtLang: tgtLang,
-              },
-              (chunk) => {
-                // Forward chunk as SSE event
-                res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-              }
-            );
-          } else {
-            await indicTrans2Service.streamTranslate(
-              text,
-              {
-                srcLang: srcLang,
-                tgtLang: tgtLang,
-              },
-              (chunk) => {
-                // Forward chunk as SSE event
-                res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-              }
-            );
-          }
+          await nllbService.streamTranslate(
+            text,
+            {
+              srcLang: srcLang,
+              tgtLang: tgtLang,
+            },
+            (chunk) => {
+              // Forward chunk as SSE event
+              res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            }
+          );
 
           // End SSE stream
           res.end();
@@ -287,18 +269,10 @@ export class StitchController {
       }
 
       // Non-streaming: single-shot translation
-      let translated: string;
-      if (useNLLB) {
-        translated = await nllbService.translate(text, {
-          srcLang: srcLang,
-          tgtLang: tgtLang,
-        });
-      } else {
-        translated = await indicTrans2Service.translate(text, {
-          srcLang: srcLang,
-          tgtLang: tgtLang,
-        });
-      }
+      const translated = await nllbService.translate(text, {
+        srcLang: srcLang,
+        tgtLang: tgtLang,
+      });
 
       res.json({
         success: true,
@@ -349,11 +323,11 @@ export class StitchController {
       const tgtCode =
         (targetLanguage as keyof typeof languageService) || "hi";
 
-      // NLLB uses same language code format as IndicTrans2
-      const srcLang = languageService.toIndicTrans2Code(
+      // NLLB uses FLORES-200 language code format (eng_Latn, hin_Deva, etc.)
+      const srcLang = languageService.toNLLBCode(
         srcCode as any
       );
-      const tgtLang = languageService.toIndicTrans2Code(
+      const tgtLang = languageService.toNLLBCode(
         tgtCode as any
       );
 

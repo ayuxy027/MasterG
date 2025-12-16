@@ -1,10 +1,5 @@
 torch>=2.1.0
 transformers>=4.51.0
-indictranstoolkit
 numpy>=2.1.0
-sentencepiece
-sacremoses
-indic-nlp-library
-indic-transliteration
 protobuf>=3.20.0
 accelerate>=1.12.0

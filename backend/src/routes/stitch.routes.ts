@@ -44,8 +44,8 @@ router.post(
 
 /**
  * POST /api/stitch/translate
- * Translate generated content using IndicTrans2
- * Body: { text, sourceLanguage, targetLanguage }
+ * Translate generated content using NLLB-200
+ * Body: { text, sourceLanguage, targetLanguage, stream? }
  */
 router.post(
   "/translate",
