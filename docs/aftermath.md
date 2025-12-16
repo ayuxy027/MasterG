@@ -2,122 +2,72 @@
 
 ## Context
 
-We explored the feasibility of multilingual educational content generation under **extreme resource constraints** (CPU-only, 4–8 GB RAM, offline-first) for a hackathon submission. The system generates English educational content using a capable LLM (e.g., DeepSeek) and then translates it into **22 Indian languages** using a lightweight MT model.
+We explored the feasibility of multilingual educational content generation under **extreme resource constraints** (CPU-only, 4–8 GB RAM, offline-first) for a hackathon submission. The system generates English educational content using a capable LLM (e.g., DeepSeek via Ollama) and then translates it into **Indian languages** using a lightweight MT model.
 
 ---
 
-## Initial Approach
+## Final Architecture Decision
 
-* English educational content generated via a strong LLM.
-* Translation performed using **IndicTrans2 (ai4bharat/indictrans2-en-indic-dist-200M)**.
-* Goal: NCERT-aligned, age-appropriate, culturally relevant educational content.
+### Current Approach
 
----
-
-## Observed Problems
-
-### 1. Translation Quality Issues
-
-* Sentence merging across inputs.
-* Subject–object inversion.
-* Loss of key scientific entities (e.g., chlorophyll, carbon dioxide).
-* Hallucinated or incorrect scientific terms (e.g., "ऑक्सीजन डाइऑक्साइड").
-* Failure on complex grammar (contrast clauses like “although”).
-
-### 2. Root Cause Analysis
-
-* IndicTrans2-200M is a **small, distilled model (~200M params)**.
-* Optimized for speed and general prose, not scientific or educational text.
-* Limited clause handling, weak terminology retention, and shallow context window.
-* These failures are **expected behavior**, not bugs.
+* English educational content generated via DeepSeek R1 (via Ollama)
+* Translation performed using **NLLB-200 (facebook/nllb-200-distilled-600M)**
+* Goal: NCERT-aligned, age-appropriate, culturally relevant educational content
 
 ---
 
-## Model Options Evaluated
-
-### Current Model
-
-* **ai4bharat/indictrans2-en-indic-dist-200M**
-* Pros: Fast, CPU-friendly, offline-capable.
-* Cons: Poor for science, long sentences, and high-fidelity translation.
-
-### Larger Alternative
-
-* **ai4bharat/indictrans2-en-indic-1B**
-* Better structure and entity retention.
-* Requires significantly more memory and is slow on CPU.
-* Not ideal for hackathon CPU-only constraints.
-
-**Decision:** Do NOT upgrade to 1B for hackathon use.
-
----
-
-## Final Architecture Decision (Winning Strategy)
-
-Instead of chasing perfect translation, we shifted to **controlled correctness** via a hybrid pipeline.
+## Translation Pipeline
 
 ### Revised Pipeline
 
-1. **English Content Generation** (LLM)
+1. **English Content Generation** (Ollama/DeepSeek R1)
+   - Generate content using strict MT-safe prompt
+   - One sentence per line format
+   - No markdown, minimal pronouns
 
-   * Simplified, literal, MT-friendly English.
-   * No complex clauses or idioms.
+2. **NLLB-200 Translation**
+   - Line-by-line processing (one sentence per inference)
+   - Stream sentence-by-sentence results
+   - FLORES-200 language code format
 
-2. **Sentence Simplification & Splitting**
-
-   * One sentence per translation call.
-   * Short, direct sentences.
-
-3. **Glossary Locking (Critical Step)**
-
-   * Replace key scientific terms with placeholders before translation.
-   * Restore correct Hindi/Indic terms post-translation.
-
-4. **IndicTrans2-200M Translation**
-
-   * Used in safe mode (short inputs only).
-
-5. **Post-Translation Validation**
-
-   * Regex and rule-based fixes.
-   * Detect and correct known failure patterns.
+3. **Output**
+   - Clean translated text in target language
+   - Preserved scientific terminology
+   - Maintained sentence boundaries
 
 ---
 
-## Prompt Engineering Improvements
+## Model Selection Rationale
 
-* Rewrote the generation prompt to:
+### NLLB-200 (Current Model)
 
-  * Force simple English.
-  * Avoid conjunction-heavy sentences.
-  * Repeat nouns instead of pronouns.
-  * Separate cultural context from core explanations.
-* This significantly improved downstream translation reliability.
+* **facebook/nllb-200-distilled-600M**
+* Pros: 
+  - Excellent multilingual coverage (200 languages)
+  - Strong translation quality
+  - Better terminology retention than smaller models
+  - GPU acceleration support (CUDA/MPS)
+* Cons:
+  - Larger memory footprint (~3-4GB RAM)
+  - Slightly slower than smaller models
 
----
-
-## Hackathon Insight (Key Takeaway)
-
-Judges care more about:
-
-* Understanding and respecting constraints.
-* Designing systems that fail safely.
-* Clear trade-off explanations.
-* Engineering maturity and scalability.
-
-Perfect translation under offline, CPU-only constraints is unrealistic.
-**Demonstrating controlled, explainable correctness is the real win.**
+**Decision:** NLLB-200 provides the best balance of quality and performance for educational content translation.
 
 ---
 
-## Final Verdict
+## Key Learnings
 
-* The translation issues were **model-capacity limitations**, not design mistakes.
-* A hybrid, rule-augmented MT pipeline is the most viable solution.
-* This approach aligns strongly with hackathon judging criteria and real-world rural deployment constraints.
+1. **Sentence-level processing** is critical for quality
+2. **Strict prompt engineering** for source content improves translation
+3. **GPU acceleration** significantly improves performance (when available)
+4. **Streaming responses** improve user experience
+5. **Persistent model caching** reduces latency after first request
 
 ---
 
-## One-Line Summary
+## Implementation Notes
 
-> We optimized for *responsible multilingual education under extreme constraints*, not for perfect tra
+* Model cached in memory via persistent Python server
+* Supports both single-shot and streaming translation
+* Auto-detects best available device (CUDA > MPS > CPU)
+* Line-by-line processing enforced for consistency

@@ -42,8 +42,8 @@ interface EnvConfig {
   OLLAMA_URL?: string;
   OLLAMA_MODEL?: string;
 
-  // IndicTrans2 Configuration
-  INDICTRANS2_ENABLED: boolean;
+  // NLLB-200 Configuration (only translation service)
+  NLLB_ENABLED: boolean;
   
   // Python Executable (for proxy services)
   PYTHON_EXECUTABLE?: string;
@@ -96,9 +96,9 @@ export const env: EnvConfig = {
   OLLAMA_URL: process.env.OLLAMA_URL,
   OLLAMA_MODEL: process.env.OLLAMA_MODEL,
 
-  // IndicTrans2 Configuration
-  INDICTRANS2_ENABLED:
-    getEnvVariable("INDICTRANS2_ENABLED", "true") === "true",
+  // NLLB-200 Configuration (only translation service)
+  NLLB_ENABLED:
+    getEnvVariable("NLLB_ENABLED", "true") === "true", // Default enabled
 
   // Python Executable (for proxy services)
   PYTHON_EXECUTABLE: process.env.PYTHON_EXECUTABLE || "python3",

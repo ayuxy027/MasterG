@@ -191,10 +191,10 @@ class LanguageService {
   }
 
   /**
-   * Map our internal language codes to IndicTrans2 codes
-   * See docs/IndicTrans2.md for the full mapping.
+   * Map our internal language codes to NLLB-200 language codes (FLORES-200 format)
+   * Format: xxx_Script (e.g., hin_Deva, eng_Latn, mar_Deva)
    */
-  toIndicTrans2Code(code: SupportedLanguageCode): string {
+  toNLLBCode(code: SupportedLanguageCode): string {
     const map: Record<SupportedLanguageCode, string> = {
       hi: "hin_Deva",
       mr: "mar_Deva",

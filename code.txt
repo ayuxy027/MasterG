@@ -1,0 +1,43 @@
+English → eng_Latn
+
+Hindi → hin_Deva
+
+Marathi → mar_Deva
+
+Bengali → ben_Beng
+
+Gujarati → guj_Gujr
+
+Punjabi → pan_Guru
+
+Tamil → tam_Taml
+
+Telugu → tel_Telu
+
+Kannada → kan_Knda
+
+Malayalam → mal_Mlym
+
+Odia (Oriya) → ory_Orya
+
+Assamese → asm_Beng
+
+Urdu → urd_Arab
+
+Kashmiri → kas_Arab
+
+Sindhi → snd_Arab
+
+Nepali → npi_Deva
+
+Konkani → gom_Deva
+
+Manipuri (Meitei) → mni_Beng
+
+Bodo → brx_Deva
+
+Maithili → mai_Deva
+
+Dogri → doi_Deva
+
+Sanskrit → san_Deva
