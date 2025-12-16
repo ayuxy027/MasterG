@@ -94,20 +94,22 @@ def load_model():
   os.chdir(str(INDIC_MODEL_PATH))
   
   try:
-    # Load tokenizer
+    # Load tokenizer (vocab file paths are now set in tokenizer_config.json)
+    # Pass vocab files here since they're removed from config to avoid duplicate argument error
+    import traceback
     try:
       tokenizer = AutoTokenizer.from_pretrained(
         ".",
         trust_remote_code=True,
         local_files_only=True,
         use_fast=False,
+        src_vocab_file=str(INDIC_MODEL_PATH / "model.SRC"),
+        tgt_vocab_file=str(INDIC_MODEL_PATH / "model.TGT"),
       )
-    except Exception:
-      tokenizer = AutoTokenizer.from_pretrained(
-        ".",
-        trust_remote_code=True,
-        local_files_only=True,
-      )
+    except Exception as e:
+      sys.stderr.write(f"Error loading tokenizer: {e}\n")
+      sys.stderr.write(traceback.format_exc() + "\n")
+      raise
     
     # Load model
     torch._dynamo.config.disable = True

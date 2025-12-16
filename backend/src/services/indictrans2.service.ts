@@ -22,14 +22,16 @@ export class IndicTrans2Service {
       "indictrans2_server.py"  // Changed to server version
     );
     // Use venv python - CRITICAL for torch and other dependencies
+    // Windows uses Scripts directory, Unix uses bin
+    const isWindows = process.platform === 'win32';
     const venvPython = path.resolve(
       __dirname,
       "..",
       "..",
       "proxy",
       "venv",
-      "bin",
-      "python"
+      isWindows ? "Scripts" : "bin",
+      isWindows ? "python.exe" : "python"
     );
     // Always prioritize venv python if it exists (has torch and all deps)
     if (fs.existsSync(venvPython)) {
@@ -39,7 +41,7 @@ export class IndicTrans2Service {
       this.pythonExecutable = env.PYTHON_EXECUTABLE || "python3";
       console.warn(`⚠️  IndicTrans2 venv not found at ${venvPython}, using ${this.pythonExecutable}. Translation may fail without proper dependencies.`);
     }
-    
+
     // Start persistent Python server
     this.startServer();
   }
