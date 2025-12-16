@@ -298,8 +298,8 @@ def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
         translated_sentences.append(sentence)
         
     except Exception as e:
-      # Log error but keep original sentence
-      sys.stderr.write(f"Error translating sentence '{sentence[:50]}': {e}\n")
+      # Log warning but keep original sentence (use "Warning" not "Error" to avoid Node.js error handler)
+      sys.stderr.write(f"Warning: Exception translating sentence '{sentence[:50]}': {e}\n")
       translated_sentences.append(sentence)
       continue
   
@@ -515,7 +515,7 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str) -> None:
 
     except Exception as e:
       sys.stderr.write(
-        f"Error translating sentence '{sentence[:50]}': {e}\n"
+        f"Warning: Exception translating sentence '{sentence[:50]}': {e}\n"
       )
       translated = restore_terms(sentence, term_map)
       translated = post_process_translation(translated)

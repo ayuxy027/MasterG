@@ -258,8 +258,9 @@ export class IndicTrans2Service {
 
     const errorHandler = (data: Buffer) => {
       const stderr = data.toString();
-      // Only treat as error if it's not just a log message
-      if (stderr.includes("Error") || stderr.includes("Traceback")) {
+      // Only treat as fatal error if it's a Traceback or Fatal error
+      // Ignore "Warning" messages - those are expected and handled gracefully
+      if (stderr.includes("Traceback") || stderr.includes("Fatal error") || (stderr.includes("Error") && !stderr.includes("Warning"))) {
         this.pythonProcess.stderr.removeListener("data", errorHandler);
         resolve({
           success: false,

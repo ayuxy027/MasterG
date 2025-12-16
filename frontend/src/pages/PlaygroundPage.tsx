@@ -66,10 +66,10 @@ const PlaygroundPage: React.FC = () => {
   };
 
   const checkIndicTrans2Status = async () => {
-    // Test with a simple translation (very short to be fast)
+    // Test with a known MT-safe sentence (not too short, well-formed)
     try {
       const testResult = await stitchAPI.translateContent({
-        text: "Hello",
+        text: "Photosynthesis is a biological process that converts light energy into chemical energy.",
         sourceLanguage: "en",
         targetLanguage: "hi",
       });
