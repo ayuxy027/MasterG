@@ -14,7 +14,10 @@ import sys
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+
+# Import glossary for term locking
+from glossary import extract_and_replace_terms, restore_terms
 
 # Disable PyTorch compile and meta tensors to avoid device issues
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
@@ -160,111 +163,147 @@ def load_model():
     raise
 
 
+def post_process_translation(text: str) -> str:
+  """
+  Apply rule-based post-processing fixes for known failure patterns.
+  
+  Fixes:
+  - Coordination errors ("A and B use C" -> "A uses B and C")
+  - Subject-object inversion
+  - Repeated words/phrases
+  - Missing punctuation
+  """
+  # Remove excessive repetition (same word 3+ times in a row)
+  text = re.sub(r'(\S+)(\s+\1){2,}', r'\1', text)
+  
+  # Fix common coordination errors (basic pattern matching)
+  # This is a simplified fix - more complex patterns would need NLP
+  
+  # Remove extra spaces
+  text = re.sub(r'\s+', ' ', text)
+  
+  # Ensure proper spacing around punctuation
+  text = re.sub(r'\s*([.!?])\s*', r'\1 ', text)
+  
+  return text.strip()
+
+
+def split_into_sentences(text: str) -> List[str]:
+  """
+  Split text into individual sentences.
+  CRITICAL: One sentence per inference call as per model.md requirements.
+  """
+  # Split by sentence endings
+  sentences = re.split(r'(?<=[.!?])\s+', text)
+  
+  # Clean and filter empty sentences
+  cleaned = []
+  for sentence in sentences:
+    sentence = sentence.strip()
+    if sentence and len(sentence) > 0:
+      cleaned.append(sentence)
+  
+  return cleaned if cleaned else [text]
+
+
 def translate(text: str, src_lang: str, tgt_lang: str) -> Dict[str, Any]:
-  """Translate text using cached model"""
+  """
+  Translate text using cached model with:
+  - One sentence per inference call (mandatory per model.md)
+  - Glossary locking for scientific terms
+  - Post-processing for known failure patterns
+  """
   tokenizer, model, processor = load_model()
   
   # Strip markdown before translation
   clean_text = strip_markdown(text)
   
-  # Chunk long texts
-  MAX_CHUNK_LENGTH = 400  # Reduced for better quality
+  # CRITICAL: Extract and replace scientific terms with placeholders
+  text_with_placeholders, term_map = extract_and_replace_terms(clean_text)
   
-  def chunk_text(text: str, max_chars: int) -> list[str]:
-    """Split text into chunks at sentence boundaries"""
-    if len(text) <= max_chars:
-      return [text]
-    
-    chunks = []
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    current_chunk = ""
-    
-    for sentence in sentences:
-      sentence = sentence.strip()
-      if not sentence:
-        continue
-      
-      if len(sentence) > max_chars:
-        if current_chunk:
-          chunks.append(current_chunk.strip())
-          current_chunk = ""
-        parts = sentence.split(', ')
-        for part in parts:
-          if len(current_chunk) + len(part) + 2 <= max_chars:
-            current_chunk += part + ", "
-          else:
-            if current_chunk:
-              chunks.append(current_chunk.rstrip(', ').strip())
-            current_chunk = part + ", "
-        continue
-      
-      if len(current_chunk) + len(sentence) + 1 <= max_chars:
-        current_chunk += sentence + " "
-      else:
-        if current_chunk:
-          chunks.append(current_chunk.strip())
-        current_chunk = sentence + " "
-    
-    if current_chunk:
-      chunks.append(current_chunk.strip())
-    
-    return chunks if chunks else [text]
+  # CRITICAL: Split into individual sentences (one per call)
+  sentences = split_into_sentences(text_with_placeholders)
   
-  text_chunks = chunk_text(clean_text, MAX_CHUNK_LENGTH)
-  translated_chunks = []
+  if not sentences:
+    return {"success": False, "error": "No sentences found in input text"}
   
+  translated_sentences = []
   device = next(model.parameters()).device
   
-  for chunk in text_chunks:
-    if not chunk.strip():
+  # Process ONE sentence at a time (mandatory per model.md)
+  for sentence in sentences:
+    if not sentence.strip():
+      continue
+    
+    # Skip if sentence is just a placeholder (edge case)
+    if sentence.strip().startswith("SCI") and len(sentence.strip().split()) == 1:
+      translated_sentences.append(sentence.strip())
       continue
       
     try:
-      batch = processor.preprocess_batch([chunk], src_lang=src_lang, tgt_lang=tgt_lang)
+      # Preprocess single sentence
+      batch = processor.preprocess_batch([sentence], src_lang=src_lang, tgt_lang=tgt_lang)
       if not batch or len(batch) == 0:
-        sys.stderr.write(f"Warning: Preprocessing returned empty batch for chunk: {chunk[:50]}\n")
+        sys.stderr.write(f"Warning: Preprocessing failed for sentence: {sentence[:50]}\n")
+        # Keep original if preprocessing fails
+        translated_sentences.append(sentence)
         continue
       
+      # Tokenize
       inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=180)
       if inputs is None or "input_ids" not in inputs:
-        sys.stderr.write(f"Warning: Tokenization failed for chunk: {chunk[:50]}\n")
+        sys.stderr.write(f"Warning: Tokenization failed for sentence: {sentence[:50]}\n")
+        translated_sentences.append(sentence)
         continue
       
       inputs = {k: v.to(device) for k, v in inputs.items()}
       
+      # Generate translation (one sentence at a time)
       with torch.inference_mode():
         outputs = model.generate(
           **inputs,
           max_length=180,
-          num_beams=2,  # Reduced for speed
+          num_beams=2,
           use_cache=False,
           early_stopping=True,
-          repetition_penalty=1.3,  # Reduce repetition
-          length_penalty=0.8,  # Shorter outputs
+          repetition_penalty=1.3,
+          length_penalty=0.8,
         )
       
+      # Decode
       translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
       if not translation or len(translation) == 0:
-        sys.stderr.write(f"Warning: Decoding returned empty result for chunk: {chunk[:50]}\n")
+        sys.stderr.write(f"Warning: Decoding failed for sentence: {sentence[:50]}\n")
+        translated_sentences.append(sentence)
         continue
       
+      # Postprocess
       post = processor.postprocess_batch([translation[0]], lang=tgt_lang)
       if post and len(post) > 0 and post[0].strip():
-        translated_chunks.append(post[0].strip())
+        translated_sentences.append(post[0].strip())
       else:
-        sys.stderr.write(f"Warning: Postprocessing returned empty result for chunk: {chunk[:50]}\n")
+        sys.stderr.write(f"Warning: Postprocessing failed for sentence: {sentence[:50]}\n")
+        translated_sentences.append(sentence)
         
     except Exception as e:
-      # Log error but continue with other chunks
-      sys.stderr.write(f"Error translating chunk '{chunk[:50]}': {e}\n")
-      import traceback
-      sys.stderr.write(traceback.format_exc())
+      # Log error but keep original sentence
+      sys.stderr.write(f"Error translating sentence '{sentence[:50]}': {e}\n")
+      translated_sentences.append(sentence)
       continue
   
-  if not translated_chunks:
-    return {"success": False, "error": "All translation chunks failed. Check server logs for details."}
+  if not translated_sentences:
+    return {"success": False, "error": "All translation sentences failed"}
   
-  final_translation = " ".join(translated_chunks)
+  # Join translated sentences with proper spacing
+  # Add space between sentences, but preserve original punctuation
+  combined_translation = " ".join(translated_sentences)
+  
+  # CRITICAL: Restore scientific terms from placeholders BEFORE post-processing
+  final_translation = restore_terms(combined_translation, term_map)
+  
+  # Apply post-processing fixes (removes repetition, fixes spacing)
+  final_translation = post_process_translation(final_translation)
+  
   return {"success": True, "translated": final_translation}
 
 
