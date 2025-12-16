@@ -39,10 +39,8 @@ export class StitchController {
     try {
       const {
         topic,
-        language,
         grade,
         subject,
-        curriculum,
         culturalContext,
         stream,
       } = req.body;
@@ -55,13 +53,11 @@ export class StitchController {
         return;
       }
 
-      // Build comprehensive prompt
+      // Build comprehensive prompt (content is always generated in English)
       const prompt = this.buildContentPrompt({
         topic,
-        language: language || "hi",
         grade: grade || "8",
         subject: subject || "mathematics",
-        curriculum: curriculum || "ncert",
         culturalContext: culturalContext || false,
       });
 
@@ -334,109 +330,87 @@ export class StitchController {
 
   /**
    * Build comprehensive content generation prompt
+   * Content is always generated in English for translation
    */
   private buildContentPrompt(params: {
     topic: string;
-    language: string;
     grade: string;
     subject: string;
-    curriculum: string;
     culturalContext: boolean;
   }): string {
-    const languageNames: Record<string, string> = {
-      hi: "Hindi (हिंदी)",
-      bn: "Bengali (বাংলা)",
-      ta: "Tamil (தமிழ்)",
-      te: "Telugu (తెలుగు)",
-      kn: "Kannada (ಕನ್ನಡ)",
-      ml: "Malayalam (മലയാളം)",
-      mr: "Marathi (मराठी)",
-      gu: "Gujarati (ગુજરાતી)",
-      pa: "Punjabi (ਪੰਜਾਬੀ)",
-      ur: "Urdu (اردو)",
-      or: "Odia (ଓଡ଼ିଆ)",
-      as: "Assamese (অসমীয়া)",
-      en: "English",
-    };
-
     const subjectNames: Record<string, string> = {
       mathematics: "Mathematics",
       science: "Science",
       social: "Social Studies",
-      language: "Language",
     };
 
-    const curriculumNames: Record<string, string> = {
-      ncert: "NCERT",
-      cbse: "CBSE",
-      state: "State Board",
-    };
-
-    const languageName = languageNames[params.language] || params.language;
+    // Use subject name if it's a known subject, otherwise use the custom value directly
     const subjectName = subjectNames[params.subject] || params.subject;
-    const curriculumName = curriculumNames[params.curriculum] || params.curriculum;
 
     let prompt = `
-You are an expert Indian educator and curriculum designer.
+You are an expert Indian educator and curriculum designer specializing in NCERT, CBSE, and State Board curricula.
 
-Generate educational content with the following details:
+Generate comprehensive educational content with the following details:
 
 Topic: ${params.topic}
 Subject: ${subjectName}
 Grade Level: Class ${params.grade}
-Curriculum: ${curriculumName}
-Target Language: ${languageName}
+Curriculum Alignment: Follow NCERT, CBSE, and State Board standards
 
-Primary Goal:
-Create accurate, age-appropriate, curriculum-aligned educational content that is easy to translate into Indian languages without loss of meaning.
+IMPORTANT: This content will be translated into multiple Indian languages. Write in clear, translation-friendly English.
 
-Content Guidelines:
-- Write in clear, simple, and direct sentences.
-- Avoid complex grammar, idioms, metaphors, or poetic language.
-- Prefer short sentences over long or compound sentences.
-- Do NOT use unnecessary conjunctions such as "although", "however", "therefore", or "whereas".
-- Keep factual accuracy extremely high (NCERT-safe).
+Content Requirements:
+- Provide comprehensive, detailed explanations suitable for Class ${params.grade} level
+- Use clear, simple sentences that are easy to translate
+- Include sufficient context and detail - aim for thorough coverage of the topic
+- Maintain high factual accuracy aligned with NCERT, CBSE, and State Board curricula
+- Structure content with clear sections and logical flow
 
-Pedagogical Requirements:
-- Adjust depth, vocabulary, and examples strictly according to Class ${params.grade}.
-- Explain concepts step-by-step.
-- Use definitions, explanations, and examples where appropriate.
-- Maintain a neutral, teacher-friendly tone suitable for textbooks, worksheets, and lesson plans.
+Formatting Rules:
+- Output MUST be plain text only - NO markdown, bullets, numbering, asterisks, or special formatting characters
+- Use simple line breaks to separate sentences and paragraphs
+- Do NOT use any markdown syntax (no #, *, -, [], (), etc.)
+- Write naturally but ensure each major idea is clearly separated
 
-STRICT LINE-BY-LINE OUTPUT FORMAT (VERY IMPORTANT):
-- Output MUST be plain text only. Do NOT use markdown, bullets, numbering, or special formatting.
-- Each logical sentence MUST be written on its own line.
-- Do NOT break one sentence across multiple lines.
-- Do NOT put more than one sentence on the same line.
-- Leave a completely blank line between major sections (like Definition, Raw Materials, Importance).
-- Each line MUST make sense on its own when read independently.
-- Do NOT refer to previous lines using words like "this", "that", or "it" without repeating the noun.
+Pedagogical Approach:
+- Adjust depth and complexity appropriately for Class ${params.grade}
+- Include relevant examples and real-world applications
+- Explain concepts thoroughly with adequate detail
+- Use definitions, step-by-step explanations, and illustrative examples
+- Maintain an educational, teacher-friendly tone suitable for classroom use
 
 Scientific & Mathematical Accuracy:
-- Use correct scientific and mathematical terminology.
-- Preserve symbols, formulas, units, and notation exactly.
-- Do NOT invent facts or simplify incorrectly.
+- Use correct scientific and mathematical terminology
+- Preserve all symbols, formulas, units, and notation exactly
+- Ensure all facts are accurate and curriculum-aligned
+- Do NOT simplify or modify established scientific facts
 
-Translation & Multilingual Safety Rules:
-- Avoid ambiguous pronouns.
-- Repeat key nouns instead of using "it", "this", or "that".
-- Keep terminology consistent throughout the content.
-- Prefer explicit statements over implied meaning.
+Content Scope:
+- Generate comprehensive content that thoroughly covers the topic
+- Include multiple aspects, examples, and explanations
+- Provide enough detail for students to understand the concept fully
+- Cover the topic from introduction through key concepts to applications
 
 ${params.culturalContext ? `
-Cultural Context Instructions:
-- Include simple, relevant regional or Indian examples (festivals, daily life, local environment).
-- Ensure cultural references support learning and do not distract from the core concept.
-- Keep cultural examples optional and clearly separated from core explanations.
+Cultural Context:
+- Include relevant Indian examples and cultural references where appropriate
+- Relate concepts to familiar contexts (festivals, daily life, local environment)
+- Ensure cultural examples enhance learning without distracting from core concepts
 ` : ``}
 
-Output Expectations:
-- Content must be easy to copy into lesson plans or worksheets.
-- Output must be suitable for offline use.
-- Avoid emojis, slang, or informal expressions.
-- Do not include meta explanations about how the content was generated.
+Educational Guardrails:
+- ONLY generate content related to educational topics
+- Reject any requests for non-educational content
+- Focus strictly on curriculum-aligned educational material
+- Maintain professional, appropriate tone throughout
 
-Begin generating the content now.
+Output Style:
+- Write in clear, professional English
+- Avoid emojis, slang, or overly casual expressions
+- Do not include meta-commentary about the generation process
+- Ensure content is ready for direct use in educational contexts
+
+Begin generating the comprehensive educational content now.
 `;
 
     return prompt.trim();

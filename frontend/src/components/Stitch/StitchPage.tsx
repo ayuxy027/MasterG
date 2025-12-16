@@ -1,21 +1,31 @@
 import React, { useState, useEffect, useRef } from "react";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
 
-// Supported Indian languages
-const INDIAN_LANGUAGES = [
+// All 22 scheduled Indian languages + English (from language service)
+const ALL_LANGUAGES = [
+  { code: "en", name: "English", native: "English" },
   { code: "hi", name: "Hindi", native: "हिंदी" },
+  { code: "mr", name: "Marathi", native: "मराठी" },
+  { code: "gu", name: "Gujarati", native: "ગુજરાતી" },
   { code: "bn", name: "Bengali", native: "বাংলা" },
   { code: "ta", name: "Tamil", native: "தமிழ்" },
   { code: "te", name: "Telugu", native: "తెలుగు" },
   { code: "kn", name: "Kannada", native: "ಕನ್ನಡ" },
   { code: "ml", name: "Malayalam", native: "മലയാളം" },
-  { code: "mr", name: "Marathi", native: "मराठी" },
-  { code: "gu", name: "Gujarati", native: "ગુજરાતી" },
   { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
   { code: "ur", name: "Urdu", native: "اردو" },
   { code: "or", name: "Odia", native: "ଓଡ଼ିଆ" },
   { code: "as", name: "Assamese", native: "অসমীয়া" },
-  { code: "en", name: "English", native: "English" },
+  { code: "ks", name: "Kashmiri", native: "कॉशुर" },
+  { code: "kok", name: "Konkani", native: "कोंकणी" },
+  { code: "mai", name: "Maithili", native: "मैथिली" },
+  { code: "mni", name: "Manipuri", native: "ꯃꯅꯤꯄꯨꯔꯤ" },
+  { code: "ne", name: "Nepali", native: "नेपाली" },
+  { code: "sa", name: "Sanskrit", native: "संस्कृत" },
+  { code: "sd", name: "Sindhi", native: "سنڌي" },
+  { code: "sat", name: "Santali", native: "ᱥᱟᱱᱛᱟᱲᱤ" },
+  { code: "brx", name: "Bodo", native: "बर'" },
+  { code: "doi", name: "Dogri", native: "डोगरी" },
 ];
 
 const GRADE_LEVELS = [
@@ -25,17 +35,10 @@ const GRADE_LEVELS = [
   { value: "custom", label: "Custom" },
 ];
 
-const SUBJECTS = [
+const CORE_SUBJECTS = [
   { value: "mathematics", label: "Mathematics" },
   { value: "science", label: "Science" },
   { value: "social", label: "Social Studies" },
-  { value: "language", label: "Language" },
-];
-
-const CURRICULUMS = [
-  { value: "ncert", label: "NCERT" },
-  { value: "cbse", label: "CBSE" },
-  { value: "state", label: "State Board" },
 ];
 
 interface ContentPreviewProps {
@@ -70,12 +73,9 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
     <div className="h-full overflow-auto p-6 bg-white">
       <div className="prose max-w-none">
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <pre className="whitespace-pre-wrap text-xs font-mono text-gray-800 leading-relaxed">
+          <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
             {content}
           </pre>
-        </div>
-        <div className="mt-4 text-xs text-gray-500 italic">
-          Note: This is plain generated content from the offline LLM.
         </div>
       </div>
     </div>
@@ -83,20 +83,21 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
 };
 
 const StitchPage: React.FC = () => {
-  const [selectedLanguage, setSelectedLanguage] = useState("hi");
   const [selectedGrade, setSelectedGrade] = useState("8");
   const [selectedSubject, setSelectedSubject] = useState("mathematics");
-  const [selectedCurriculum, setSelectedCurriculum] = useState("ncert");
+  const [customSubject, setCustomSubject] = useState("");
   const [topic, setTopic] = useState("");
   const [culturalContext, setCulturalContext] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [generatedContent, setGeneratedContent] = useState("");
-  const [targetLanguageForTranslation, setTargetLanguageForTranslation] =
-    useState("hi");
+  const [englishContent, setEnglishContent] = useState(""); // Store original English content
+  const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
+  const [targetLanguageForTranslation, setTargetLanguageForTranslation] = useState("hi");
+  const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
   const [ollamaStatus, setOllamaStatus] = useState<{
     connected: boolean;
     checking: boolean;
@@ -124,6 +125,12 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // Validate custom subject if selected
+    if (selectedSubject === "custom" && !customSubject.trim()) {
+      setError("Please enter a custom subject name");
+      return;
+    }
+
     // Abort any existing generation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -135,11 +142,17 @@ const StitchPage: React.FC = () => {
     setError(null);
     setThinkingText("");
     setGeneratedContent("");
+    setEnglishContent("");
+    setTranslatedContent({});
+    setActiveTab("english");
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL
         ? `${import.meta.env.VITE_API_URL}/api`
         : "http://localhost:5001/api";
+
+      // Use custom subject if selected, otherwise use selectedSubject
+      const finalSubject = selectedSubject === "custom" ? customSubject.trim() : selectedSubject;
 
       const response = await fetch(`${API_BASE_URL}/stitch/generate`, {
         method: "POST",
@@ -149,10 +162,8 @@ const StitchPage: React.FC = () => {
         signal: controller.signal,
         body: JSON.stringify({
           topic: topic.trim(),
-          language: selectedLanguage,
           grade: selectedGrade,
-          subject: selectedSubject,
-          curriculum: selectedCurriculum,
+          subject: finalSubject,
           culturalContext,
           stream: true,
         }),
@@ -192,11 +203,12 @@ const StitchPage: React.FC = () => {
                 setThinkingText(accumulatedThinking);
               } else if (parsed.type === "response") {
                 accumulatedResponse += parsed.content;
-                // Update content in real-time as response comes in
                 setGeneratedContent(accumulatedResponse);
+                setEnglishContent(accumulatedResponse); // Store English version
               } else if (parsed.type === "complete") {
-                // Final result - use provided content or accumulated response
-                setGeneratedContent(parsed.content || accumulatedResponse);
+                const finalContent = parsed.content || accumulatedResponse;
+                setGeneratedContent(finalContent);
+                setEnglishContent(finalContent); // Store English version
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }
@@ -237,6 +249,54 @@ const StitchPage: React.FC = () => {
     }
   };
 
+  const handleTranslate = async (targetLang: string) => {
+    if (!englishContent.trim()) {
+      setError("No content to translate");
+      return;
+    }
+
+    // Check if already translated
+    if (translatedContent[targetLang]) {
+      setActiveTab(targetLang);
+      return;
+    }
+
+    setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
+    setError(null);
+
+    try {
+      const resp = await stitchAPI.translateContent({
+        text: englishContent,
+        sourceLanguage: "en",
+        targetLanguage: targetLang,
+      });
+
+      if (resp.success && resp.translated) {
+        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
+        setActiveTab(targetLang);
+        setError(null);
+      } else {
+        const errorMsg = resp.error || "Translation failed. Please try again.";
+        setError(errorMsg);
+      }
+    } catch (err) {
+      const msg =
+        err instanceof StitchApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : "Translation failed. Please try again.";
+      setError(msg);
+    } finally {
+      setIsTranslating(prev => ({ ...prev, [targetLang]: false }));
+    }
+  };
+
+  const getLanguageName = (code: string) => {
+    const lang = ALL_LANGUAGES.find(l => l.code === code);
+    return lang ? `${lang.name} (${lang.native})` : code;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -246,8 +306,7 @@ const StitchPage: React.FC = () => {
             <span className="text-orange-500">Stitch</span> - Offline Content Generator
           </h1>
           <p className="text-gray-600 text-lg">
-            Generate curriculum-aligned educational content in 22+ Indian languages using
-            offline LLM (Ollama + DeepSeek)
+            Generate comprehensive, curriculum-aligned educational content offline using DeepSeek R1
           </p>
         </div>
 
@@ -280,24 +339,6 @@ const StitchPage: React.FC = () => {
               </div>
 
               <div className="space-y-5">
-                {/* Language */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Language
-                  </label>
-                  <select
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
-                  >
-                    {INDIAN_LANGUAGES.map((lang) => (
-                      <option key={lang.code} value={lang.code}>
-                        {lang.name} ({lang.native})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Grade Level */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -321,39 +362,48 @@ const StitchPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Subject
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {SUBJECTS.map((subject) => (
-                      <button
-                        key={subject.value}
-                        onClick={() => setSelectedSubject(subject.value)}
-                        className={`px-4 py-2.5 rounded-lg border-2 transition-all font-medium text-sm ${
-                          selectedSubject === subject.value
-                            ? "border-orange-500 bg-orange-50 text-orange-700"
-                            : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
-                        }`}
-                      >
-                        {subject.label}
-                      </button>
-                    ))}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      {CORE_SUBJECTS.map((subject) => (
+                        <button
+                          key={subject.value}
+                          onClick={() => {
+                            setSelectedSubject(subject.value);
+                            setCustomSubject("");
+                          }}
+                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
+                            selectedSubject === subject.value && selectedSubject !== "custom"
+                              ? "border-orange-500 bg-orange-50 text-orange-700"
+                              : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
+                          }`}
+                        >
+                          {subject.label.split(" ")[0]}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedSubject("custom");
+                        setCustomSubject("");
+                      }}
+                      className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
+                        selectedSubject === "custom"
+                          ? "border-orange-500 bg-orange-50 text-orange-700"
+                          : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
+                      }`}
+                    >
+                      Custom
+                    </button>
+                    {selectedSubject === "custom" && (
+                      <input
+                        type="text"
+                        value={customSubject}
+                        onChange={(e) => setCustomSubject(e.target.value)}
+                        placeholder="Enter subject name..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
+                      />
+                    )}
                   </div>
-                </div>
-
-                {/* Curriculum */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Curriculum
-                  </label>
-                  <select
-                    value={selectedCurriculum}
-                    onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
-                  >
-                    {CURRICULUMS.map((curriculum) => (
-                      <option key={curriculum.value} value={curriculum.value}>
-                        {curriculum.label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 {/* Topic */}
@@ -390,7 +440,7 @@ const StitchPage: React.FC = () => {
                 {/* Generate Button */}
                 <button
                   onClick={handleGenerate}
-                  disabled={isGenerating || !topic.trim()}
+                  disabled={isGenerating || !topic.trim() || (selectedSubject === "custom" && !customSubject.trim())}
                   className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-all shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   {isGenerating ? (
@@ -508,7 +558,7 @@ const StitchPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Content Preview */}
+            {/* Content Preview with Tabs */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex flex-col">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center gap-3">
@@ -528,15 +578,12 @@ const StitchPage: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900">Content Preview</h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-600">Translate to</label>
                   <select
                     value={targetLanguageForTranslation}
-                    onChange={(e) =>
-                      setTargetLanguageForTranslation(e.target.value)
-                    }
+                    onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
                     className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
                   >
-                    {INDIAN_LANGUAGES.map((lang) => (
+                    {ALL_LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
                         {lang.name}
                       </option>
@@ -544,45 +591,11 @@ const StitchPage: React.FC = () => {
                   </select>
                   <button
                     type="button"
-                    disabled={!generatedContent.trim() || isTranslating}
-                    onClick={async () => {
-                      setIsTranslating(true);
-                      setError(null);
-                      console.log("🔄 Starting translation...");
-                      try {
-                        // Content is always generated in English first (prompt is MT-safe English)
-                        // So sourceLanguage should be "en" (English)
-                        const resp = await stitchAPI.translateContent({
-                          text: generatedContent,
-                          sourceLanguage: "en",
-                          targetLanguage: targetLanguageForTranslation,
-                        });
-                        console.log("✅ Translation response:", resp);
-                        if (resp.success && resp.translated) {
-                          setGeneratedContent(resp.translated);
-                          setError(null);
-                          console.log("✅ Translation successful!");
-                        } else {
-                          const errorMsg = resp.error || "Translation failed. Please try again.";
-                          setError(errorMsg);
-                          console.error("❌ Translation failed:", errorMsg);
-                        }
-                      } catch (err) {
-                        const msg =
-                          err instanceof StitchApiError
-                            ? err.message
-                            : err instanceof Error
-                            ? err.message
-                            : "Translation failed. Please try again.";
-                        setError(msg);
-                        console.error("❌ Translation error:", err);
-                      } finally {
-                        setIsTranslating(false);
-                      }
-                    }}
+                    disabled={!englishContent.trim() || isTranslating[targetLanguageForTranslation]}
+                    onClick={() => handleTranslate(targetLanguageForTranslation)}
                     className="text-xs px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {isTranslating ? (
+                    {isTranslating[targetLanguageForTranslation] ? (
                       <>
                         <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -596,8 +609,47 @@ const StitchPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Tabs */}
+              {englishContent && (
+                <div className="flex border-b border-gray-200 px-6">
+                  <button
+                    onClick={() => setActiveTab("english")}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === "english"
+                        ? "border-orange-500 text-orange-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
+                  >
+                    English
+                  </button>
+                  {Object.keys(translatedContent).map((langCode) => (
+                    <button
+                      key={langCode}
+                      onClick={() => setActiveTab(langCode)}
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === langCode
+                          ? "border-orange-500 text-orange-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      }`}
+                    >
+                      {getLanguageName(langCode)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Tab Content */}
               <div className="flex-1 overflow-hidden">
-                <ContentPreview content={generatedContent} />
+                {activeTab === "english" ? (
+                  <ContentPreview content={englishContent} />
+                ) : translatedContent[activeTab] ? (
+                  <ContentPreview content={translatedContent[activeTab]} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <p className="text-sm">No translation available for this language yet</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
