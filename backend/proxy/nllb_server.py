@@ -265,12 +265,16 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str) -> None:
       # Move to device
       inputs = {k: v.to(device) for k, v in inputs.items()}
       
-      # Get target language token ID
-      if tgt_lang not in tokenizer.lang_code_to_id:
+      # Get target language token ID (NLLB uses language codes directly in vocab)
+      vocab = tokenizer.get_vocab()
+      if tgt_lang in vocab:
+        tgt_lang_id = vocab[tgt_lang]
+      elif "eng_Latn" in vocab:
         sys.stderr.write(f"Warning: Language code '{tgt_lang}' not found, using 'eng_Latn'\n")
-        tgt_lang_id = tokenizer.lang_code_to_id.get("eng_Latn", 250004)
+        tgt_lang_id = vocab["eng_Latn"]
       else:
-        tgt_lang_id = tokenizer.lang_code_to_id[tgt_lang]
+        sys.stderr.write(f"Warning: Could not find language code '{tgt_lang}', using default\n")
+        tgt_lang_id = 256068  # Fallback to a common language code ID
       
       # Generate translation
       with torch.inference_mode():
