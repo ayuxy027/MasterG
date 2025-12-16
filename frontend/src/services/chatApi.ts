@@ -4,10 +4,11 @@ import type {
   SessionListItem,
   UploadResponse,
   FileListItem,
+  StreamChunk,
 } from "../types/chat";
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
+// API Configuration - VITE_API_URL should NOT include /api suffix
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // Utility functions for session management
 export const generateUserId = (): string => {
@@ -44,12 +45,14 @@ export class ChatApiError extends Error {
 // API Client functions
 
 /**
- * Send a query to the chat API
+ * Send a query to the chat API (non-streaming)
+ * @param mentionedFileIds - Optional file IDs to filter RAG search (for @ mentions)
  */
 export async function sendQuery(
   userId: string,
   sessionId: string,
-  query: string
+  query: string,
+  mentionedFileIds?: string[]
 ): Promise<QueryResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/query`, {
@@ -61,6 +64,7 @@ export async function sendQuery(
         userId,
         sessionId,
         query,
+        mentionedFileIds,
       }),
     });
 
@@ -79,6 +83,87 @@ export async function sendQuery(
     if (error instanceof ChatApiError) throw error;
     throw new ChatApiError(
       error instanceof Error ? error.message : "Network error",
+      undefined,
+      error
+    );
+  }
+}
+
+/**
+ * Send a streaming query to the chat API
+ * Returns Server-Sent Events for real-time response streaming
+ * @param onChunk - Callback function called for each streamed chunk
+ * @param mentionedFileIds - Optional file IDs to filter RAG search (for @ mentions)
+ */
+export async function sendStreamingQuery(
+  userId: string,
+  sessionId: string,
+  query: string,
+  onChunk: (chunk: StreamChunk) => void,
+  mentionedFileIds?: string[]
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/query/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId,
+        sessionId,
+        query,
+        mentionedFileIds,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ChatApiError(
+        errorData.message || "Streaming request failed",
+        response.status,
+        errorData
+      );
+    }
+
+    // Read the SSE stream
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      throw new ChatApiError("Failed to get response stream");
+    }
+
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE messages
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr && jsonStr !== "[DONE]") {
+            try {
+              const chunk = JSON.parse(jsonStr) as StreamChunk;
+              onChunk(chunk);
+            } catch (e) {
+              // Ignore parse errors for incomplete JSON
+              console.warn("Failed to parse SSE chunk:", jsonStr);
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    if (error instanceof ChatApiError) throw error;
+    throw new ChatApiError(
+      error instanceof Error ? error.message : "Streaming error",
       undefined,
       error
     );
@@ -180,6 +265,7 @@ export async function getAllSessions(
     return (
       data.sessions?.map((session: any) => ({
         sessionId: session.sessionId,
+        chatName: session.chatName,
         messageCount: session.messages?.length || 0,
         lastMessage:
           session.messages?.[session.messages.length - 1]?.content ||
@@ -285,6 +371,49 @@ export async function deleteSession(
     );
   }
 }
+
+/**
+ * Update chat name/title and save to database
+ */
+export async function updateChatName(
+  userId: string,
+  sessionId: string,
+  chatName: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/chats/${sessionId}/name?userId=${encodeURIComponent(
+        userId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ chatName }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ChatApiError(
+        errorData.message || "Failed to update chat name",
+        response.status,
+        errorData
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ChatApiError) throw error;
+    throw new ChatApiError(
+      error instanceof Error ? error.message : "Network error",
+      undefined,
+      error
+    );
+  }
+}
+
 
 /**
  * Get all documents in a chat session
@@ -398,8 +527,7 @@ export async function generateChatName(firstMessage: string): Promise<string> {
     )}...". Only return the title, nothing else.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${
-        import.meta.env.VITE_GEMINI_API_KEY || ""
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY || ""
       }`,
       {
         method: "POST",

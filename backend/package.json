@@ -20,16 +20,19 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "google-auth-library": "^10.5.0",
+    "mammoth": "^1.11.0",
     "mongoose": "^8.19.3",
     "multer": "^1.4.5-lts.1",
     "node-cache": "^5.1.2",
+    "officeparser": "^5.2.2",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.4",
     "pdfjs-dist": "^5.4.394",
     "pino": "^8.19.0",
     "pino-pretty": "^10.3.1",
     "tesseract.js": "^6.0.1",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "whisper-node": "^1.1.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

@@ -1,258 +1,126 @@
-import { QueryType } from "./queryValidator.service";
-import { retrievalManagerService } from "./retrievalManager.service";
-import { modelOrchestratorService } from "./modelOrchestrator.service";
-import { queryPreprocessorService } from "./queryPreprocessor.service";
+import { ollamaChatService } from "./ollamaChat.service";
+import { ollamaEmbeddingService } from "./ollamaEmbedding.service";
+import { vectorDBService } from "./vectordb.service";
 import { ChatMessage } from "../types";
 import logger from "./logger.service";
 
-export interface DecisionResult {
-  strategy: "SIMPLE_RESPONSE" | "RAG_RESPONSE" | "DIRECT_ANSWER" | "FALLBACK";
-  useRAG: boolean;
-  reason: string;
-  confidence: number;
-}
-
 /**
- * Decision Engine
- * Determines the best strategy for responding to queries
+ * Simplified Decision Engine
+ * Uses only Ollama (DeepSeek R1) - Completely Offline
  */
 export class DecisionEngineService {
-  /**
-   * Decide response strategy based on query analysis
-   */
-  async makeDecision(
-    queryType: QueryType,
-    hasDocuments: boolean,
-    chatHistoryLength: number,
-    language: string
-  ): Promise<DecisionResult> {
-    // CASE 1: Greeting or invalid query
-    if (queryType === QueryType.GREETING || queryType === QueryType.INVALID) {
-      return {
-        strategy: "SIMPLE_RESPONSE",
-        useRAG: false,
-        reason: "Greeting or invalid query - no retrieval needed",
-        confidence: 0.95,
-      };
-    }
-
-    // CASE 2: Out of scope
-    if (queryType === QueryType.OUT_OF_SCOPE) {
-      return {
-        strategy: "FALLBACK",
-        useRAG: false,
-        reason: "Query out of scope",
-        confidence: 0.9,
-      };
-    }
-
-    // CASE 3: Direct answer (factual)
-    if (queryType === QueryType.DIRECT_ANSWER) {
-      return {
-        strategy: "DIRECT_ANSWER",
-        useRAG: false,
-        reason: "Factual query - can answer directly without documents",
-        confidence: 0.85,
-      };
-    }
-
-    // CASE 4: RAG query but no documents
-    if (queryType === QueryType.VALID_RAG_QUERY && !hasDocuments) {
-      return {
-        strategy: "FALLBACK",
-        useRAG: false,
-        reason: "RAG query but no documents available",
-        confidence: 0.8,
-      };
-    }
-
-    // CASE 5: RAG query with documents
-    if (queryType === QueryType.VALID_RAG_QUERY && hasDocuments) {
-      return {
-        strategy: "RAG_RESPONSE",
-        useRAG: true,
-        reason: "Valid RAG query with available documents",
-        confidence: 0.9,
-      };
-    }
-
-    // DEFAULT: Simple response
-    return {
-      strategy: "SIMPLE_RESPONSE",
-      useRAG: false,
-      reason: "Default fallback to simple response",
-      confidence: 0.5,
-    };
-  }
+  private readonly TOP_K = 8;
+  private readonly SIMILARITY_THRESHOLD = 0.4;
 
   /**
-   * Execute decision strategy
+   * Handle RAG query - retrieve context and generate answer
    */
-  async executeStrategy(
-    decision: DecisionResult,
+  async handleRAGQuery(
     query: string,
     chatHistory: ChatMessage[],
-    chromaCollectionName: string,
-    language: string
+    chromaCollectionName: string
   ): Promise<{ answer: string; sources: any[]; metadata: any }> {
-    logger.info(`🎯 Executing strategy: ${decision.strategy}`);
+    const startTime = Date.now();
 
-    switch (decision.strategy) {
-      case "SIMPLE_RESPONSE":
-        return await this.handleSimpleResponse(query, chatHistory, language);
+    try {
+      // Step 1: Generate query embedding using Ollama
+      logger.info("🔍 Generating query embedding with Ollama");
+      const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(query);
 
-      case "DIRECT_ANSWER":
-        return await this.handleDirectAnswer(query, chatHistory, language);
+      // Step 2: Retrieve relevant chunks from ChromaDB
+      logger.info(`🔍 Searching in collection: ${chromaCollectionName}`);
+      const searchResults = await vectorDBService.queryChunks(
+        queryEmbedding,
+        this.TOP_K,
+        chromaCollectionName
+      );
 
-      case "RAG_RESPONSE":
-        return await this.handleRAGResponse(
-          query,
-          chatHistory,
-          chromaCollectionName,
-          language
-        );
+      // Step 3: Filter and build context
+      const relevantChunks = this.filterChunks(searchResults);
 
-      case "FALLBACK":
-        return await this.handleFallback(query, language);
+      if (relevantChunks.length === 0) {
+        return {
+          answer: "I couldn't find relevant information in your documents for this question. Try rephrasing or ask about something else in the documents.",
+          sources: [],
+          metadata: {
+            chunksFound: 0,
+            duration: Date.now() - startTime,
+          },
+        };
+      }
 
-      default:
-        return await this.handleSimpleResponse(query, chatHistory, language);
-    }
-  }
+      // Step 4: Build context string
+      const context = this.buildContext(relevantChunks);
 
-  /**
-   * Handle simple response (no RAG)
-   */
-  private async handleSimpleResponse(
-    query: string,
-    chatHistory: ChatMessage[],
-    language: string
-  ): Promise<{ answer: string; sources: any[]; metadata: any }> {
-    const response = await modelOrchestratorService.generateSimpleResponse(
-      query,
-      chatHistory,
-      language
-    );
+      // Step 5: Build sources for citation
+      const sources = relevantChunks.slice(0, 3).map((chunk) => ({
+        pdfName: chunk.metadata.fileName || "Document",
+        pageNo: chunk.metadata.page || 1,
+        snippet: chunk.content.substring(0, 150) + "...",
+      }));
 
-    return {
-      answer: response.answer,
-      sources: [],
-      metadata: {
-        strategy: "SIMPLE_RESPONSE",
-        model: response.model,
-        cached: response.cached,
-        duration: response.duration,
-      },
-    };
-  }
+      // Step 6: Generate answer using Ollama
+      logger.info("🤖 Generating answer with Ollama (DeepSeek R1)");
+      const response = await ollamaChatService.generateEducationalAnswer(
+        context,
+        chatHistory,
+        query,
+        "en",
+        sources
+      );
 
-  /**
-   * Handle direct answer (factual)
-   */
-  private async handleDirectAnswer(
-    query: string,
-    chatHistory: ChatMessage[],
-    language: string
-  ): Promise<{ answer: string; sources: any[]; metadata: any }> {
-    const response = await modelOrchestratorService.generateSimpleResponse(
-      query,
-      chatHistory,
-      language
-    );
-
-    return {
-      answer: response.answer,
-      sources: [],
-      metadata: {
-        strategy: "DIRECT_ANSWER",
-        model: response.model,
-        cached: response.cached,
-        duration: response.duration,
-      },
-    };
-  }
-
-  /**
-   * Handle RAG response (with retrieval)
-   */
-  private async handleRAGResponse(
-    query: string,
-    chatHistory: ChatMessage[],
-    chromaCollectionName: string,
-    language: string
-  ): Promise<{ answer: string; sources: any[]; metadata: any }> {
-    // Step 1: Retrieve relevant context
-    const retrieval = await retrievalManagerService.retrieve(
-      query,
-      chromaCollectionName,
-      language
-    );
-
-    if (retrieval.chunks.length === 0) {
       return {
-        answer:
-          language === "en"
-            ? "I couldn't find relevant information in your documents."
-            : "मुझे आपके दस्तावेज़ों में प्रासंगिक जानकारी नहीं मिली।",
-        sources: [],
+        answer: response.answer,
+        sources,
         metadata: {
-          strategy: "RAG_RESPONSE",
-          retrievalStats: retrieval.stats,
+          chunksFound: relevantChunks.length,
+          duration: Date.now() - startTime,
+          thinking: response.thinking,
         },
       };
+    } catch (error: any) {
+      logger.error("RAG query error:", error);
+      throw error;
     }
-
-    // Step 2: Build context
-    const context = retrievalManagerService.buildContext(retrieval.chunks);
-
-    // Step 3: Build sources
-    const sources = retrieval.chunks.slice(0, 5).map((chunk) => ({
-      pdfName: chunk.metadata.fileName,
-      pageNo: chunk.metadata.page || 1,
-      snippet: chunk.content.substring(0, 100),
-    }));
-
-    // Step 4: Generate answer
-    const response = await modelOrchestratorService.generateResponse(
-      context,
-      query,
-      chatHistory,
-      language,
-      sources
-    );
-
-    return {
-      answer: response.answer,
-      sources,
-      metadata: {
-        strategy: "RAG_RESPONSE",
-        model: response.model,
-        cached: response.cached,
-        duration: response.duration,
-        retrievalStats: retrieval.stats,
-      },
-    };
   }
 
   /**
-   * Handle fallback
+   * Filter chunks by similarity score
    */
-  private async handleFallback(
-    query: string,
-    language: string
-  ): Promise<{ answer: string; sources: any[]; metadata: any }> {
-    const fallbacks: Record<string, string> = {
-      en: "I'm sorry, I can't help with that. Please ask a question related to your uploaded documents.",
-      hi: "क्षमा करें, मैं इसमें मदद नहीं कर सकता। कृपया अपने अपलोड किए गए दस्तावेज़ों से संबंधित प्रश्न पूछें।",
-    };
+  private filterChunks(searchResults: {
+    documents: string[];
+    metadatas: any[];
+    distances: number[];
+  }): Array<{ content: string; metadata: any; score: number }> {
+    if (!searchResults.documents || searchResults.documents.length === 0) {
+      return [];
+    }
 
-    return {
-      answer: fallbacks[language] || fallbacks.en,
-      sources: [],
-      metadata: {
-        strategy: "FALLBACK",
-      },
-    };
+    return searchResults.documents
+      .map((doc, idx) => ({
+        content: doc,
+        metadata: searchResults.metadatas[idx],
+        distance: searchResults.distances[idx],
+        score: 1 - searchResults.distances[idx],
+      }))
+      .filter((chunk) => chunk.score >= this.SIMILARITY_THRESHOLD)
+      .sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Build context string from chunks
+   */
+  private buildContext(
+    chunks: Array<{ content: string; metadata: any }>
+  ): string {
+    return chunks
+      .slice(0, 5)
+      .map((chunk, idx) => {
+        const fileName = chunk.metadata.fileName || "Document";
+        const pageNo = chunk.metadata.page || 1;
+        return `[Source ${idx + 1}: ${fileName}, Page ${pageNo}]\n${chunk.content}`;
+      })
+      .join("\n\n---\n\n");
   }
 }
 

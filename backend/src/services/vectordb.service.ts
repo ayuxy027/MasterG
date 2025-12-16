@@ -101,8 +101,7 @@ export class VectorDBService {
       }
 
       console.log(
-        `📦 Total: ${chunks.length} chunks from ${
-          Object.keys(chunksByPdf).length
+        `📦 Total: ${chunks.length} chunks from ${Object.keys(chunksByPdf).length
         } PDF(s)`
       );
     } catch (error) {
@@ -143,6 +142,55 @@ export class VectorDBService {
     } catch (error) {
       console.error("Vector query error:", error);
       throw new Error("Failed to query vector database");
+    }
+  }
+
+  /**
+   * Query similar chunks with optional file filter (for @ mentions)
+   * Filters results to only include chunks from specified files
+   */
+  async queryChunksWithFilter(
+    queryEmbedding: number[],
+    topK: number = 3,
+    collectionName?: string,
+    fileIds?: string[]
+  ): Promise<{
+    documents: string[];
+    metadatas: ChunkMetadata[];
+    distances: number[];
+  }> {
+    try {
+      const collection = await this.initCollection(collectionName);
+
+      // Build where filter if fileIds are provided
+      let whereFilter: any = undefined;
+      if (fileIds && fileIds.length > 0) {
+        if (fileIds.length === 1) {
+          whereFilter = { fileId: { $eq: fileIds[0] } };
+        } else {
+          whereFilter = { fileId: { $in: fileIds } };
+        }
+        console.log(`🎯 Filtering query to files: ${fileIds.join(', ')}`);
+      }
+
+      const results = await collection.query({
+        queryEmbeddings: [queryEmbedding],
+        nResults: topK,
+        where: whereFilter,
+      });
+
+      if (!results.documents || !results.metadatas || !results.distances) {
+        throw new Error("Invalid query results");
+      }
+
+      return {
+        documents: results.documents[0] || [],
+        metadatas: (results.metadatas[0] as ChunkMetadata[]) || [],
+        distances: results.distances[0] || [],
+      };
+    } catch (error) {
+      console.error("Vector query with filter error:", error);
+      throw new Error("Failed to query vector database with filter");
     }
   }
 
@@ -221,11 +269,11 @@ export class VectorDBService {
   }
 
   /**
-   * Delete chunks by file ID
+   * Delete chunks by file ID from a specific collection
    */
-  async deleteByFileId(fileId: string): Promise<void> {
+  async deleteByFileId(fileId: string, collectionName?: string): Promise<void> {
     try {
-      const collection = await this.initCollection();
+      const collection = await this.initCollection(collectionName);
 
       // Query all documents with the fileId
       const results = await collection.get({
@@ -237,6 +285,8 @@ export class VectorDBService {
           ids: results.ids,
         });
         console.log(`Deleted ${results.ids.length} chunks for file ${fileId}`);
+      } else {
+        console.log(`No chunks found for file ${fileId}`);
       }
     } catch (error) {
       console.error("Delete chunks error:", error);
@@ -362,6 +412,29 @@ export class VectorDBService {
     } catch (error) {
       console.error("Get documents by file error:", error);
       throw new Error("Failed to get documents by file ID");
+    }
+  }
+
+  /**
+   * Delete a ChromaDB collection entirely
+   * Used when deleting a chat session
+   */
+  async deleteCollection(collectionName: string): Promise<void> {
+    try {
+      // Remove from local cache
+      this.collections.delete(collectionName);
+
+      // Delete from ChromaDB
+      await this.client.deleteCollection({ name: collectionName });
+      console.log(`🗑️ ChromaDB collection deleted: ${collectionName}`);
+    } catch (error: any) {
+      // Collection might not exist - that's ok
+      if (error.message?.includes('does not exist')) {
+        console.log(`📌 ChromaDB collection ${collectionName} doesn't exist (already deleted)`);
+        return;
+      }
+      console.error("Delete collection error:", error);
+      throw new Error(`Failed to delete collection: ${collectionName}`);
     }
   }
 }

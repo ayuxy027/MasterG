@@ -8,7 +8,7 @@ export interface SourceCitation {
 }
 
 export interface QueryMetadata {
-  layer: "LAYER1-GROQ-FAST" | "LAYER3-GEMINI";
+  layer: "LAYER1-GROQ-FAST" | "LAYER3-GEMINI" | "LAYER3-GEMINI-STREAM";
   reasoning: string;
   responseTimeMs: number;
   messageCount: number;
@@ -94,6 +94,8 @@ export interface MessageUI {
   sources?: SourceCitation[];
   metadata?: QueryMetadata;
   isLoading?: boolean;
+  isStreaming?: boolean; // NEW: indicates message is currently streaming
+  streamingLayer?: string; // NEW: current layer being used for streaming
 }
 
 export interface UploadProgress {
@@ -103,3 +105,19 @@ export interface UploadProgress {
   status: "uploading" | "processing" | "completed" | "error";
   error?: string;
 }
+
+// Streaming response types (for SSE)
+export interface StreamChunk {
+  type: 'layer' | 'text' | 'source' | 'done' | 'error';
+  content?: string;
+  layer?: string;
+  source?: SourceCitation;
+  error?: string;
+}
+
+// @ Mention types
+export interface MentionedFile {
+  fileId: string;
+  fileName: string;
+}
+

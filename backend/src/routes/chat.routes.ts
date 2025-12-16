@@ -21,4 +21,7 @@ router.get("/health/status", chatController.getHealth.bind(chatController));
 // Delete a chat session
 router.delete("/:sessionId", chatController.deleteSession.bind(chatController));
 
+// Update chat name/title
+router.patch("/:sessionId/name", chatController.updateChatName.bind(chatController));
+
 export default router;

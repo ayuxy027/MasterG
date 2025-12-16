@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { chatService } from "../services/chat.service";
 import { vectorDBService } from "../services/vectordb.service";
 import { asyncRAGOrchestratorService } from "../services/asyncRAGOrchestrator.service";
-import { monitoringService } from "../services/monitoring.service";
 import logger from "../services/logger.service";
 
 export class ChatController {
@@ -112,10 +111,50 @@ export class ChatController {
   }
 
   /**
-   * Query chat with async RAG pipeline
+   * Update chat name/title
+   */
+  async updateChatName(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.query.userId as string;
+      const sessionId = req.params.sessionId;
+      const { chatName } = req.body;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      if (!chatName || typeof chatName !== "string") {
+        res.status(400).json({
+          success: false,
+          error: "chatName is required",
+        });
+        return;
+      }
+
+      await chatService.updateChatName(userId, sessionId, chatName.trim());
+
+      res.status(200).json({
+        success: true,
+        message: "Chat name updated successfully",
+      });
+    } catch (error: any) {
+      console.error("Update chat name error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to update chat name",
+      });
+    }
+  }
+
+  /**
+   * Query chat with simplified RAG pipeline (Ollama only)
    */
   async queryChat(req: Request, res: Response): Promise<void> {
-    const startTime = monitoringService.trackRequestStart("query");
+    const startTime = Date.now();
 
     try {
       const { query, userId, sessionId } = req.body;
@@ -125,7 +164,6 @@ export class ChatController {
           success: false,
           error: "query, userId, and sessionId are required",
         });
-        monitoringService.trackError("VALIDATION_ERROR");
         return;
       }
 
@@ -144,7 +182,7 @@ export class ChatController {
         `🔍 Processing query for session: ${sessionId} with ${chatHistory.length} context messages`
       );
 
-      // Process query through async RAG pipeline with chat context
+      // Process query through simplified RAG pipeline
       const result = await asyncRAGOrchestratorService.processQuery(
         query,
         chatHistory,
@@ -164,15 +202,7 @@ export class ChatController {
         sources: result.sources,
       });
 
-      // Track metrics
-      monitoringService.trackRequestComplete(
-        result.metadata.correlationId,
-        startTime,
-        result.metadata.strategy,
-        result.metadata.language,
-        true,
-        result.metadata.cached
-      );
+      logger.info(`✅ Query completed in ${Date.now() - startTime}ms`);
 
       res.status(200).json({
         success: true,
@@ -182,15 +212,6 @@ export class ChatController {
       });
     } catch (error: any) {
       logger.error("Query chat error:", error);
-      monitoringService.trackError("QUERY_ERROR");
-      monitoringService.trackRequestComplete(
-        "unknown",
-        startTime,
-        "ERROR",
-        "en",
-        false,
-        false
-      );
 
       res.status(500).json({
         success: false,
@@ -200,17 +221,15 @@ export class ChatController {
   }
 
   /**
-   * Get system health and metrics
+   * Get system health status
    */
   async getHealth(req: Request, res: Response): Promise<void> {
     try {
       const health = await asyncRAGOrchestratorService.getHealthStatus();
-      const metrics = monitoringService.getMetrics();
 
       res.status(200).json({
         success: true,
         health,
-        metrics,
       });
     } catch (error: any) {
       logger.error("Health check error:", error);
