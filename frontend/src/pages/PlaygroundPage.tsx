@@ -86,59 +86,6 @@ const PlaygroundPage: React.FC = () => {
     }
   };
 
-  const testNllbTranslation = async () => {
-    setNllbTranslationLoading(true);
-    setNllbTranslationError(null);
-    setNllbTranslationResult("");
-    try {
-      if (nllbTranslationStreaming) {
-        await stitchAPI.translateContentNLLBStream(
-          {
-            text: nllbTranslationText,
-            sourceLanguage: nllbTranslationSource,
-            targetLanguage: nllbTranslationTarget,
-          },
-          (chunk) => {
-            if (chunk.type === "error" || chunk.success === false) {
-              setNllbTranslationError(chunk.error || "Streaming translation error");
-              return;
-            }
-
-            if (chunk.type === "chunk" && chunk.translated) {
-              // Append sentence-by-sentence
-              setNllbTranslationResult((prev) =>
-                prev ? `${prev}\n${chunk.translated}` : chunk.translated || ""
-              );
-            } else if (chunk.type === "complete" && chunk.translated) {
-              // Optionally replace with full combined translation
-              setNllbTranslationResult(chunk.translated);
-            }
-          }
-        );
-      } else {
-        const result = await stitchAPI.translateContentNLLB({
-          text: nllbTranslationText,
-          sourceLanguage: nllbTranslationSource,
-          targetLanguage: nllbTranslationTarget,
-        });
-        if (result.success && result.translated) {
-          setNllbTranslationResult(result.translated);
-        } else {
-          setNllbTranslationError(result.error || "Translation failed");
-        }
-      }
-    } catch (err) {
-      setNllbTranslationError(
-        err instanceof StitchApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : "Translation failed"
-      );
-    } finally {
-      setNllbTranslationLoading(false);
-    }
-  };
 
   const testOllama = async () => {
     setOllamaLoading(true);

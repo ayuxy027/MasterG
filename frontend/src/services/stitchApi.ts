@@ -173,7 +173,7 @@ class StitchApi {
   }
 
   /**
-   * Translate generated content using IndicTrans2
+   * Translate generated content using NLLB-200
    */
   async translateContent(
     request: StitchTranslateRequest
@@ -290,7 +290,7 @@ class StitchApi {
   }
 
   /**
-   * Check NLLB-200 connection status
+   * Check NLLB-200 connection status (via translate endpoint test)
    */
   async checkNLLBStatus(): Promise<{
     success: boolean;
@@ -300,144 +300,43 @@ class StitchApi {
     error?: string;
   }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stitch/status/nllb`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new StitchApiError(
-          errorData.error || `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (error instanceof StitchApiError) {
-        throw error;
-      }
-      throw new StitchApiError(
-        error instanceof Error ? error.message : "Failed to check NLLB status"
-      );
-    }
-  }
-
-  /**
-   * Translate generated content using NLLB-200
-   */
-  async translateContentNLLB(
-    request: StitchTranslateRequest
-  ): Promise<StitchTranslateResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/stitch/translate/nllb`, {
+      // Use the translate endpoint with a test query to check status
+      const response = await fetch(`${API_BASE_URL}/stitch/translate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          text: "Test",
+          sourceLanguage: "en",
+          targetLanguage: "hi",
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new StitchApiError(
-          errorData.error || `HTTP ${response.status}: ${response.statusText}`
-        );
+        return {
+          success: false,
+          connected: false,
+          enabled: true,
+          error: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
+        };
       }
 
-      return await response.json();
+      const data = await response.json();
+      return {
+        success: true,
+        connected: data.success === true,
+        enabled: true,
+        message: "NLLB-200 is working",
+      };
     } catch (error) {
-      if (error instanceof StitchApiError) {
-        throw error;
-      }
-      throw new StitchApiError(
-        error instanceof Error ? error.message : "Failed to translate content with NLLB"
-      );
-    }
-  }
-
-  /**
-   * Stream translation sentence-by-sentence using NLLB-200
-   */
-  async translateContentNLLBStream(
-    request: StitchTranslateRequest,
-    onChunk: (chunk: StitchTranslateStreamChunk) => void
-  ): Promise<void> {
-    let response: Response;
-    try {
-      response = await fetch(`${API_BASE_URL}/stitch/translate/nllb`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ...request, stream: true }),
-      });
-    } catch (error) {
-      onChunk({
+      return {
         success: false,
-        type: "error",
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to start streaming translation",
-      });
-      return;
-    }
-
-    if (!response.ok || !response.body) {
-      let errMsg = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const data = await response.json();
-        if (data && data.error) {
-          errMsg = data.error;
-        }
-      } catch {
-        // ignore JSON parse error, keep default message
-      }
-      onChunk({
-        success: false,
-        type: "error",
-        error: errMsg,
-      });
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      // SSE events are separated by double newline
-      let sepIndex = buffer.indexOf("\n\n");
-      while (sepIndex !== -1) {
-        const rawEvent = buffer.slice(0, sepIndex).trim();
-        buffer = buffer.slice(sepIndex + 2);
-
-        if (rawEvent.startsWith("data:")) {
-          const jsonPart = rawEvent.slice(5).trim();
-          try {
-            const parsed = JSON.parse(jsonPart) as StitchTranslateStreamChunk;
-            onChunk(parsed);
-          } catch (error) {
-            onChunk({
-              success: false,
-              type: "error",
-              error:
-                error instanceof Error
-                  ? `Failed to parse stream chunk: ${error.message}`
-                  : "Failed to parse stream chunk",
-            });
-          }
-        }
-
-        sepIndex = buffer.indexOf("\n\n");
-      }
+        connected: false,
+        enabled: true,
+        error: error instanceof Error ? error.message : "NLLB service unavailable",
+      };
     }
   }
 

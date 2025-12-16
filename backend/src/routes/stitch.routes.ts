@@ -53,16 +53,6 @@ router.post(
 );
 
 /**
- * POST /api/stitch/translate/nllb
- * Translate generated content using NLLB-200
- * Body: { text, sourceLanguage, targetLanguage, stream? }
- */
-router.post(
-  "/translate/nllb",
-  asyncHandler(stitchController.translateContentNLLB.bind(stitchController))
-);
-
-/**
  * GET /api/stitch/status/nllb
  * Check NLLB-200 connection status
  */

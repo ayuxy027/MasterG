@@ -87,10 +87,30 @@ def load_model():
       low_cpu_mem_usage=False,
     )
     
-    # Move to CPU (or GPU if available)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Auto-detect best device with acceleration support
+    if torch.cuda.is_available():
+      device = "cuda"
+      sys.stderr.write("Using CUDA GPU acceleration\n")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+      device = "mps"  # Apple Silicon GPU
+      sys.stderr.write("Using Apple Silicon (MPS) GPU acceleration\n")
+    else:
+      device = "cpu"
+      sys.stderr.write("Using CPU (no GPU acceleration available)\n")
+    
     model = model.to(device)
     model.eval()
+    
+    # Use torch.compile for faster inference on CUDA (PyTorch 2.0+)
+    # Note: MPS doesn't support torch.compile yet, so skip for MPS
+    try:
+      if device == "cuda" and hasattr(torch, "compile"):
+        # CUDA: Use torch.compile for faster inference
+        model = torch.compile(model, mode="reduce-overhead")
+        sys.stderr.write("Enabled torch.compile for CUDA optimization\n")
+    except Exception as e:
+      # Fallback if compile fails - model will still work, just slower
+      sys.stderr.write(f"Note: torch.compile not available or failed: {e}\n")
     
     sys.stderr.write(f"✅ NLLB-200 model loaded on {device}!\n")
     

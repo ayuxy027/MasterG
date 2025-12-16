@@ -1,168 +1,76 @@
-# Translation Model Analysis – IndicTrans2 (200M)
+# Translation Model Analysis – NLLB-200 (600M)
 
 ## Model in Use
 
-* **Model Name:** ai4bharat/indictrans2-en-indic-dist-200M
-* **Type:** English → Indic Machine Translation model
-* **Size:** ~200M parameters (distilled)
-* **Deployment:** CPU-only, offline-friendly
-* **Memory Footprint:** ~400–450 MB on disk
+* **Model Name:** facebook/nllb-200-distilled-600M
+* **Type:** Multilingual Machine Translation model (200 languages)
+* **Size:** ~600M parameters (distilled)
+* **Deployment:** CPU/GPU-friendly, offline-capable
+* **Memory Footprint:** ~3-4 GB RAM during inference
+* **Storage:** ~2.4GB (cached by HuggingFace transformers library)
 
-This model was selected due to strict hackathon constraints: low memory (4–8 GB RAM), offline operation, and multilingual coverage.
+This model was selected for its excellent multilingual coverage, strong translation quality, and reasonable resource requirements for offline operation.
 
 ---
 
 ## Core Strengths
 
-### 1. Lightweight & Offline-Capable
+### 1. Multilingual & Offline-Capable
 
-* Runs fully on CPU without GPU dependency.
-* Suitable for low-resource and rural deployments.
-* Fast inference for short inputs.
+* Supports 200 languages including all major Indian languages
+* Runs on CPU, GPU (CUDA), or Apple Silicon (MPS)
+* Fully offline operation after initial model download
+* Fast inference for short to medium inputs
 
-### 2. Strong at Short, Literal Sentences
+### 2. Strong Translation Quality
 
 * Performs reliably on:
-
+  * Educational content
+  * Scientific terminology
   * Simple factual statements
-  * Single-clause sentences
-  * Declarative educational facts
+  * Multi-clause sentences
 * Demonstrated correct handling of:
+  * Science definitions
+  * Educational explanations
+  * Formal language
 
-  * Basic science definitions
-  * Cause–effect statements (when short)
+### 3. Good Terminology Retention
 
-### 3. Good Terminology Retention with Guardrails
-
-* When combined with glossary locking:
-
-  * Preserves scientific terms (e.g., photosynthesis, chlorophyll).
-  * Avoids catastrophic hallucinations.
-* Errors become predictable and rule-fixable.
+* Preserves scientific terms better than smaller models
+* Handles proper nouns correctly
+* Maintains grammatical structure
 
 ---
 
-## Observed Failure Modes (Critical)
+## Technical Details
 
-### 1. Context Overload on Large Inputs
+### Language Code Format
 
-When given large or multi-sentence inputs, the model:
+NLLB-200 uses FLORES-200 language codes:
+* English: `eng_Latn`
+* Hindi: `hin_Deva`
+* Marathi: `mar_Deva`
+* Bengali: `ben_Beng`
+* Tamil: `tam_Taml`
+* And 195+ other languages
 
-* Merges multiple sentences into one.
-* Loses sentence boundaries.
-* Blends subjects and objects across sentences.
-* Produces semantically incorrect outputs.
+### Device Support
 
-**Root cause:** limited context handling capacity in a small, distilled model.
+* **CUDA**: GPU acceleration with torch.compile optimization
+* **MPS**: Apple Silicon GPU acceleration (M1/M2/M3)
+* **CPU**: Fallback for systems without GPU
 
----
+### Performance
 
-### 2. Clause & Conjunction Breakdown
-
-The model struggles with:
-
-* Contrast clauses ("although", "however")
-* Long compound sentences
-* Nested or dependent clauses
-
-This often leads to:
-
-* Subject flipping
-* Loss of negation ("does not")
-* Partial sentence outputs
+* First request: Model loading (~5-10 seconds)
+* Subsequent requests: ~2-5 seconds per sentence
+* Streaming: Sentence-by-sentence translation support
 
 ---
 
-### 3. Coordination Errors ("and" problem)
+## Integration Notes
 
-Sentences of the form:
-
-> A uses B and C.
-
-May be mistranslated as:
-
-> A and B use C.
-
-This is a known limitation of low-capacity MT models and appears consistently.
-
----
-
-## Why These Failures Occur
-
-* The model is **distilled**, prioritizing speed over alignment fidelity.
-* Limited attention span and embedding capacity.
-* Machine translation models do not reason; they map patterns.
-* Large inputs cause internal compression, leading to sentence fusion.
-
-These behaviors are expected and documented limitations, not implementation bugs.
-
----
-
-## Proven Mitigation Strategies (Current System)
-
-### 1. Sentence-Level Processing (Mandatory)
-
-* Input must be split into single sentences.
-* One sentence per inference call.
-* Avoid batching raw paragraphs directly.
-
-### 2. Input Simplification
-
-* Prefer short, literal English sentences.
-* Avoid conjunction-heavy constructions.
-* Replace complex clauses with multiple simple sentences.
-
-### 3. Glossary Locking (Critical)
-
-* Replace key domain terms with placeholders before translation.
-* Restore correct target-language terms post-translation.
-
-### 4. Lightweight Post-Processing
-
-* Rule-based fixes for known patterns.
-* Regex-based correction for common scientific errors.
-
----
-
-## Recommendations for Cursor / Further Improvement
-
-### A. Batch Processing with Safeguards
-
-* Batch sentences only after explicit sentence splitting.
-* Maintain sentence index mapping to prevent merge errors.
-
-### B. Adaptive Chunking
-
-* Enforce maximum token length per input.
-* Reject or re-split inputs exceeding safe thresholds.
-
-### C. Fallback Logic
-
-* If translation confidence drops:
-
-  * Re-run sentence with simplified structure.
-  * Or switch to glossary-only literal translation.
-
-### D. Do NOT Rely on Paragraph-Level Translation
-
-* Paragraph-level translation is unsafe for this model.
-* Sentence-level control is essential for correctness.
-
----
-
-## Final Assessment
-
-IndicTrans2-200M is **not a general-purpose translator**.
-It is a **constrained, lightweight MT engine** that performs well when:
-
-* Input is structured.
-* Context size is controlled.
-* Domain terminology is locked.
-
-When used correctly, it can reliably support multilingual educational content under extreme resource constraints.
-
----
-
-## One-Line Summary
-
-> The model fails on large contexts due to sentence-boundary collapse, but performs reliably under sentence-level, glossary-controlled translation pipelines.
+* Model is cached by HuggingFace transformers library
+* Persistent Python server keeps model in memory
+* Supports both single-shot and streaming translation
+* Line-by-line processing for best quality
