@@ -13,7 +13,7 @@ export interface StitchGenerateRequest {
 
 export interface StitchGenerateResponse {
   success: boolean;
-  latexCode?: string;
+  content?: string;
   metadata?: {
     topic: string;
     language: string;
@@ -47,6 +47,18 @@ export interface StitchModel {
     parameter_size: string;
     quantization_level: string;
   };
+}
+
+export interface StitchTranslateRequest {
+  text: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+export interface StitchTranslateResponse {
+  success: boolean;
+  translated?: string;
+  error?: string;
 }
 
 export class StitchApiError extends Error {
@@ -119,7 +131,7 @@ class StitchApi {
   }
 
   /**
-   * Generate LaTeX content
+   * Generate content
    */
   async generateContent(
     request: StitchGenerateRequest
@@ -152,16 +164,18 @@ class StitchApi {
   }
 
   /**
-   * Generate PDF from LaTeX
+   * Translate generated content using IndicTrans2
    */
-  async generatePDF(latexCode: string): Promise<Blob> {
+  async translateContent(
+    request: StitchTranslateRequest
+  ): Promise<StitchTranslateResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stitch/pdf`, {
+      const response = await fetch(`${API_BASE_URL}/stitch/translate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ latexCode }),
+        body: JSON.stringify(request),
       });
 
       if (!response.ok) {
@@ -171,16 +185,17 @@ class StitchApi {
         );
       }
 
-      return await response.blob();
+      return await response.json();
     } catch (error) {
       if (error instanceof StitchApiError) {
         throw error;
       }
       throw new StitchApiError(
-        error instanceof Error ? error.message : "Failed to generate PDF"
+        error instanceof Error ? error.message : "Failed to translate content"
       );
     }
   }
+
 }
 
 export const stitchAPI = new StitchApi();
