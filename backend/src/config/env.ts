@@ -41,6 +41,12 @@ interface EnvConfig {
   // Ollama Configuration
   OLLAMA_URL?: string;
   OLLAMA_MODEL?: string;
+
+  // IndicTrans2 Configuration
+  INDICTRANS2_ENABLED: boolean;
+  
+  // Python Executable (for proxy services)
+  PYTHON_EXECUTABLE?: string;
 }
 
 const getEnvVariable = (key: string, defaultValue?: string): string => {
@@ -89,6 +95,13 @@ export const env: EnvConfig = {
   // Ollama Configuration (optional - defaults in service)
   OLLAMA_URL: process.env.OLLAMA_URL,
   OLLAMA_MODEL: process.env.OLLAMA_MODEL,
+
+  // IndicTrans2 Configuration
+  INDICTRANS2_ENABLED:
+    getEnvVariable("INDICTRANS2_ENABLED", "true") === "true",
+
+  // Python Executable (for proxy services)
+  PYTHON_EXECUTABLE: process.env.PYTHON_EXECUTABLE || "python3",
 };
 
 export default env;

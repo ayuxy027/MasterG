@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import { ollamaService } from "../services/ollama.service";
+import { languageService } from "../services/language.service";
+import { indicTrans2Service } from "../services/indictrans2.service";
+import { env } from "../config/env";
 
 export class StitchController {
   /**
@@ -30,7 +33,7 @@ export class StitchController {
   }
 
   /**
-   * Generate LaTeX content with streaming support for thinking text
+   * Generate educational content with streaming support for thinking text
    */
   async generateContent(req: Request, res: Response): Promise<void> {
     try {
@@ -87,14 +90,14 @@ export class StitchController {
               res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
             } else if (chunk.type === "response") {
               responseText += chunk.content;
-              // Send response chunk to client (this is the actual LaTeX output)
+              // Send response chunk to client (this is the actual content output)
               res.write(`data: ${JSON.stringify({ type: "response", content: chunk.content })}\n\n`);
             }
           }
 
-          // After streaming completes, send final result with complete LaTeX
-          const latexCode = responseText || this.extractLatexFromThinking(thinkingText);
-          res.write(`data: ${JSON.stringify({ type: "complete", latexCode, thinkingText })}\n\n`);
+          // After streaming completes, send final result with complete content
+          const content = responseText || thinkingText;
+          res.write(`data: ${JSON.stringify({ type: "complete", content, thinkingText })}\n\n`);
           res.end();
         } catch (error) {
           res.write(
@@ -105,15 +108,15 @@ export class StitchController {
         return;
       }
 
-      // Non-streaming: Generate LaTeX using Ollama
-      const latexCode = await ollamaService.generateLatexContent(prompt, {
+      // Non-streaming: Generate plain text content using Ollama
+      const content = await ollamaService.generateTextContent(prompt, {
         temperature: 0.7,
         maxTokens: 4096,
       });
 
       res.json({
         success: true,
-        latexCode,
+        content,
         metadata: {
           topic,
           language,
@@ -133,41 +136,16 @@ export class StitchController {
   }
 
   /**
-   * Extract LaTeX code from thinking text (DeepSeek R1 format)
-   */
-  private extractLatexFromThinking(thinkingText: string): string {
-    // DeepSeek R1 typically has thinking marked, then final answer
-    // Look for LaTeX document markers
-    const latexStart = thinkingText.indexOf("\\documentclass");
-    if (latexStart !== -1) {
-      return thinkingText.substring(latexStart);
-    }
-    
-    // If no clear marker, return full text (might be pure LaTeX)
-    return thinkingText;
-  }
-
-  /**
-   * Generate PDF from LaTeX
+   * Generate PDF from content (not implemented in current version)
    */
   async generatePDF(req: Request, res: Response): Promise<void> {
     try {
-      const { latexCode } = req.body;
-
-      if (!latexCode) {
-        res.status(400).json({
-          success: false,
-          error: "LaTeX code is required",
-        });
-        return;
-      }
-
-      // TODO: Implement LaTeX to PDF compilation
-      // This would require a LaTeX compiler like pdflatex or xelatex
-      // For now, return error indicating it's not implemented
+      // For now, PDF generation is not implemented to keep the stack simple.
+      // Frontend can still display / copy content; PDF compile can be added later.
       res.status(501).json({
         success: false,
-        error: "PDF generation not yet implemented. Requires LaTeX compiler setup.",
+        error:
+          "PDF generation is not yet implemented. Generated content is available for manual formatting/export.",
       });
     } catch (error) {
       console.error("PDF generation error:", error);
@@ -198,6 +176,66 @@ export class StitchController {
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Failed to list models",
+      });
+    }
+  }
+
+  /**
+   * Translate generated content using IndicTrans2
+   */
+  async translateContent(req: Request, res: Response): Promise<void> {
+    try {
+      if (!env.INDICTRANS2_ENABLED) {
+        res.status(503).json({
+          success: false,
+          error: "IndicTrans2 translation is not enabled. Set INDICTRANS2_ENABLED=true in your environment.",
+        });
+        return;
+      }
+
+      const { text, sourceLanguage, targetLanguage } = req.body as {
+        text?: string;
+        sourceLanguage?: string;
+        targetLanguage?: string;
+      };
+
+      if (!text || !text.trim()) {
+        res.status(400).json({
+          success: false,
+          error: "Text is required for translation",
+        });
+        return;
+      }
+
+      const srcCode =
+        (sourceLanguage as keyof typeof languageService) || "en";
+      const tgtCode =
+        (targetLanguage as keyof typeof languageService) || "hi";
+
+      const srcIndic = languageService.toIndicTrans2Code(
+        srcCode as any
+      );
+      const tgtIndic = languageService.toIndicTrans2Code(
+        tgtCode as any
+      );
+
+      const translated = await indicTrans2Service.translate(text, {
+        srcLang: srcIndic,
+        tgtLang: tgtIndic,
+      });
+
+      res.json({
+        success: true,
+        translated,
+      });
+    } catch (error) {
+      console.error("IndicTrans2 translation error:", error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Translation failed",
       });
     }
   }
@@ -246,27 +284,67 @@ export class StitchController {
     const subjectName = subjectNames[params.subject] || params.subject;
     const curriculumName = curriculumNames[params.curriculum] || params.curriculum;
 
-    let prompt = `Generate educational content in LaTeX format for:
+    let prompt = `
+You are an expert Indian educator and curriculum designer.
+
+Generate educational content with the following details:
 
 Topic: ${params.topic}
-Language: ${languageName}
-Grade Level: Class ${params.grade}
 Subject: ${subjectName}
-Curriculum: ${curriculumName}`;
+Grade Level: Class ${params.grade}
+Curriculum: ${curriculumName}
+Target Language: ${languageName}
 
-    if (params.culturalContext) {
-      prompt += `\nInclude cultural context: Yes (add regional examples, festivals, local references)`;
-    }
+Primary Goal:
+Create accurate, age-appropriate, curriculum-aligned educational content that is easy to translate into Indian languages without loss of meaning.
 
-    prompt += `\n\nRequirements:
-- Create age-appropriate content for Class ${params.grade} students
-- Use proper ${languageName} script and fonts
-- Include mathematical notation if needed (for mathematics/science)
-- Follow ${curriculumName} curriculum standards
-- Structure content with clear sections and subsections
-- Use proper LaTeX formatting for all elements`;
+Content Guidelines:
+- Write in clear, simple, and direct sentences.
+- Avoid complex grammar, idioms, metaphors, or poetic language.
+- Prefer short sentences over long or compound sentences.
+- Do NOT use unnecessary conjunctions such as "although", "however", "therefore", or "whereas".
+- Keep factual accuracy extremely high (NCERT-safe).
 
-    return prompt;
+Pedagogical Requirements:
+- Adjust depth, vocabulary, and examples strictly according to Class ${params.grade}.
+- Explain concepts step-by-step.
+- Use definitions, explanations, and examples where appropriate.
+- Maintain a neutral, teacher-friendly tone suitable for textbooks, worksheets, and lesson plans.
+
+Structure Requirements:
+- Use clear section headings.
+- Use bullet points where helpful.
+- Keep paragraphs short (2–4 lines max).
+- Ensure logical flow between sections.
+
+Scientific & Mathematical Accuracy:
+- Use correct scientific and mathematical terminology.
+- Preserve symbols, formulas, units, and notation exactly.
+- Do NOT invent facts or simplify incorrectly.
+
+Translation & Multilingual Safety Rules:
+- Avoid ambiguous pronouns.
+- Repeat key nouns instead of using "it", "this", or "that".
+- Keep terminology consistent throughout the content.
+- Prefer explicit statements over implied meaning.
+
+${params.culturalContext ? `
+Cultural Context Instructions:
+- Include simple, relevant regional or Indian examples (festivals, daily life, local environment).
+- Ensure cultural references support learning and do not distract from the core concept.
+- Keep cultural examples optional and clearly separated from core explanations.
+` : ``}
+
+Output Expectations:
+- Content must be easy to copy into lesson plans or worksheets.
+- Output must be suitable for offline use.
+- Avoid emojis, slang, or informal expressions.
+- Do not include meta explanations about how the content was generated.
+
+Begin generating the content now.
+`;
+
+    return prompt.trim();
   }
 }
 

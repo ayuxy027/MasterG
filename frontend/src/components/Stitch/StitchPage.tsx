@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
 
 // Supported Indian languages
@@ -38,12 +38,12 @@ const CURRICULUMS = [
   { value: "state", label: "State Board" },
 ];
 
-interface LaTeXPreviewProps {
-  latexCode: string;
+interface ContentPreviewProps {
+  content: string;
 }
 
-const LaTeXPreview: React.FC<LaTeXPreviewProps> = ({ latexCode }) => {
-  if (!latexCode) {
+const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
+  if (!content) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 bg-gray-50 rounded-lg">
         <div className="text-center">
@@ -60,7 +60,7 @@ const LaTeXPreview: React.FC<LaTeXPreviewProps> = ({ latexCode }) => {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <p className="text-sm font-medium">LaTeX preview will appear here</p>
+          <p className="text-sm font-medium">Generated content will appear here</p>
         </div>
       </div>
     );
@@ -71,11 +71,11 @@ const LaTeXPreview: React.FC<LaTeXPreviewProps> = ({ latexCode }) => {
       <div className="prose max-w-none">
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
           <pre className="whitespace-pre-wrap text-xs font-mono text-gray-800 leading-relaxed">
-            {latexCode}
+            {content}
           </pre>
         </div>
         <div className="mt-4 text-xs text-gray-500 italic">
-          Note: LaTeX rendering preview will be implemented with MathJax/KaTeX
+          Note: This is plain generated content from the offline LLM.
         </div>
       </div>
     </div>
@@ -90,9 +90,13 @@ const StitchPage: React.FC = () => {
   const [topic, setTopic] = useState("");
   const [culturalContext, setCulturalContext] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [latexCode, setLatexCode] = useState("");
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [generatedContent, setGeneratedContent] = useState("");
+  const [targetLanguageForTranslation, setTargetLanguageForTranslation] =
+    useState("hi");
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [ollamaStatus, setOllamaStatus] = useState<{
     connected: boolean;
     checking: boolean;
@@ -120,10 +124,17 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // Abort any existing generation
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsGenerating(true);
     setError(null);
     setThinkingText("");
-    setLatexCode("");
+    setGeneratedContent("");
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -135,6 +146,7 @@ const StitchPage: React.FC = () => {
         headers: {
           "Content-Type": "application/json",
         },
+        signal: controller.signal,
         body: JSON.stringify({
           topic: topic.trim(),
           language: selectedLanguage,
@@ -180,11 +192,11 @@ const StitchPage: React.FC = () => {
                 setThinkingText(accumulatedThinking);
               } else if (parsed.type === "response") {
                 accumulatedResponse += parsed.content;
-                // Update LaTeX code in real-time as response comes in
-                setLatexCode(accumulatedResponse);
+                // Update content in real-time as response comes in
+                setGeneratedContent(accumulatedResponse);
               } else if (parsed.type === "complete") {
-                // Final result - use provided latexCode or accumulated response
-                setLatexCode(parsed.latexCode || accumulatedResponse);
+                // Final result - use provided content or accumulated response
+                setGeneratedContent(parsed.content || accumulatedResponse);
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }
@@ -199,43 +211,31 @@ const StitchPage: React.FC = () => {
         }
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof StitchApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : "Failed to generate content. Please try again.";
-      setError(errorMessage);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Generation stopped.");
+      } else {
+        const errorMessage =
+          err instanceof StitchApiError
+            ? err.message
+            : err instanceof Error
+            ? err.message
+            : "Failed to generate content. Please try again.";
+        setError(errorMessage);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsGenerating(false);
     }
   };
 
-  const handleGeneratePDF = async () => {
-    if (!latexCode) {
-      setError("No LaTeX code to compile. Please generate content first.");
-      return;
-    }
-
-    try {
-      const blob = await stitchAPI.generatePDF(latexCode);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `stitch-${topic.replace(/\s+/g, "-")}-${Date.now()}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      const errorMessage =
-        err instanceof StitchApiError
-          ? err.message
-          : "PDF generation is not yet implemented. Requires LaTeX compiler setup.";
-      setError(errorMessage);
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      setThinkingText("Generation stopped.");
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
@@ -247,7 +247,7 @@ const StitchPage: React.FC = () => {
           </h1>
           <p className="text-gray-600 text-lg">
             Generate curriculum-aligned educational content in 22+ Indian languages using
-            offline LLM (Ollama + DeepSeek) with LaTeX rendering
+            offline LLM (Ollama + DeepSeek)
           </p>
         </div>
 
@@ -420,6 +420,14 @@ const StitchPage: React.FC = () => {
                     "Generate Content"
                   )}
                 </button>
+                {isGenerating && (
+                  <button
+                    onClick={handleStopGeneration}
+                    className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all border border-gray-300"
+                  >
+                    Stop Generating
+                  </button>
+                )}
 
                 {/* Error Display */}
                 {error && (
@@ -500,7 +508,7 @@ const StitchPage: React.FC = () => {
               </div>
             </div>
 
-            {/* LaTeX Preview */}
+            {/* Content Preview */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex flex-col">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center gap-3">
@@ -517,31 +525,77 @@ const StitchPage: React.FC = () => {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <h3 className="text-lg font-semibold text-gray-900">LaTeX Preview</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Content Preview</h3>
                 </div>
-                <button
-                  onClick={handleGeneratePDF}
-                  disabled={!latexCode}
-                  className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed font-medium flex items-center gap-2"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-600">Translate to</label>
+                  <select
+                    value={targetLanguageForTranslation}
+                    onChange={(e) =>
+                      setTargetLanguageForTranslation(e.target.value)
+                    }
+                    className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  Generate PDF
-                </button>
+                    {INDIAN_LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!generatedContent.trim() || isTranslating}
+                    onClick={async () => {
+                      setIsTranslating(true);
+                      setError(null);
+                      console.log("🔄 Starting translation...");
+                      try {
+                        const resp = await stitchAPI.translateContent({
+                          text: generatedContent,
+                          sourceLanguage: selectedLanguage,
+                          targetLanguage: targetLanguageForTranslation,
+                        });
+                        console.log("✅ Translation response:", resp);
+                        if (resp.success && resp.translated) {
+                          setGeneratedContent(resp.translated);
+                          setError(null);
+                          console.log("✅ Translation successful!");
+                        } else {
+                          const errorMsg = resp.error || "Translation failed. Please try again.";
+                          setError(errorMsg);
+                          console.error("❌ Translation failed:", errorMsg);
+                        }
+                      } catch (err) {
+                        const msg =
+                          err instanceof StitchApiError
+                            ? err.message
+                            : err instanceof Error
+                            ? err.message
+                            : "Translation failed. Please try again.";
+                        setError(msg);
+                        console.error("❌ Translation error:", err);
+                      } finally {
+                        setIsTranslating(false);
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isTranslating ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Translating...
+                      </>
+                    ) : (
+                      "Translate"
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="flex-1 overflow-hidden">
-                <LaTeXPreview latexCode={latexCode} />
+                <ContentPreview content={generatedContent} />
               </div>
             </div>
           </div>

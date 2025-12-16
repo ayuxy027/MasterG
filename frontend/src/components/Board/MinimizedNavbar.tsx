@@ -100,14 +100,14 @@ const MinimizedNavbar: React.FC<MinimizedNavbarProps> = ({ isExpanded, onToggle 
                 LMR
               </a>
               <a
-                href="/stich"
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/stich')
+                href="/stitch"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/stitch')
                   ? 'bg-orange-400 text-white font-semibold shadow-md'
                   : 'text-orange-500 hover:bg-orange-50'
                   }`}
                 onClick={(e) => {
                   e.preventDefault();
-                  navigate('/stich');
+                  navigate('/stitch');
                   onToggle();
                 }}
               >
@@ -115,7 +115,7 @@ const MinimizedNavbar: React.FC<MinimizedNavbarProps> = ({ isExpanded, onToggle 
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66"></path>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"></path>
                 </svg>
-                Stich
+                Stitch
               </a>
               <a
                 href="/board"

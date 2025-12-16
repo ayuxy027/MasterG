@@ -6,6 +6,7 @@ import LMRPage from "./components/LMR/LMRPage";
 import PostersPage from "./components/Posters/PostersPage";
 import BoardPage from "./components/Board/BoardPage";
 import StitchPage from "./components/Stitch/StitchPage";
+import PlaygroundPage from "./pages/PlaygroundPage";
 
 const App = () => {
   return (
@@ -35,9 +36,14 @@ const App = () => {
           <BoardPage />
         </Layout>
       } />
-      <Route path="/stich" element={
+      <Route path="/stitch" element={
         <Layout>
           <StitchPage />
+        </Layout>
+      } />
+      <Route path="/playground" element={
+        <Layout>
+          <PlaygroundPage />
         </Layout>
       } />
     </Routes>

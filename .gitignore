@@ -1,13 +1,18 @@
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
 # Environment variables
 .env
 .env.*
 !.env.example
 
-# Node modules
+# Node modules (all locations)
 node_modules/
+**/node_modules/
+backend/node_modules/
+frontend/node_modules/
 
 # Build output
 dist/
@@ -16,38 +21,95 @@ out/
 .next/
 .vercel/
 coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Python virtual environments (all locations)
+venv/
+env/
+ENV/
+backend/proxy/venv/
+**/venv/
+**/env/
+**/ENV/
+.venv/
+
+# Downloaded models and AI model files (large binary files)
+backend/proxy/models/
+**/models/
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.h5
+*.onnx
+*.pkl
+*.pickle
+*.ckpt
+
+# Hugging Face cache
+.cache/
+.huggingface/
+**/.huggingface/
+
+# Temporary files
 tmp/
 temp/
-.cache/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# VSCode
-.vscode/
-*.code-workspace
+*.tmp
+*.swp
+*.swo
+*~
+.*.swp
 
 # Logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# OS
-Thumbs.db
-Desktop.ini
-
-# Misc
-*.tgz
-*.swp
-*.swo
-
-# Test
-jest-test-results.json
-coverage/
+# VSCode
+.vscode/
+*.code-workspace
+.history/
 
 # IDEs
 .idea/
 *.iml
+*.sublime-project
+*.sublime-workspace
+*.sublime-workspace
+
+# OS
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Misc
+*.tgz
+*.zip
+*.tar.gz
+
+# Test
+jest-test-results.json
+coverage/
+.nyc_output/
 
 # Other deployment dirs
 .netlify/
@@ -57,18 +119,10 @@ firebase-debug.log
 # System
 *.pid
 *.seed
-
-# Runtime data
 pids/
-*.pid.lock
 
 # Local env
 local.env
-
-# Python cache (just in case)
-__pycache__/
-*.pyc
-*.pyo
 
 # SvelteKit/SolidStart adapters
 .svelte-kit/
@@ -80,3 +134,40 @@ __pycache__/
 # Expo
 .expo/
 .expo-shared/
+
+# Uploads directory (user-uploaded files)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# TypeScript
+*.tsbuildinfo
+
+# Python package files (keep setup files, ignore compiled)
+*.pyc
+*.pyo
+*.pyd
+.python-version
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Compiled binaries
+*.exe
+*.dll
+*.dylib
+
+# Archive files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
