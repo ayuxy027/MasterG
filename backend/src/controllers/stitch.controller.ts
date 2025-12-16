@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { ollamaService } from "../services/ollama.service";
 import { languageService } from "../services/language.service";
 import { indicTrans2Service } from "../services/indictrans2.service";
+import { nllbService } from "../services/nllb.service";
 import { env } from "../config/env";
 
 export class StitchController {
@@ -181,14 +182,18 @@ export class StitchController {
   }
 
   /**
-   * Translate generated content using IndicTrans2
+   * Translate generated content (default: uses NLLB-200, fallback to IndicTrans2)
    */
   async translateContent(req: Request, res: Response): Promise<void> {
     try {
-      if (!env.INDICTRANS2_ENABLED) {
+      // Default to NLLB-200, fallback to IndicTrans2 if NLLB is disabled
+      const useNLLB = env.NLLB_ENABLED;
+      const useIndicTrans2 = env.INDICTRANS2_ENABLED && !useNLLB;
+
+      if (!useNLLB && !useIndicTrans2) {
         res.status(503).json({
           success: false,
-          error: "IndicTrans2 translation is not enabled. Set INDICTRANS2_ENABLED=true in your environment.",
+          error: "No translation service enabled. Set NLLB_ENABLED=true or INDICTRANS2_ENABLED=true in your environment.",
         });
         return;
       }
@@ -213,10 +218,10 @@ export class StitchController {
       const tgtCode =
         (targetLanguage as keyof typeof languageService) || "hi";
 
-      const srcIndic = languageService.toIndicTrans2Code(
+      const srcLang = languageService.toIndicTrans2Code(
         srcCode as any
       );
-      const tgtIndic = languageService.toIndicTrans2Code(
+      const tgtLang = languageService.toIndicTrans2Code(
         tgtCode as any
       );
 
@@ -236,11 +241,143 @@ export class StitchController {
         res.setHeader("X-Accel-Buffering", "no");
 
         try {
-          await indicTrans2Service.streamTranslate(
+          if (useNLLB) {
+            await nllbService.streamTranslate(
+              text,
+              {
+                srcLang: srcLang,
+                tgtLang: tgtLang,
+              },
+              (chunk) => {
+                // Forward chunk as SSE event
+                res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+              }
+            );
+          } else {
+            await indicTrans2Service.streamTranslate(
+              text,
+              {
+                srcLang: srcLang,
+                tgtLang: tgtLang,
+              },
+              (chunk) => {
+                // Forward chunk as SSE event
+                res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+              }
+            );
+          }
+
+          // End SSE stream
+          res.end();
+        } catch (error) {
+          res.write(
+            `data: ${JSON.stringify({
+              success: false,
+              type: "error",
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Streaming translation failed",
+            })}\n\n`
+          );
+          res.end();
+        }
+
+        return;
+      }
+
+      // Non-streaming: single-shot translation
+      let translated: string;
+      if (useNLLB) {
+        translated = await nllbService.translate(text, {
+          srcLang: srcLang,
+          tgtLang: tgtLang,
+        });
+      } else {
+        translated = await indicTrans2Service.translate(text, {
+          srcLang: srcLang,
+          tgtLang: tgtLang,
+        });
+      }
+
+      res.json({
+        success: true,
+        translated,
+      });
+    } catch (error) {
+      console.error("Translation error:", error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Translation failed",
+      });
+    }
+  }
+
+  /**
+   * Translate generated content using NLLB-200
+   */
+  async translateContentNLLB(req: Request, res: Response): Promise<void> {
+    try {
+      if (!env.NLLB_ENABLED) {
+        res.status(503).json({
+          success: false,
+          error: "NLLB-200 translation is not enabled. Set NLLB_ENABLED=true in your environment.",
+        });
+        return;
+      }
+
+      const { text, sourceLanguage, targetLanguage } = req.body as {
+        text?: string;
+        sourceLanguage?: string;
+        targetLanguage?: string;
+        stream?: boolean;
+      };
+
+      if (!text || !text.trim()) {
+        res.status(400).json({
+          success: false,
+          error: "Text is required for translation",
+        });
+        return;
+      }
+
+      const srcCode =
+        (sourceLanguage as keyof typeof languageService) || "en";
+      const tgtCode =
+        (targetLanguage as keyof typeof languageService) || "hi";
+
+      // NLLB uses same language code format as IndicTrans2
+      const srcLang = languageService.toIndicTrans2Code(
+        srcCode as any
+      );
+      const tgtLang = languageService.toIndicTrans2Code(
+        tgtCode as any
+      );
+
+      // If stream flag is set, use Server-Sent Events for sentence-by-sentence streaming
+      if (req.body && (req.body as any).stream) {
+        // Set CORS + SSE headers
+        res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization"
+        );
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+
+        try {
+          await nllbService.streamTranslate(
             text,
             {
-              srcLang: srcIndic,
-              tgtLang: tgtIndic,
+              srcLang: srcLang,
+              tgtLang: tgtLang,
             },
             (chunk) => {
               // Forward chunk as SSE event
@@ -268,9 +405,9 @@ export class StitchController {
       }
 
       // Non-streaming: single-shot translation
-      const translated = await indicTrans2Service.translate(text, {
-        srcLang: srcIndic,
-        tgtLang: tgtIndic,
+      const translated = await nllbService.translate(text, {
+        srcLang: srcLang,
+        tgtLang: tgtLang,
       });
 
       res.json({
@@ -278,13 +415,54 @@ export class StitchController {
         translated,
       });
     } catch (error) {
-      console.error("IndicTrans2 translation error:", error);
+      console.error("NLLB translation error:", error);
       res.status(500).json({
         success: false,
         error:
           error instanceof Error
             ? error.message
             : "Translation failed",
+      });
+    }
+  }
+
+  /**
+   * Check NLLB-200 connection status
+   */
+  async checkNLLBStatus(req: Request, res: Response): Promise<void> {
+    try {
+      if (!env.NLLB_ENABLED) {
+        res.json({
+          success: true,
+          connected: false,
+          enabled: false,
+          message: "NLLB-200 is not enabled. Set NLLB_ENABLED=true to enable.",
+        });
+        return;
+      }
+
+      // Test with a simple translation
+      const testResult = await nllbService.translate(
+        "Photosynthesis is a biological process.",
+        {
+          srcLang: "eng_Latn",
+          tgtLang: "hin_Deva",
+        }
+      );
+
+      res.json({
+        success: true,
+        connected: true,
+        enabled: true,
+        message: "NLLB-200 model loaded and ready",
+        testTranslation: testResult.substring(0, 50), // First 50 chars for verification
+      });
+    } catch (error) {
+      res.json({
+        success: false,
+        connected: false,
+        enabled: env.NLLB_ENABLED,
+        error: error instanceof Error ? error.message : "NLLB service unavailable",
       });
     }
   }

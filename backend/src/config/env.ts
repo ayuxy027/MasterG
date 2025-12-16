@@ -45,6 +45,9 @@ interface EnvConfig {
   // IndicTrans2 Configuration
   INDICTRANS2_ENABLED: boolean;
   
+  // NLLB-200 Configuration
+  NLLB_ENABLED: boolean;
+  
   // Python Executable (for proxy services)
   PYTHON_EXECUTABLE?: string;
 }
@@ -98,7 +101,11 @@ export const env: EnvConfig = {
 
   // IndicTrans2 Configuration
   INDICTRANS2_ENABLED:
-    getEnvVariable("INDICTRANS2_ENABLED", "true") === "true",
+    getEnvVariable("INDICTRANS2_ENABLED", "false") === "true", // Default disabled, NLLB is default
+
+  // NLLB-200 Configuration (DEFAULT)
+  NLLB_ENABLED:
+    getEnvVariable("NLLB_ENABLED", "true") === "true", // Default enabled as primary translation model
 
   // Python Executable (for proxy services)
   PYTHON_EXECUTABLE: process.env.PYTHON_EXECUTABLE || "python3",
