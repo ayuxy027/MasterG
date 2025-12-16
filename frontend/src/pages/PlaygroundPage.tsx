@@ -30,6 +30,7 @@ const PlaygroundPage: React.FC = () => {
   const [translationResult, setTranslationResult] = useState("");
   const [translationLoading, setTranslationLoading] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
+  const [translationStreaming, setTranslationStreaming] = useState(true);
 
   // Check service statuses
   useEffect(() => {
@@ -126,15 +127,41 @@ const PlaygroundPage: React.FC = () => {
     setTranslationError(null);
     setTranslationResult("");
     try {
-      const result = await stitchAPI.translateContent({
-        text: translationText,
-        sourceLanguage: translationSource,
-        targetLanguage: translationTarget,
-      });
-      if (result.success && result.translated) {
-        setTranslationResult(result.translated);
+      if (translationStreaming) {
+        await stitchAPI.translateContentStream(
+          {
+            text: translationText,
+            sourceLanguage: translationSource,
+            targetLanguage: translationTarget,
+          },
+          (chunk) => {
+            if (chunk.type === "error" || chunk.success === false) {
+              setTranslationError(chunk.error || "Streaming translation error");
+              return;
+            }
+
+            if (chunk.type === "chunk" && chunk.translated) {
+              // Append sentence-by-sentence
+              setTranslationResult((prev) =>
+                prev ? `${prev}\n${chunk.translated}` : chunk.translated || ""
+              );
+            } else if (chunk.type === "complete" && chunk.translated) {
+              // Optionally replace with full combined translation
+              setTranslationResult(chunk.translated);
+            }
+          }
+        );
       } else {
-        setTranslationError(result.error || "Translation failed");
+        const result = await stitchAPI.translateContent({
+          text: translationText,
+          sourceLanguage: translationSource,
+          targetLanguage: translationTarget,
+        });
+        if (result.success && result.translated) {
+          setTranslationResult(result.translated);
+        } else {
+          setTranslationError(result.error || "Translation failed");
+        }
       }
     } catch (err) {
       setTranslationError(
@@ -285,6 +312,17 @@ const PlaygroundPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Test IndicTrans2 (Translation)</h2>
             <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    checked={translationStreaming}
+                    onChange={(e) => setTranslationStreaming(e.target.checked)}
+                  />
+                  Enable streaming (sentence-by-sentence)
+                </label>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Source Language
