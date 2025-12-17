@@ -88,7 +88,6 @@ const StitchPage: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState("mathematics");
   const [customSubject, setCustomSubject] = useState("");
   const [topic, setTopic] = useState("");
-  const [culturalContext, setCulturalContext] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [generatedContent, setGeneratedContent] = useState("");
@@ -173,7 +172,7 @@ const StitchPage: React.FC = () => {
           topic: topic.trim(),
           grade: finalGrade,
           subject: finalSubject,
-          culturalContext,
+          culturalContext: false,
           stream: true,
         }),
       });
@@ -364,8 +363,8 @@ const StitchPage: React.FC = () => {
                           }}
                           className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
                             selectedGrade === grade.value && selectedGrade !== "custom"
-                              ? "border-orange-500 bg-orange-50 text-orange-700"
-                              : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
+                              ? "border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-500 ring-opacity-20"
+                              : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
                           }`}
                         >
                           {grade.label}
@@ -379,7 +378,7 @@ const StitchPage: React.FC = () => {
                       }}
                       className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
                         selectedGrade === "custom"
-                          ? "border-orange-500 bg-orange-50 text-orange-700"
+                          ? "border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-500 ring-opacity-20"
                           : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
                       }`}
                     >
@@ -391,7 +390,7 @@ const StitchPage: React.FC = () => {
                         value={customGrade}
                         onChange={(e) => setCustomGrade(e.target.value)}
                         placeholder="Enter grade level..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400 transition-all"
                       />
                     )}
                   </div>
@@ -410,7 +409,11 @@ const StitchPage: React.FC = () => {
                         setCustomSubject("");
                       }
                     }}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
+                    className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${
+                      selectedSubject && selectedSubject !== ""
+                        ? "border-orange-500 ring-2 ring-orange-500 ring-opacity-20"
+                        : "border-gray-300 focus:border-orange-500"
+                    } focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 focus:border-orange-500`}
                   >
                     {CORE_SUBJECTS.map((subject) => (
                       <option key={subject.value} value={subject.value}>
@@ -425,7 +428,7 @@ const StitchPage: React.FC = () => {
                       value={customSubject}
                       onChange={(e) => setCustomSubject(e.target.value)}
                       placeholder="Enter subject name..."
-                      className="w-full mt-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
+                      className="w-full mt-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400 transition-all"
                     />
                   )}
                 </div>
@@ -440,32 +443,15 @@ const StitchPage: React.FC = () => {
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                     placeholder="e.g., Photosynthesis, Quadratic Equations"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400 transition-all"
                   />
-                </div>
-
-                {/* Cultural Context */}
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="culturalContext"
-                    checked={culturalContext}
-                    onChange={(e) => setCulturalContext(e.target.checked)}
-                    className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <label
-                    htmlFor="culturalContext"
-                    className="ml-2 text-sm text-gray-700 cursor-pointer"
-                  >
-                    Include cultural context
-                  </label>
                 </div>
 
                 {/* Generate Button */}
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating || !topic.trim() || (selectedGrade === "custom" && !customGrade.trim()) || (selectedSubject === "custom" && !customSubject.trim())}
-                  className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-all shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+                  className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 active:bg-orange-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300"
                 >
                   {isGenerating ? (
                     <span className="flex items-center justify-center gap-2">
