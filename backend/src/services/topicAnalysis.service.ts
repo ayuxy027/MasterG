@@ -32,7 +32,7 @@ DOCUMENT:
  * Uses simple heuristics to identify section headings and key content
  */
 function generateFallbackTopics(documentContent: string, documentName: string): Topic[] {
-    console.log("📊 Generating fallback topics from document structure...");
+
 
     // Try to find section headings (patterns like "Chapter X", "Section X", numbered headings, etc.)
     const headingPatterns = [
@@ -147,7 +147,7 @@ function generateFallbackTopics(documentContent: string, documentName: string): 
         );
     }
 
-    console.log(`✅ Generated ${topics.length} fallback topics`);
+
     return topics;
 }
 
@@ -163,15 +163,15 @@ async function getDocumentChunks(
         // Get the correct collection name using chatService (same as browse controller)
         const collectionName = await chatService.getChromaCollectionName(userId, sessionId);
 
-        console.log(`🔍 Looking for document ${fileId} in collection ${collectionName}`);
+
 
         // Use vectorDBService.getDocumentsByFileId which is proven to work
         const result = await vectorDBService.getDocumentsByFileId(fileId, collectionName);
 
-        console.log(`📦 Found ${result.documents?.length || 0} chunks for fileId ${fileId}`);
+
 
         if (!result.documents || result.documents.length === 0) {
-            console.log(`No chunks found for fileId ${fileId} in collection ${collectionName}`);
+
             return [];
         }
 
@@ -194,7 +194,7 @@ async function getDocumentChunks(
 
         return chunks;
     } catch (error) {
-        console.error("Error fetching document chunks:", error);
+
         throw error;
     }
 }
@@ -227,8 +227,8 @@ async function extractTopicsWithAI(
 
         const prompt = TOPIC_EXTRACTION_PROMPT + truncatedContent;
 
-        console.log(`🤖 Extracting topics using Ollama (${OLLAMA_MODEL})...`);
-        console.log(`📝 Prompt length: ${prompt.length} characters`);
+
+
 
         const response = await axios.post(
             `${OLLAMA_URL}/api/generate`,
@@ -249,8 +249,7 @@ async function extractTopicsWithAI(
         );
 
         // Debug: Log what we received
-        console.log(`📡 Ollama response status: ${response.status}`);
-        console.log(`📡 Ollama response keys:`, Object.keys(response.data));
+
 
         // Try multiple ways to get the response text
         let responseText = response.data.response || response.data.content || response.data.message?.content;
@@ -260,11 +259,11 @@ async function extractTopicsWithAI(
         }
 
         if (!responseText) {
-            console.error("❌ Full Ollama response:", JSON.stringify(response.data, null, 2).substring(0, 500));
+
             throw new Error("No response from Ollama - check if model is loaded");
         }
 
-        console.log(`✅ Got response from Ollama (${responseText.length} chars)`);
+
 
         // Parse response and remove thinking tags
         let text = parseOllamaResponse(responseText);
@@ -293,21 +292,21 @@ async function extractTopicsWithAI(
 
             topics = JSON.parse(cleanText);
         } catch (parseError) {
-            console.warn("⚠️ AI did not return valid JSON, using fallback topic extraction");
-            console.log("AI response was:", text.substring(0, 200) + "...");
+
+
             // Use fallback when AI doesn't return proper JSON
             return generateFallbackTopics(documentContent, documentName);
         }
 
         // Ensure topics is an array
         if (!Array.isArray(topics)) {
-            console.warn("⚠️ AI response was not an array, using fallback");
+
             return generateFallbackTopics(documentContent, documentName);
         }
 
         // If empty array, use fallback
         if (topics.length === 0) {
-            console.warn("⚠️ AI returned empty topics array, using fallback");
+
             return generateFallbackTopics(documentContent, documentName);
         }
 
@@ -341,7 +340,7 @@ async function extractTopicsWithAI(
                 : [],
         }));
 
-        console.log(`✅ Extracted ${topics.length} topics using Ollama`);
+
 
         return topics;
     } catch (error: any) {
@@ -351,7 +350,7 @@ async function extractTopicsWithAI(
         if (error.code === "ETIMEDOUT") {
             throw new Error("Ollama request timed out. The model may be processing.");
         }
-        console.error("Error extracting topics with Ollama:", error.message);
+
         throw error;
     }
 }
@@ -430,7 +429,7 @@ export async function analyzeDocument(
 
         return savedAnalysis as unknown as DocumentAnalysis;
     } catch (error) {
-        console.error("Error analyzing document:", error);
+
         throw error;
     }
 }
@@ -449,7 +448,7 @@ export async function getDocumentAnalysis(
         });
         return analysis as unknown as DocumentAnalysis | null;
     } catch (error) {
-        console.error("Error getting document analysis:", error);
+
         throw error;
     }
 }
@@ -468,7 +467,7 @@ export async function getSessionAnalyses(
         }).sort({ analyzedAt: -1 });
         return analyses as unknown as DocumentAnalysis[];
     } catch (error) {
-        console.error("Error getting session analyses:", error);
+
         throw error;
     }
 }
@@ -487,7 +486,7 @@ export async function getSessionProgress(
         });
         return progress;
     } catch (error) {
-        console.error("Error getting session progress:", error);
+
         throw error;
     }
 }
@@ -530,7 +529,7 @@ export async function updateTopicProgress(
 
         return progress;
     } catch (error) {
-        console.error("Error updating topic progress:", error);
+
         throw error;
     }
 }
@@ -570,7 +569,7 @@ export async function getSessionStats(
             timeSpent,
         };
     } catch (error) {
-        console.error("Error getting session stats:", error);
+
         throw error;
     }
 }

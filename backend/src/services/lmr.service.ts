@@ -142,10 +142,9 @@ Respond ONLY with valid JSON, no additional text.`;
         language: languageName,
       };
     } catch (error) {
-      console.error("❌ Generate summary error:", error);
+
       throw new Error(
-        `Failed to generate summary: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate summary: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -220,10 +219,9 @@ Respond ONLY with valid JSON array, no additional text.`;
         pageReference: q.pageReference,
       }));
     } catch (error) {
-      console.error("❌ Generate questions error:", error);
+
       throw new Error(
-        `Failed to generate questions: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate questions: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -300,10 +298,9 @@ Respond ONLY with valid JSON array, no additional text.`;
         subject: q.subject || "General",
       }));
     } catch (error) {
-      console.error("❌ Generate quiz error:", error);
+
       throw new Error(
-        `Failed to generate quiz: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate quiz: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -373,10 +370,9 @@ Respond ONLY with valid JSON array, no additional text.`;
         mnemonics: n.mnemonics || [],
       }));
     } catch (error) {
-      console.error("❌ Generate recall notes error:", error);
+
       throw new Error(
-        `Failed to generate recall notes: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate recall notes: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -401,10 +397,9 @@ Respond ONLY with valid JSON array, no additional text.`;
         recallNotes,
       };
     } catch (error) {
-      console.error("❌ Get all content error:", error);
+
       throw new Error(
-        `Failed to generate content: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate content: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }

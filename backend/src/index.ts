@@ -80,25 +80,38 @@ async function startServer() {
   // Connect to MongoDB (optional - app works without it)
   await connectDatabase();
 
+  // Check ChromaDB connection
+  try {
+    const chromaResponse = await fetch(`${env.CHROMA_URL}/api/v1/heartbeat`);
+    if (chromaResponse.ok) {
+      console.log('ChromaDB connected');
+    }
+  } catch (error) {
+    // ChromaDB not available - silent
+  }
+
+  // Check Ollama connection
+  try {
+    const ollamaUrl = env.OLLAMA_URL || 'http://localhost:11434';
+    const ollamaResponse = await fetch(`${ollamaUrl}/api/tags`);
+    if (ollamaResponse.ok) {
+      console.log('Ollama connected');
+    }
+  } catch (error) {
+    // Ollama not available - silent
+  }
+
+  // Check Whisper availability
+  const fs = await import('fs');
+  const path = await import('path');
+  const whisperPath = path.join(__dirname, '..', 'bin', 'whisper', 'whisper-cli.exe');
+  if (fs.existsSync(whisperPath)) {
+    console.log('Whisper is running');
+  }
+
   // Start server
   app.listen(env.PORT, () => {
-    console.log("=================================");
-    console.log(`🚀 Server running on port ${env.PORT}`);
-    console.log(`📚 Environment: ${env.NODE_ENV}`);
-    console.log(`🔗 ChromaDB: ${env.CHROMA_URL}`);
-    console.log(
-      `💾 MongoDB: ${env.MONGODB_URI
-        ? "✅ Connected"
-        : "⚠️  Not configured (chat history disabled)"
-      }`
-    );
-    console.log("=================================");
-    console.log("✨ Features:");
-    console.log("  - PDF page-wise chunking with page numbers");
-    console.log("  - Stateful chat history (last 10 messages)");
-    console.log("  - Multiple PDFs per session");
-    console.log("  - Source citations (PDF name + page number)");
-    console.log("=================================");
+    console.log(`Server running on port ${env.PORT}`);
   });
 }
 

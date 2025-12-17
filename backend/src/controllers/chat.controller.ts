@@ -27,7 +27,7 @@ export class ChatController {
         sessions,
       });
     } catch (error: any) {
-      console.error("Get chat sessions error:", error);
+
       res.status(500).json({
         success: false,
         error: error.message || "Failed to get chat sessions",
@@ -71,7 +71,7 @@ export class ChatController {
         documentCount: files.length,
       });
     } catch (error: any) {
-      console.error("Get session details error:", error);
+
       res.status(500).json({
         success: false,
         error: error.message || "Failed to get session details",
@@ -102,7 +102,7 @@ export class ChatController {
         message: "Chat session deleted successfully",
       });
     } catch (error: any) {
-      console.error("Delete chat session error:", error);
+
       res.status(500).json({
         success: false,
         error: error.message || "Failed to delete chat session",
@@ -142,7 +142,7 @@ export class ChatController {
         message: "Chat name updated successfully",
       });
     } catch (error: any) {
-      console.error("Update chat name error:", error);
+
       res.status(500).json({
         success: false,
         error: error.message || "Failed to update chat name",
@@ -178,9 +178,7 @@ export class ChatController {
         10
       );
 
-      logger.info(
-        `🔍 Processing query for session: ${sessionId} with ${chatHistory.length} context messages`
-      );
+
 
       // Process query through simplified RAG pipeline
       const result = await asyncRAGOrchestratorService.processQuery(
@@ -202,7 +200,7 @@ export class ChatController {
         sources: result.sources,
       });
 
-      logger.info(`✅ Query completed in ${Date.now() - startTime}ms`);
+
 
       res.status(200).json({
         success: true,
@@ -211,7 +209,7 @@ export class ChatController {
         metadata: result.metadata,
       });
     } catch (error: any) {
-      logger.error("Query chat error:", error);
+
 
       res.status(500).json({
         success: false,
@@ -232,7 +230,7 @@ export class ChatController {
         health,
       });
     } catch (error: any) {
-      logger.error("Health check error:", error);
+
       res.status(500).json({
         success: false,
         error: error.message || "Health check failed",

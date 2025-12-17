@@ -32,11 +32,7 @@ class SpeechService {
             fs.mkdirSync(this.tempDir, { recursive: true });
         }
 
-        // Log configuration
-        console.log("[Speech] Whisper CLI path:", this.whisperPath);
-        console.log("[Speech] Model path:", this.modelPath);
-        console.log("[Speech] Whisper exists:", fs.existsSync(this.whisperPath));
-        console.log("[Speech] Model exists:", fs.existsSync(this.modelPath));
+
     }
 
     /**
@@ -47,10 +43,10 @@ class SpeechService {
         try {
             // Use ffmpeg to convert to 16kHz mono WAV (required by whisper.cpp)
             const command = `ffmpeg -y -i "${inputPath}" -ar 16000 -ac 1 -c:a pcm_s16le "${outputPath}"`;
-            console.log("[Speech] Converting audio:", command);
+
             await execAsync(command);
         } catch (error: any) {
-            console.error("[Speech] FFmpeg conversion failed:", error.message);
+
             // If ffmpeg fails, try to use the file directly if it's already WAV
             if (inputPath.endsWith(".wav")) {
                 fs.copyFileSync(inputPath, outputPath);
@@ -76,9 +72,7 @@ class SpeechService {
         const wavPath = path.join(this.tempDir, `speech_${timestamp}.wav`);
 
         try {
-            console.log(
-                `[Speech] Starting local Whisper transcription, buffer size: ${audioBuffer.length} bytes, type: ${mimeType}`
-            );
+
 
             // Check if whisper binary exists
             if (!fs.existsSync(this.whisperPath)) {
@@ -92,7 +86,7 @@ class SpeechService {
 
             // Write audio buffer to temp file
             fs.writeFileSync(inputPath, audioBuffer);
-            console.log(`[Speech] Saved input audio to: ${inputPath}`);
+
 
             // Convert to WAV format if not already WAV
             if (mimeType !== "audio/wav" && mimeType !== "audio/wave" && mimeType !== "audio/x-wav") {
@@ -107,7 +101,7 @@ class SpeechService {
 
             return result;
         } catch (error: any) {
-            console.error("[Speech] Transcription error:", error.message);
+
             throw error;
         } finally {
             // Cleanup temp files
@@ -129,7 +123,7 @@ class SpeechService {
         // --threads: number of CPU threads
         const command = `"${this.whisperPath}" -m "${this.modelPath}" -f "${wavPath}" -otxt -np --threads 4`;
 
-        console.log("[Speech] Running whisper command:", command);
+
 
         try {
             const { stdout, stderr } = await execAsync(command, {
@@ -138,10 +132,7 @@ class SpeechService {
                 cwd: path.dirname(this.whisperPath), // Run from whisper directory for DLL loading
             });
 
-            console.log("[Speech] Whisper stdout:", stdout);
-            if (stderr) {
-                console.log("[Speech] Whisper stderr:", stderr);
-            }
+
 
             // Read the output text file
             const outputPath = wavPath + ".txt";
@@ -155,7 +146,7 @@ class SpeechService {
             }
 
             const text = fs.readFileSync(outputPath, "utf-8").trim();
-            console.log(`[Speech] Transcription successful: "${text.substring(0, 100)}..."`);
+
 
             return {
                 text,
@@ -163,10 +154,7 @@ class SpeechService {
                 duration: 0,
             };
         } catch (error: any) {
-            console.error("[Speech] Whisper execution failed:");
-            console.error("  stdout:", error.stdout || "(empty)");
-            console.error("  stderr:", error.stderr || "(empty)");
-            console.error("  code:", error.code);
+
 
             // Check for common errors
             if (error.code === 3221225781) {
