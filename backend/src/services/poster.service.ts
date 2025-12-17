@@ -1,5 +1,6 @@
 import env from "../config/env";
 import { GoogleAuth } from "google-auth-library";
+import axios from "axios";
 
 interface ImageGenerationParams {
   prompt: string;
@@ -26,26 +27,17 @@ const promptCache = new Map<string, { enhanced: string; timestamp: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 export class PosterService {
-  /**
-   * Step 1: Analyze the query to understand topic and requirements
-   */
   private async analyzeQuery(
     query: string,
     category: string,
     language: string
   ): Promise<QueryAnalysis> {
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMMA_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are an educational content analyst. Analyze this poster request for Indian students:
+      // Use Ollama instead of Gemini
+      const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
+      const ollamaModel = process.env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
+
+      const prompt = `You are an educational content analyst. Analyze this poster request for Indian students:
 
 Query: "${query}"
 Category: ${category}
@@ -66,50 +58,36 @@ For example, if query is "photosynthesis":
 - keyElements should list: "chloroplast with detailed structure", "sunlight rays entering leaf", "carbon dioxide molecules entering", "oxygen molecules being released", "glucose/sugar molecules being produced", "water molecules from roots"
 - textElements should include specific labels like "Photosynthesis Process", "Sunlight", "Carbon Dioxide (CO2)", "Oxygen (O2)", "Water (H2O)", "Glucose (C6H12O6)"
 
-Be EXTREMELY specific and educational. Return ONLY the JSON:`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              maxOutputTokens: 400,
-              temperature: 0.4,
-              responseSchema: {
-                type: "object",
-                properties: {
-                  topic: { type: "string" },
-                  keyElements: { type: "array", items: { type: "string" } },
-                  visualStyle: { type: "string" },
-                  textElements: { type: "array", items: { type: "string" } },
-                },
-                required: [
-                  "topic",
-                  "keyElements",
-                  "visualStyle",
-                  "textElements",
-                ],
-              },
-            },
-          }),
+Be EXTREMELY specific and educational. Return ONLY the JSON:`;
+
+      const response = await axios.post(
+        `${ollamaUrl}/api/generate`,
+        {
+          model: ollamaModel,
+          prompt,
+          stream: false,
+          options: {
+            temperature: 0.4,
+            num_predict: 400,
+          },
+        },
+        {
+          timeout: 30000,
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        const analysisText =
-          data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (response.data.response) {
+        const analysisText = response.data.response.trim();
 
-        if (analysisText) {
-          // Try to parse JSON from the response
-          const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            return parsed;
-          }
+        // Try to parse JSON from the response
+        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return parsed;
         }
       }
     } catch (error) {
-      console.error("Query analysis error:", error);
+      console.error("Query analysis error (Ollama):", error);
     }
 
     // Fallback analysis - more detailed based on query
@@ -215,18 +193,11 @@ Be EXTREMELY specific and educational. Return ONLY the JSON:`,
       const educationalContext = this.getEducationalContext(category, language);
       const layoutGuidance = this.getLayoutGuidance(aspectRatio, language);
 
-      // Step 2: Generate detailed prompt based on analysis
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMMA_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are an expert educational content creator specializing in visual learning materials for Indian students.
+      // Step 2: Generate detailed prompt based on analysis using Ollama
+      const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
+      const ollamaModel = process.env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
+
+      const enhancementPrompt = `You are an expert educational content creator specializing in visual learning materials for Indian students.
 
 TOPIC: "${query}" (${category} category)
 LANGUAGE: ${language}
@@ -280,24 +251,26 @@ Generate a complete, detailed prompt (200-250 words) that includes:
 - Style and tone
 - Educational accuracy notes
 
-RESPOND WITH ONLY THE PROMPT - no explanations, no meta-commentary, just the detailed image generation prompt:`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              maxOutputTokens: 300,
-              temperature: 0.6,
-              topP: 0.85,
-            },
-          }),
+RESPOND WITH ONLY THE PROMPT - no explanations, no meta-commentary, just the detailed image generation prompt:`;
+
+      const response = await axios.post(
+        `${ollamaUrl}/api/generate`,
+        {
+          model: ollamaModel,
+          prompt: enhancementPrompt,
+          stream: false,
+          options: {
+            temperature: 0.6,
+            num_predict: 300,
+          },
+        },
+        {
+          timeout: 30000,
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        const enhanced =
-          data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (response.data.response) {
+        const enhanced = response.data.response.trim();
 
         if (enhanced) {
           promptCache.set(cacheKey, { enhanced, timestamp: Date.now() });
@@ -369,7 +342,7 @@ RESPOND WITH ONLY THE PROMPT - no explanations, no meta-commentary, just the det
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.error?.message ||
-            `Image generation failed: ${response.statusText}`
+          `Image generation failed: ${response.statusText}`
         );
       }
 

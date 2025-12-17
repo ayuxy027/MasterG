@@ -1,4 +1,4 @@
-import { geminiService } from "./gemini.service";
+import { ollamaChatService } from "./ollamaChat.service";
 import { vectorDBService } from "./vectordb.service";
 import { documentService } from "./document.service";
 import { embeddingService } from "./embedding.service";
@@ -38,6 +38,76 @@ export interface LMRRecallNote {
 }
 
 export class LMRService {
+  /**
+   * Helper: Sanitize JSON string from AI responses
+   * Handles Python-style syntax (None, True, False) and malformed JSON
+   */
+  private sanitizeJSON(jsonString: string): string {
+    let cleaned = jsonString;
+
+    // Remove any markdown code block markers
+    cleaned = cleaned.replace(/```json\s*/g, '');
+    cleaned = cleaned.replace(/```\s*/g, '');
+
+    // Replace Python-style None with null (multiple patterns)
+    cleaned = cleaned.replace(/:\s*None\s*([,\}\]])/g, ': null$1');
+    cleaned = cleaned.replace(/\[\s*None\s*([,\]])/g, '[null$1');
+    cleaned = cleaned.replace(/,\s*None\s*([,\}\]])/g, ', null$1');
+
+    // Replace Python-style True/False with lowercase
+    cleaned = cleaned.replace(/:\s*True\s*([,\}\]])/g, ': true$1');
+    cleaned = cleaned.replace(/:\s*False\s*([,\}\]])/g, ': false$1');
+    cleaned = cleaned.replace(/,\s*True\s*([,\}\]])/g, ', true$1');
+    cleaned = cleaned.replace(/,\s*False\s*([,\}\]])/g, ', false$1');
+
+    // Remove trailing commas before closing brackets/braces
+    cleaned = cleaned.replace(/,(\s*[\}\]])/g, '$1');
+
+    // Fix missing commas between array elements (common DeepSeek issue)
+    cleaned = cleaned.replace(/\}(\s*)\{/g, '},$1{');
+    cleaned = cleaned.replace(/\](\s*)\[/g, '],$1[');
+
+    // Fix missing commas between string values
+    cleaned = cleaned.replace(/"(\s+)"/g, '",$1"');
+
+    return cleaned;
+  }
+
+  /**
+   * Helper: Extract and parse JSON from AI response
+   */
+  private extractAndParseJSON(response: string, isArray: boolean = false): any {
+    try {
+      // Remove DeepSeek thinking tags if present
+      let cleanedResponse = response.replace(/<think>[\s\S]*?<\/think>/g, '');
+
+      // Extract JSON pattern
+      const pattern = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+      const jsonMatch = cleanedResponse.match(pattern);
+
+      if (!jsonMatch) {
+        console.error("❌ No JSON pattern found in response");
+        console.error("Response preview:", response.substring(0, 500));
+        throw new Error("No valid JSON found in response");
+      }
+
+      // Sanitize and parse
+      const raw = jsonMatch[0];
+      const sanitized = this.sanitizeJSON(raw);
+
+      // Log for debugging if sanitization changed anything
+      if (raw !== sanitized) {
+        console.log("🔧 JSON sanitized - original length:", raw.length, "→ sanitized:", sanitized.length);
+      }
+
+      return JSON.parse(sanitized);
+    } catch (error) {
+      console.error("❌ JSON extraction/parsing failed:", error);
+      console.error("Raw response (first 1000 chars):", response.substring(0, 1000));
+      throw new Error(`Failed to parse AI response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   /**
    * Helper: Get full document content from fileId
    */
@@ -114,9 +184,9 @@ Format your response as JSON:
   "importantConcepts": ["concept 1", "concept 2", ...]
 }
 
-Respond ONLY with valid JSON, no additional text.`;
+CRITICAL: Respond with valid JSON only. Use "null" not "None", "true" not "True", "false" not "False". No markdown, no code blocks, just pure JSON.`;
 
-      const response = await geminiService.queryWithFullDocument(
+      const response = await ollamaChatService.queryWithFullDocument(
         prompt,
         document.fullContent,
         language,
@@ -127,13 +197,8 @@ Respond ONLY with valid JSON, no additional text.`;
         }
       );
 
-      // Parse JSON response
-      const jsonMatch = response.answer.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Invalid response format from AI");
-      }
-
-      const result = JSON.parse(jsonMatch[0]);
+      // Parse JSON response using sanitized extraction
+      const result = this.extractAndParseJSON(response.answer, false);
 
       return {
         summary: result.summary,
@@ -189,9 +254,9 @@ Format as JSON array:
   ...
 ]
 
-Respond ONLY with valid JSON array, no additional text.`;
+CRITICAL: Respond with valid JSON only. Use "null" not "None", "true" not "True", "false" not "False". No markdown, no code blocks, just pure JSON array.`;
 
-      const response = await geminiService.queryWithFullDocument(
+      const response = await ollamaChatService.queryWithFullDocument(
         prompt,
         document.fullContent,
         language,
@@ -202,13 +267,8 @@ Respond ONLY with valid JSON array, no additional text.`;
         }
       );
 
-      // Parse JSON response
-      const jsonMatch = response.answer.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error("Invalid response format from AI");
-      }
-
-      const questions = JSON.parse(jsonMatch[0]);
+      // Parse JSON response using sanitized extraction
+      const questions = this.extractAndParseJSON(response.answer, true);
 
       return questions.map((q: any, index: number) => ({
         id: index + 1,
@@ -267,9 +327,9 @@ Format as JSON array:
   ...
 ]
 
-Respond ONLY with valid JSON array, no additional text.`;
+CRITICAL: Respond with valid JSON only. Use "null" not "None", "true" not "True", "false" not "False". No markdown, no code blocks, just pure JSON array.`;
 
-      const response = await geminiService.queryWithFullDocument(
+      const response = await ollamaChatService.queryWithFullDocument(
         prompt,
         document.fullContent,
         language,
@@ -280,13 +340,8 @@ Respond ONLY with valid JSON array, no additional text.`;
         }
       );
 
-      // Parse JSON response
-      const jsonMatch = response.answer.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error("Invalid response format from AI");
-      }
-
-      const quizzes = JSON.parse(jsonMatch[0]);
+      // Parse JSON response using sanitized extraction
+      const quizzes = this.extractAndParseJSON(response.answer, true);
 
       return quizzes.map((q: any, index: number) => ({
         id: index + 1,
@@ -342,9 +397,9 @@ Format as JSON array:
   ...
 ]
 
-Respond ONLY with valid JSON array, no additional text.`;
+CRITICAL: Respond with valid JSON only. Use "null" not "None", "true" not "True", "false" not "False". No markdown, no code blocks, just pure JSON array.`;
 
-      const response = await geminiService.queryWithFullDocument(
+      const response = await ollamaChatService.queryWithFullDocument(
         prompt,
         document.fullContent,
         language,
@@ -355,13 +410,8 @@ Respond ONLY with valid JSON array, no additional text.`;
         }
       );
 
-      // Parse JSON response
-      const jsonMatch = response.answer.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error("Invalid response format from AI");
-      }
-
-      const notes = JSON.parse(jsonMatch[0]);
+      // Parse JSON response using sanitized extraction
+      const notes = this.extractAndParseJSON(response.answer, true);
 
       return notes.map((n: any) => ({
         topic: n.topic,
