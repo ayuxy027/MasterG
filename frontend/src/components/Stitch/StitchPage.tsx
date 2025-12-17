@@ -310,7 +310,7 @@ const StitchPage: React.FC = () => {
         {/* Header */}
         <div className="mb-6 sm:mb-8 text-center">
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-800 mb-2 sm:mb-3">
-            <span className="text-orange-400">Stitch</span> - Offline Content Generator
+            <span className="text-orange-400">Stitch</span> Offline Content
           </h1>
           <p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
             Generate comprehensive, curriculum-aligned educational content offline using DeepSeek R1
