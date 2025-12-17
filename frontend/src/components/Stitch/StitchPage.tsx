@@ -346,7 +346,7 @@ const StitchPage: React.FC = () => {
                 <h2 className="text-xl font-semibold text-gray-900">Configuration</h2>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {/* Grade Level */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -363,8 +363,8 @@ const StitchPage: React.FC = () => {
                           }}
                           className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
                             selectedGrade === grade.value && selectedGrade !== "custom"
-                              ? "border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-500 ring-opacity-20"
-                              : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                              ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                              : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
                           }`}
                         >
                           {grade.label}
@@ -378,8 +378,8 @@ const StitchPage: React.FC = () => {
                       }}
                       className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
                         selectedGrade === "custom"
-                          ? "border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-500 ring-opacity-20"
-                          : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
+                          ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                          : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white"
                       }`}
                     >
                       Custom
@@ -390,7 +390,7 @@ const StitchPage: React.FC = () => {
                         value={customGrade}
                         onChange={(e) => setCustomGrade(e.target.value)}
                         placeholder="Enter grade level..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
                       />
                     )}
                   </div>
@@ -411,9 +411,9 @@ const StitchPage: React.FC = () => {
                     }}
                     className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${
                       selectedSubject && selectedSubject !== ""
-                        ? "border-orange-500 ring-2 ring-orange-500 ring-opacity-20"
-                        : "border-gray-300 focus:border-orange-500"
-                    } focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 focus:border-orange-500`}
+                        ? "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
+                        : "border-gray-200 focus:border-orange-300"
+                    } focus:ring-2 focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300`}
                   >
                     {CORE_SUBJECTS.map((subject) => (
                       <option key={subject.value} value={subject.value}>
@@ -428,7 +428,7 @@ const StitchPage: React.FC = () => {
                       value={customSubject}
                       onChange={(e) => setCustomSubject(e.target.value)}
                       placeholder="Enter subject name..."
-                      className="w-full mt-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                      className="w-full mt-2 px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
                     />
                   )}
                 </div>
@@ -443,7 +443,7 @@ const StitchPage: React.FC = () => {
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                     placeholder="e.g., Photosynthesis, Quadratic Equations"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
                   />
                 </div>
 
@@ -483,7 +483,7 @@ const StitchPage: React.FC = () => {
                 {isGenerating && (
                   <button
                     onClick={handleStopGeneration}
-                    className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all border border-gray-300"
+                    className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 border border-gray-300 shadow-sm hover:shadow"
                   >
                     Stop Generating
                   </button>
