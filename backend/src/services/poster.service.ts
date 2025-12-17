@@ -550,5 +550,4 @@ export const posterService = new PosterService();
 // Clear cache every 30 minutes
 setInterval(() => {
   posterService.clearExpiredCache();
-  console.log("🧹 Cleared expired poster cache entries");
 }, 30 * 60 * 1000);
