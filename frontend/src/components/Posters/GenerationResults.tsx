@@ -72,14 +72,14 @@ const GenerationResults: React.FC<GenerationResultsProps> = ({
   }
 
   return (
-    <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-100 overflow-hidden">
+    <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 overflow-hidden">
       {/* Header with Download All Button */}
-      <div className="p-6 border-b-2 border-orange-100 bg-gradient-to-br from-orange-50 to-white flex justify-between items-center">
+      <div className="p-4 sm:p-6 border-b-2 border-orange-200/60 flex justify-between items-center">
         <div>
-          <h3 className="text-xl font-bold text-gray-800">
+          <h3 className="text-sm sm:text-base font-semibold text-gray-800">
             Generated Educational Posters
           </h3>
-          <p className="text-gray-600 text-sm">
+          <p className="text-gray-600 text-xs sm:text-sm">
             {posters.length} poster{posters.length > 1 ? "s" : ""} created
             successfully
           </p>

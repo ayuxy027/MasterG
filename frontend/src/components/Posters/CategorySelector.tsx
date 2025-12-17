@@ -35,8 +35,23 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-md rounded-2xl p-6 shadow-xl border-2 border-orange-100">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Category</h3>
+    <div className="bg-white/80 backdrop-blur-md rounded-2xl p-5 sm:p-6 shadow-xl border-2 border-orange-200/60">
+      <div className="flex items-center gap-2 mb-4">
+        <svg
+          className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+          />
+        </svg>
+        <h3 className="text-sm sm:text-base font-semibold text-gray-800">Category</h3>
+      </div>
       <div className="flex flex-wrap gap-3">
         {allCategories.map((category) => (
           <button
