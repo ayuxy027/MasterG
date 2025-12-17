@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { chunkingService } from "../services/chunking.service";
-import { embeddingService } from "../services/embedding.service";
 import { ollamaEmbeddingService } from "../services/ollamaEmbedding.service";
 import { vectorDBService } from "../services/vectordb.service";
 import { chatService } from "../services/chat.service";
@@ -136,28 +135,17 @@ export class UploadController {
         `✅ Created ${allChunks.length} chunks total`
       );
 
-      // Step 3: Generate embeddings page-wise (ONLINE/OFFLINE)
-      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
-      console.log(`🔧 Mode: ${isOfflineMode ? 'OFFLINE (Ollama)' : 'ONLINE (Google)'}`);
+      // Step 3: Generate embeddings using Ollama (offline-first)
       console.log(
-        `🔄 Generating embeddings page-wise for ${allChunks.length} pages...`
+        `🔄 Generating embeddings with Ollama for ${allChunks.length} chunks...`
       );
 
-      let embeddingResults;
-      if (isOfflineMode) {
-        // Use Ollama for embeddings (offline)
-        embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
-          allChunks.map((chunk) => chunk.content)
-        );
-      } else {
-        // Use Google API for embeddings (online)
-        embeddingResults = await embeddingService.generateEmbeddings(
-          allChunks.map((chunk) => chunk.content)
-        );
-      }
+      const embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
+        allChunks.map((chunk) => chunk.content)
+      );
 
       console.log(
-        `✅ Generated ${embeddingResults.length} embeddings (1 per page) for easier page-wise matching`
+        `✅ Generated ${embeddingResults.length} embeddings`
       );
 
       // Step 4: Store in chat-specific ChromaDB collection

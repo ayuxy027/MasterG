@@ -8,7 +8,7 @@ const router = express.Router();
 
 // Ollama config
 const OLLAMA_URL = env.OLLAMA_URL || "http://localhost:11434";
-const OLLAMA_MODEL = env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
+const OLLAMA_MODEL = env.OLLAMA_MODEL || "deepseek-r1:1.5b";
 
 /**
  * GET /api/analyze/documents
