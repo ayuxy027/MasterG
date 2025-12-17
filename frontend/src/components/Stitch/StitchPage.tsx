@@ -39,7 +39,6 @@ const CORE_SUBJECTS = [
   { value: "mathematics", label: "Mathematics" },
   { value: "science", label: "Science" },
   { value: "social", label: "Social Studies" },
-  { value: "custom", label: "Custom" },
 ];
 
 interface ContentPreviewProps {
@@ -85,6 +84,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
 
 const StitchPage: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState("8");
+  const [customGrade, setCustomGrade] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("mathematics");
   const [customSubject, setCustomSubject] = useState("");
   const [topic, setTopic] = useState("");
@@ -126,6 +126,12 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // Validate custom grade if selected
+    if (selectedGrade === "custom" && !customGrade.trim()) {
+      setError("Please enter a custom grade level");
+      return;
+    }
+
     // Validate custom subject if selected
     if (selectedSubject === "custom" && !customSubject.trim()) {
       setError("Please enter a custom subject name");
@@ -152,6 +158,8 @@ const StitchPage: React.FC = () => {
         ? `${import.meta.env.VITE_API_URL}/api`
         : "http://localhost:5001/api";
 
+      // Use custom grade if selected, otherwise use selectedGrade
+      const finalGrade = selectedGrade === "custom" ? customGrade.trim() : selectedGrade;
       // Use custom subject if selected, otherwise use selectedSubject
       const finalSubject = selectedSubject === "custom" ? customSubject.trim() : selectedSubject;
 
@@ -163,7 +171,7 @@ const StitchPage: React.FC = () => {
         signal: controller.signal,
         body: JSON.stringify({
           topic: topic.trim(),
-          grade: selectedGrade,
+          grade: finalGrade,
           subject: finalSubject,
           culturalContext,
           stream: true,
@@ -345,17 +353,48 @@ const StitchPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Grade Level
                   </label>
-                  <select
-                    value={selectedGrade}
-                    onChange={(e) => setSelectedGrade(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
-                  >
-                    {GRADE_LEVELS.map((grade) => (
-                      <option key={grade.value} value={grade.value}>
-                        {grade.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      {GRADE_LEVELS.filter(grade => grade.value !== "custom").map((grade) => (
+                        <button
+                          key={grade.value}
+                          onClick={() => {
+                            setSelectedGrade(grade.value);
+                            setCustomGrade("");
+                          }}
+                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
+                            selectedGrade === grade.value && selectedGrade !== "custom"
+                              ? "border-orange-500 bg-orange-50 text-orange-700"
+                              : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
+                          }`}
+                        >
+                          {grade.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedGrade("custom");
+                        setCustomGrade("");
+                      }}
+                      className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
+                        selectedGrade === "custom"
+                          ? "border-orange-500 bg-orange-50 text-orange-700"
+                          : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
+                      }`}
+                    >
+                      Custom
+                    </button>
+                    {selectedGrade === "custom" && (
+                      <input
+                        type="text"
+                        value={customGrade}
+                        onChange={(e) => setCustomGrade(e.target.value)}
+                        placeholder="Enter grade level..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Subject */}
@@ -378,6 +417,7 @@ const StitchPage: React.FC = () => {
                         {subject.label}
                       </option>
                     ))}
+                    <option value="custom">Custom</option>
                   </select>
                   {selectedSubject === "custom" && (
                     <input
@@ -424,7 +464,7 @@ const StitchPage: React.FC = () => {
                 {/* Generate Button */}
                 <button
                   onClick={handleGenerate}
-                  disabled={isGenerating || !topic.trim() || (selectedSubject === "custom" && !customSubject.trim())}
+                  disabled={isGenerating || !topic.trim() || (selectedGrade === "custom" && !customGrade.trim()) || (selectedSubject === "custom" && !customSubject.trim())}
                   className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-all shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   {isGenerating ? (
