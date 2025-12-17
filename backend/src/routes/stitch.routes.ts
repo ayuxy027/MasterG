@@ -24,8 +24,8 @@ router.get(
 
 /**
  * POST /api/stitch/generate
- * Generate educational content
- * Body: { topic, language, grade, subject, curriculum, culturalContext, stream? }
+ * Generate educational content (always in English)
+ * Body: { topic, grade, subject, culturalContext, stream? }
  */
 router.post(
   "/generate",
@@ -44,12 +44,21 @@ router.post(
 
 /**
  * POST /api/stitch/translate
- * Translate generated content using IndicTrans2
- * Body: { text, sourceLanguage, targetLanguage }
+ * Translate generated content using NLLB-200
+ * Body: { text, sourceLanguage, targetLanguage, stream? }
  */
 router.post(
   "/translate",
   asyncHandler(stitchController.translateContent.bind(stitchController))
+);
+
+/**
+ * GET /api/stitch/status/nllb
+ * Check NLLB-200 connection status
+ */
+router.get(
+  "/status/nllb",
+  asyncHandler(stitchController.checkNLLBStatus.bind(stitchController))
 );
 
 export default router;

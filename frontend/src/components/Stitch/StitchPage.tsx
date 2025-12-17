@@ -1,21 +1,31 @@
 import React, { useState, useEffect, useRef } from "react";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
 
-// Supported Indian languages
-const INDIAN_LANGUAGES = [
+// All 22 scheduled Indian languages + English (from language service)
+const ALL_LANGUAGES = [
+  { code: "en", name: "English", native: "English" },
   { code: "hi", name: "Hindi", native: "हिंदी" },
+  { code: "mr", name: "Marathi", native: "मराठी" },
+  { code: "gu", name: "Gujarati", native: "ગુજરાતી" },
   { code: "bn", name: "Bengali", native: "বাংলা" },
   { code: "ta", name: "Tamil", native: "தமிழ்" },
   { code: "te", name: "Telugu", native: "తెలుగు" },
   { code: "kn", name: "Kannada", native: "ಕನ್ನಡ" },
   { code: "ml", name: "Malayalam", native: "മലയാളം" },
-  { code: "mr", name: "Marathi", native: "मराठी" },
-  { code: "gu", name: "Gujarati", native: "ગુજરાતી" },
   { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
   { code: "ur", name: "Urdu", native: "اردو" },
   { code: "or", name: "Odia", native: "ଓଡ଼ିଆ" },
   { code: "as", name: "Assamese", native: "অসমীয়া" },
-  { code: "en", name: "English", native: "English" },
+  { code: "ks", name: "Kashmiri", native: "कॉशुर" },
+  { code: "kok", name: "Konkani", native: "कोंकणी" },
+  { code: "mai", name: "Maithili", native: "मैथिली" },
+  { code: "mni", name: "Manipuri", native: "ꯃꯅꯤꯄꯨꯔꯤ" },
+  { code: "ne", name: "Nepali", native: "नेपाली" },
+  { code: "sa", name: "Sanskrit", native: "संस्कृत" },
+  { code: "sd", name: "Sindhi", native: "سنڌي" },
+  { code: "sat", name: "Santali", native: "ᱥᱟᱱᱛᱟᱲᱤ" },
+  { code: "brx", name: "Bodo", native: "बर'" },
+  { code: "doi", name: "Dogri", native: "डोगरी" },
 ];
 
 const GRADE_LEVELS = [
@@ -25,17 +35,10 @@ const GRADE_LEVELS = [
   { value: "custom", label: "Custom" },
 ];
 
-const SUBJECTS = [
+const CORE_SUBJECTS = [
   { value: "mathematics", label: "Mathematics" },
   { value: "science", label: "Science" },
   { value: "social", label: "Social Studies" },
-  { value: "language", label: "Language" },
-];
-
-const CURRICULUMS = [
-  { value: "ncert", label: "NCERT" },
-  { value: "cbse", label: "CBSE" },
-  { value: "state", label: "State Board" },
 ];
 
 interface ContentPreviewProps {
@@ -70,12 +73,9 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
     <div className="h-full overflow-auto p-6 bg-white">
       <div className="prose max-w-none">
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <pre className="whitespace-pre-wrap text-xs font-mono text-gray-800 leading-relaxed">
+          <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
             {content}
           </pre>
-        </div>
-        <div className="mt-4 text-xs text-gray-500 italic">
-          Note: This is plain generated content from the offline LLM.
         </div>
       </div>
     </div>
@@ -83,20 +83,21 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
 };
 
 const StitchPage: React.FC = () => {
-  const [selectedLanguage, setSelectedLanguage] = useState("hi");
   const [selectedGrade, setSelectedGrade] = useState("8");
+  const [customGrade, setCustomGrade] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("mathematics");
-  const [selectedCurriculum, setSelectedCurriculum] = useState("ncert");
+  const [customSubject, setCustomSubject] = useState("");
   const [topic, setTopic] = useState("");
-  const [culturalContext, setCulturalContext] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [generatedContent, setGeneratedContent] = useState("");
-  const [targetLanguageForTranslation, setTargetLanguageForTranslation] =
-    useState("hi");
+  const [englishContent, setEnglishContent] = useState(""); // Store original English content
+  const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
+  const [targetLanguageForTranslation, setTargetLanguageForTranslation] = useState("hi");
+  const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
   const [ollamaStatus, setOllamaStatus] = useState<{
     connected: boolean;
     checking: boolean;
@@ -124,6 +125,18 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // Validate custom grade if selected
+    if (selectedGrade === "custom" && !customGrade.trim()) {
+      setError("Please enter a custom grade level");
+      return;
+    }
+
+    // Validate custom subject if selected
+    if (selectedSubject === "custom" && !customSubject.trim()) {
+      setError("Please enter a custom subject name");
+      return;
+    }
+
     // Abort any existing generation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -135,11 +148,19 @@ const StitchPage: React.FC = () => {
     setError(null);
     setThinkingText("");
     setGeneratedContent("");
+    setEnglishContent("");
+    setTranslatedContent({});
+    setActiveTab("english");
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL
         ? `${import.meta.env.VITE_API_URL}/api`
         : "http://localhost:5001/api";
+
+      // Use custom grade if selected, otherwise use selectedGrade
+      const finalGrade = selectedGrade === "custom" ? customGrade.trim() : selectedGrade;
+      // Use custom subject if selected, otherwise use selectedSubject
+      const finalSubject = selectedSubject === "custom" ? customSubject.trim() : selectedSubject;
 
       const response = await fetch(`${API_BASE_URL}/stitch/generate`, {
         method: "POST",
@@ -149,11 +170,8 @@ const StitchPage: React.FC = () => {
         signal: controller.signal,
         body: JSON.stringify({
           topic: topic.trim(),
-          language: selectedLanguage,
-          grade: selectedGrade,
-          subject: selectedSubject,
-          curriculum: selectedCurriculum,
-          culturalContext,
+          grade: finalGrade,
+          subject: finalSubject,
           stream: true,
         }),
       });
@@ -192,11 +210,12 @@ const StitchPage: React.FC = () => {
                 setThinkingText(accumulatedThinking);
               } else if (parsed.type === "response") {
                 accumulatedResponse += parsed.content;
-                // Update content in real-time as response comes in
                 setGeneratedContent(accumulatedResponse);
+                setEnglishContent(accumulatedResponse); // Store English version
               } else if (parsed.type === "complete") {
-                // Final result - use provided content or accumulated response
-                setGeneratedContent(parsed.content || accumulatedResponse);
+                const finalContent = parsed.content || accumulatedResponse;
+                setGeneratedContent(finalContent);
+                setEnglishContent(finalContent); // Store English version
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }
@@ -237,17 +256,64 @@ const StitchPage: React.FC = () => {
     }
   };
 
+  const handleTranslate = async (targetLang: string) => {
+    if (!englishContent.trim()) {
+      setError("No content to translate");
+      return;
+    }
+
+    // Check if already translated
+    if (translatedContent[targetLang]) {
+      setActiveTab(targetLang);
+      return;
+    }
+
+    setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
+    setError(null);
+
+    try {
+      const resp = await stitchAPI.translateContent({
+        text: englishContent,
+        sourceLanguage: "en",
+        targetLanguage: targetLang,
+      });
+
+      if (resp.success && resp.translated) {
+        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
+        setActiveTab(targetLang);
+        setError(null);
+      } else {
+        const errorMsg = resp.error || "Translation failed. Please try again.";
+        setError(errorMsg);
+      }
+    } catch (err) {
+      const msg =
+        err instanceof StitchApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : "Translation failed. Please try again.";
+      setError(msg);
+    } finally {
+      setIsTranslating(prev => ({ ...prev, [targetLang]: false }));
+    }
+  };
+
+  const getLanguageName = (code: string) => {
+    const lang = ALL_LANGUAGES.find(l => l.code === code);
+    return lang ? `${lang.name} (${lang.native})` : code;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            <span className="text-orange-500">Stitch</span> - Offline Content Generator
+        <div className="mb-6 sm:mb-8 text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-800 mb-2 sm:mb-3">
+            <span className="text-orange-400">Stitch</span> Offline Content
           </h1>
-          <p className="text-gray-600 text-lg">
-            Generate curriculum-aligned educational content in 22+ Indian languages using
-            offline LLM (Ollama + DeepSeek)
+          <p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
+            Generate comprehensive, curriculum-aligned educational content offline using DeepSeek R1
           </p>
         </div>
 
@@ -255,10 +321,10 @@ const StitchPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Panel - Configuration */}
           <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-6">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-5 sm:p-6">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6">
                 <svg
-                  className="w-6 h-6 text-orange-500"
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -276,89 +342,99 @@ const StitchPage: React.FC = () => {
                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                <h2 className="text-xl font-semibold text-gray-900">Configuration</h2>
+                <h2 className="text-sm sm:text-base font-semibold text-gray-800">Configuration</h2>
               </div>
 
-              <div className="space-y-5">
-                {/* Language */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Language
-                  </label>
-                  <select
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
-                  >
-                    {INDIAN_LANGUAGES.map((lang) => (
-                      <option key={lang.code} value={lang.code}>
-                        {lang.name} ({lang.native})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
+              <div className="space-y-6">
                 {/* Grade Level */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Grade Level
                   </label>
-                  <select
-                    value={selectedGrade}
-                    onChange={(e) => setSelectedGrade(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
-                  >
-                    {GRADE_LEVELS.map((grade) => (
-                      <option key={grade.value} value={grade.value}>
-                        {grade.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      {GRADE_LEVELS.filter(grade => grade.value !== "custom").map((grade) => (
+                        <button
+                          key={grade.value}
+                          onClick={() => {
+                            setSelectedGrade(grade.value);
+                            setCustomGrade("");
+                          }}
+                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
+                            selectedGrade === grade.value && selectedGrade !== "custom"
+                              ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                              : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          {grade.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedGrade("custom");
+                        setCustomGrade("");
+                      }}
+                      className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
+                        selectedGrade === "custom"
+                          ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                          : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white"
+                      }`}
+                    >
+                      Custom
+                    </button>
+                    {selectedGrade === "custom" && (
+                      <input
+                        type="text"
+                        value={customGrade}
+                        onChange={(e) => setCustomGrade(e.target.value)}
+                        placeholder="Enter grade level..."
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Subject */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Subject
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {SUBJECTS.map((subject) => (
-                      <button
-                        key={subject.value}
-                        onClick={() => setSelectedSubject(subject.value)}
-                        className={`px-4 py-2.5 rounded-lg border-2 transition-all font-medium text-sm ${
-                          selectedSubject === subject.value
-                            ? "border-orange-500 bg-orange-50 text-orange-700"
-                            : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
-                        }`}
-                      >
-                        {subject.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Curriculum */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Curriculum
-                  </label>
                   <select
-                    value={selectedCurriculum}
-                    onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
+                    value={selectedSubject}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      if (e.target.value !== "custom") {
+                        setCustomSubject("");
+                      }
+                    }}
+                    className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${
+                      selectedSubject && selectedSubject !== ""
+                        ? "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
+                        : "border-gray-200 focus:border-orange-300"
+                    } focus:ring-2 focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300`}
                   >
-                    {CURRICULUMS.map((curriculum) => (
-                      <option key={curriculum.value} value={curriculum.value}>
-                        {curriculum.label}
+                    {CORE_SUBJECTS.map((subject) => (
+                      <option key={subject.value} value={subject.value}>
+                        {subject.label}
                       </option>
                     ))}
+                    <option value="custom">Custom</option>
                   </select>
+                  {selectedSubject === "custom" && (
+                    <input
+                      type="text"
+                      value={customSubject}
+                      onChange={(e) => setCustomSubject(e.target.value)}
+                      placeholder="Enter subject name..."
+                      className="w-full mt-2 px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                    />
+                  )}
                 </div>
 
                 {/* Topic */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Topic / Lesson Title
                   </label>
                   <input
@@ -366,32 +442,15 @@ const StitchPage: React.FC = () => {
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                     placeholder="e.g., Photosynthesis, Quadratic Equations"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
                   />
-                </div>
-
-                {/* Cultural Context */}
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="culturalContext"
-                    checked={culturalContext}
-                    onChange={(e) => setCulturalContext(e.target.checked)}
-                    className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <label
-                    htmlFor="culturalContext"
-                    className="ml-2 text-sm text-gray-700 cursor-pointer"
-                  >
-                    Include cultural context
-                  </label>
                 </div>
 
                 {/* Generate Button */}
                 <button
                   onClick={handleGenerate}
-                  disabled={isGenerating || !topic.trim()}
-                  className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-all shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+                  disabled={isGenerating || !topic.trim() || (selectedGrade === "custom" && !customGrade.trim()) || (selectedSubject === "custom" && !customSubject.trim())}
+                  className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 active:bg-orange-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300"
                 >
                   {isGenerating ? (
                     <span className="flex items-center justify-center gap-2">
@@ -423,7 +482,7 @@ const StitchPage: React.FC = () => {
                 {isGenerating && (
                   <button
                     onClick={handleStopGeneration}
-                    className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all border border-gray-300"
+                    className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 border border-gray-300 shadow-sm hover:shadow"
                   >
                     Stop Generating
                   </button>
@@ -431,17 +490,51 @@ const StitchPage: React.FC = () => {
 
                 {/* Error Display */}
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{error}</p>
+                  <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-start gap-3">
+                    <svg
+                      className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-red-800 text-xs sm:text-sm">Error</p>
+                      <p className="text-xs sm:text-sm text-red-700">{error}</p>
+                    </div>
+                    <button
+                      onClick={() => setError(null)}
+                      className="ml-auto text-red-500 hover:text-red-700"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Ollama Status */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-4 sm:p-5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">Ollama Status</span>
+                <span className="text-xs sm:text-sm font-semibold text-gray-800">Ollama Status</span>
                 {ollamaStatus.checking ? (
                   <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
                     Checking...
@@ -488,7 +581,7 @@ const StitchPage: React.FC = () => {
                     d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                   />
                 </svg>
-                <h3 className="text-lg font-semibold text-gray-900">Thinking Process</h3>
+                <h3 className="text-sm sm:text-base font-semibold text-gray-800">Thinking Process</h3>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 {!thinkingText && !isGenerating ? (
@@ -508,12 +601,12 @@ const StitchPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Content Preview */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex flex-col">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center gap-3">
+            {/* Content Preview with Tabs */}
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
+              <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-orange-200/60">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <svg
-                    className="w-5 h-5 text-orange-500"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -525,18 +618,15 @@ const StitchPage: React.FC = () => {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <h3 className="text-lg font-semibold text-gray-900">Content Preview</h3>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-800">Content Preview</h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-600">Translate to</label>
                   <select
                     value={targetLanguageForTranslation}
-                    onChange={(e) =>
-                      setTargetLanguageForTranslation(e.target.value)
-                    }
+                    onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
                     className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
                   >
-                    {INDIAN_LANGUAGES.map((lang) => (
+                    {ALL_LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
                         {lang.name}
                       </option>
@@ -544,43 +634,11 @@ const StitchPage: React.FC = () => {
                   </select>
                   <button
                     type="button"
-                    disabled={!generatedContent.trim() || isTranslating}
-                    onClick={async () => {
-                      setIsTranslating(true);
-                      setError(null);
-                      console.log("🔄 Starting translation...");
-                      try {
-                        const resp = await stitchAPI.translateContent({
-                          text: generatedContent,
-                          sourceLanguage: selectedLanguage,
-                          targetLanguage: targetLanguageForTranslation,
-                        });
-                        console.log("✅ Translation response:", resp);
-                        if (resp.success && resp.translated) {
-                          setGeneratedContent(resp.translated);
-                          setError(null);
-                          console.log("✅ Translation successful!");
-                        } else {
-                          const errorMsg = resp.error || "Translation failed. Please try again.";
-                          setError(errorMsg);
-                          console.error("❌ Translation failed:", errorMsg);
-                        }
-                      } catch (err) {
-                        const msg =
-                          err instanceof StitchApiError
-                            ? err.message
-                            : err instanceof Error
-                            ? err.message
-                            : "Translation failed. Please try again.";
-                        setError(msg);
-                        console.error("❌ Translation error:", err);
-                      } finally {
-                        setIsTranslating(false);
-                      }
-                    }}
+                    disabled={!englishContent.trim() || isTranslating[targetLanguageForTranslation]}
+                    onClick={() => handleTranslate(targetLanguageForTranslation)}
                     className="text-xs px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {isTranslating ? (
+                    {isTranslating[targetLanguageForTranslation] ? (
                       <>
                         <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -594,8 +652,47 @@ const StitchPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Tabs */}
+              {englishContent && (
+                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6">
+                  <button
+                    onClick={() => setActiveTab("english")}
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === "english"
+                        ? "border-orange-400 text-orange-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
+                    }`}
+                  >
+                    English
+                  </button>
+                  {Object.keys(translatedContent).map((langCode) => (
+                    <button
+                      key={langCode}
+                      onClick={() => setActiveTab(langCode)}
+                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === langCode
+                          ? "border-orange-400 text-orange-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
+                      }`}
+                    >
+                      {getLanguageName(langCode)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Tab Content */}
               <div className="flex-1 overflow-hidden">
-                <ContentPreview content={generatedContent} />
+                {activeTab === "english" ? (
+                  <ContentPreview content={englishContent} />
+                ) : translatedContent[activeTab] ? (
+                  <ContentPreview content={translatedContent[activeTab]} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <p className="text-sm">No translation available for this language yet</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

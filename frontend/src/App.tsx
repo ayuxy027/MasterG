@@ -7,6 +7,7 @@ import PostersPage from "./components/Posters/PostersPage";
 import BoardPage from "./components/Board/BoardPage";
 import StitchPage from "./components/Stitch/StitchPage";
 import PlaygroundPage from "./pages/PlaygroundPage";
+import BenchmarksPage from "./pages/BenchmarksPage";
 
 const App = () => {
   return (
@@ -44,6 +45,11 @@ const App = () => {
       <Route path="/playground" element={
         <Layout>
           <PlaygroundPage />
+        </Layout>
+      } />
+      <Route path="/benchmarks" element={
+        <Layout>
+          <BenchmarksPage />
         </Layout>
       } />
     </Routes>

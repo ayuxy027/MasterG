@@ -13,8 +13,10 @@ const Avatar = ({ src, alt }: { src: string; alt: string }) => {
                 <img
                     src={src}
                     alt={alt}
-                    className="relative w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full border-2 border-white shadow-md"
+                    draggable={false}
+                    className="relative w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full border-2 border-white shadow-md select-none"
                     onError={() => setImageError(true)}
+                    onDragStart={(e) => e.preventDefault()}
                 />
             )}
         </div>
@@ -47,8 +49,10 @@ const Herobox = () => {
                         <img
                             src="https://images.unsplash.com/photo-1573894999291-f440466112cc?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2070"
                             alt="Indian Students Learning"
-                            className="absolute inset-0 w-full h-full object-cover z-10"
+                            draggable={false}
+                            className="absolute inset-0 w-full h-full object-cover z-10 select-none"
                             onError={handleImageError}
+                            onDragStart={(e) => e.preventDefault()}
                         />
                     </div>
                 </div>
@@ -80,15 +84,18 @@ const Herobox = () => {
                         </Link>
                     </div>
 
-                    {/* Bottom Card - Stitch */}
+                    {/* Bottom Card - LMR */}
                     <div className="relative bg-orange-400 border-2 border-orange-400 rounded-xl p-4 sm:p-5 md:p-6 md:px-8 flex flex-col justify-center h-full hover:shadow-lg transition-all duration-300">
                         <p className="text-lg sm:text-xl font-semibold text-white leading-relaxed mb-2 sm:mb-3">
-                            Create Stunning <br />
-                            AI-Powered Presentations
+                            AI-Powered Study <br />
+                            Material Generator
                         </p>
-                        <a href="/stitch" className="inline-block bg-white text-orange-400 border-2 border-white font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm hover:bg-orange-50 hover:text-orange-500 transition-all duration-300 w-fit">
-                            Try Stitch →
-                        </a>
+                        <p className="text-xs sm:text-sm text-orange-50 mb-3 sm:mb-4 leading-relaxed">
+                            Upload PDFs, PPTs & docs. Get summaries, quizzes, recall notes & more in 22+ languages.
+                        </p>
+                        <Link to="/lmr" className="inline-block bg-white text-orange-400 border-2 border-white font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm hover:bg-orange-50 hover:text-orange-500 transition-all duration-300 w-fit">
+                            Try LMR →
+                        </Link>
                     </div>
                 </div>
 
@@ -99,8 +106,10 @@ const Herobox = () => {
                         <img
                             src="https://images.unsplash.com/photo-1597743622436-c6b5661731e0?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTR8fGluZGlhbiUyMGNsYXNzcm9vbXxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&q=60&w=900"
                             alt="Indian Classroom"
-                            className="absolute inset-0 w-full h-full object-cover z-10"
+                            draggable={false}
+                            className="absolute inset-0 w-full h-full object-cover z-10 select-none"
                             onError={handleImageError}
+                            onDragStart={(e) => e.preventDefault()}
                         />
                     </div>
                 </div>
@@ -180,11 +189,11 @@ const Landing = () => {
 
                         {/* Buttons */}
                         <div className="flex flex-row gap-3 sm:gap-4 justify-center items-center px-4">
-                            <button className="bg-orange-400 text-white border-2 border-orange-400 font-semibold px-5 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-full text-xs sm:text-sm md:text-base shadow-md hover:shadow-lg hover:bg-orange-500 hover:border-orange-500 transition-all duration-300 whitespace-nowrap">
-                                Get Started
-                            </button>
-                            <Link to="/board" className="bg-white text-orange-400 border-2 border-orange-400 font-semibold px-5 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-full text-xs sm:text-sm md:text-base shadow-md hover:shadow-lg hover:bg-orange-50 hover:border-orange-500 transition-all duration-300 whitespace-nowrap">
-                                Try Whiteboard
+                            <Link to="/benchmarks" className="bg-orange-400 text-white border-2 border-orange-400 font-semibold px-5 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-full text-xs sm:text-sm md:text-base shadow-md hover:shadow-lg hover:bg-orange-500 hover:border-orange-500 transition-all duration-300 whitespace-nowrap">
+                                View Benchmarks
+                            </Link>
+                            <Link to="/stitch" className="bg-white text-orange-400 border-2 border-orange-400 font-semibold px-5 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-full text-xs sm:text-sm md:text-base shadow-md hover:shadow-lg hover:bg-orange-50 hover:border-orange-500 transition-all duration-300 whitespace-nowrap">
+                                Try Stitch
                             </Link>
                         </div>
                     </div>

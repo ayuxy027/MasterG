@@ -61,6 +61,24 @@ const MinimizedNavbar: React.FC<MinimizedNavbarProps> = ({ isExpanded, onToggle 
             {/* Navigation Links */}
             <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
               <a
+                href="/stitch"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/stitch')
+                  ? 'bg-orange-400 text-white font-semibold shadow-md'
+                  : 'text-orange-500 hover:bg-orange-50'
+                  }`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/stitch');
+                  onToggle();
+                }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"></path>
+                </svg>
+                Stitch
+              </a>
+              <a
                 href="/chat"
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/chat')
                   ? 'bg-orange-400 text-white font-semibold shadow-md'
@@ -100,24 +118,6 @@ const MinimizedNavbar: React.FC<MinimizedNavbarProps> = ({ isExpanded, onToggle 
                 LMR
               </a>
               <a
-                href="/stitch"
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/stitch')
-                  ? 'bg-orange-400 text-white font-semibold shadow-md'
-                  : 'text-orange-500 hover:bg-orange-50'
-                  }`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/stitch');
-                  onToggle();
-                }}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66"></path>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"></path>
-                </svg>
-                Stitch
-              </a>
-              <a
                 href="/board"
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/board')
                   ? 'bg-orange-400 text-white font-semibold shadow-md'
@@ -138,6 +138,23 @@ const MinimizedNavbar: React.FC<MinimizedNavbarProps> = ({ isExpanded, onToggle 
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path>
                 </svg>
                 Whiteboard
+              </a>
+              <a
+                href="/posters"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/posters')
+                  ? 'bg-orange-400 text-white font-semibold shadow-md'
+                  : 'text-orange-500 hover:bg-orange-50'
+                  }`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/posters');
+                  onToggle();
+                }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Posters
               </a>
             </nav>
 

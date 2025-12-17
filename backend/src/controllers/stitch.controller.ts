@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { ollamaService } from "../services/ollama.service";
 import { languageService } from "../services/language.service";
-import { indicTrans2Service } from "../services/indictrans2.service";
+import { nllbService } from "../services/nllb.service";
 import { env } from "../config/env";
 
 export class StitchController {
@@ -39,11 +39,8 @@ export class StitchController {
     try {
       const {
         topic,
-        language,
         grade,
         subject,
-        curriculum,
-        culturalContext,
         stream,
       } = req.body;
 
@@ -55,14 +52,11 @@ export class StitchController {
         return;
       }
 
-      // Build comprehensive prompt
+      // Build comprehensive prompt (content is always generated in English)
       const prompt = this.buildContentPrompt({
         topic,
-        language: language || "hi",
         grade: grade || "8",
         subject: subject || "mathematics",
-        curriculum: curriculum || "ncert",
-        culturalContext: culturalContext || false,
       });
 
       // If streaming requested, use SSE
@@ -119,10 +113,8 @@ export class StitchController {
         content,
         metadata: {
           topic,
-          language,
           grade,
           subject,
-          curriculum,
           generatedAt: new Date().toISOString(),
         },
       });
@@ -181,14 +173,14 @@ export class StitchController {
   }
 
   /**
-   * Translate generated content using IndicTrans2
+   * Translate generated content using NLLB-200 (only translation service)
    */
   async translateContent(req: Request, res: Response): Promise<void> {
     try {
-      if (!env.INDICTRANS2_ENABLED) {
+      if (!env.NLLB_ENABLED) {
         res.status(503).json({
           success: false,
-          error: "IndicTrans2 translation is not enabled. Set INDICTRANS2_ENABLED=true in your environment.",
+          error: "NLLB-200 translation is not enabled. Set NLLB_ENABLED=true in your environment.",
         });
         return;
       }
@@ -197,6 +189,7 @@ export class StitchController {
         text?: string;
         sourceLanguage?: string;
         targetLanguage?: string;
+        stream?: boolean;
       };
 
       if (!text || !text.trim()) {
@@ -212,16 +205,65 @@ export class StitchController {
       const tgtCode =
         (targetLanguage as keyof typeof languageService) || "hi";
 
-      const srcIndic = languageService.toIndicTrans2Code(
+      // NLLB uses FLORES-200 language code format (eng_Latn, hin_Deva, etc.)
+      const srcLang = languageService.toNLLBCode(
         srcCode as any
       );
-      const tgtIndic = languageService.toIndicTrans2Code(
+      const tgtLang = languageService.toNLLBCode(
         tgtCode as any
       );
 
-      const translated = await indicTrans2Service.translate(text, {
-        srcLang: srcIndic,
-        tgtLang: tgtIndic,
+      // If stream flag is set, use Server-Sent Events for sentence-by-sentence streaming
+      if (req.body && (req.body as any).stream) {
+        // Set CORS + SSE headers
+        res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization"
+        );
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+
+        try {
+          await nllbService.streamTranslate(
+            text,
+            {
+              srcLang: srcLang,
+              tgtLang: tgtLang,
+            },
+            (chunk) => {
+              // Forward chunk as SSE event
+              res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            }
+          );
+
+          // End SSE stream
+          res.end();
+        } catch (error) {
+          res.write(
+            `data: ${JSON.stringify({
+              success: false,
+              type: "error",
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Streaming translation failed",
+            })}\n\n`
+          );
+          res.end();
+        }
+
+        return;
+      }
+
+      // Non-streaming: single-shot translation
+      const translated = await nllbService.translate(text, {
+        srcLang: srcLang,
+        tgtLang: tgtLang,
       });
 
       res.json({
@@ -229,7 +271,7 @@ export class StitchController {
         translated,
       });
     } catch (error) {
-      console.error("IndicTrans2 translation error:", error);
+      console.error("Translation error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -240,108 +282,123 @@ export class StitchController {
     }
   }
 
+
+  /**
+   * Check NLLB-200 connection status
+   */
+  async checkNLLBStatus(req: Request, res: Response): Promise<void> {
+    try {
+      if (!env.NLLB_ENABLED) {
+        res.json({
+          success: true,
+          connected: false,
+          enabled: false,
+          message: "NLLB-200 is not enabled. Set NLLB_ENABLED=true to enable.",
+        });
+        return;
+      }
+
+      // Test with a simple translation
+      const testResult = await nllbService.translate(
+        "Photosynthesis is a biological process.",
+        {
+          srcLang: "eng_Latn",
+          tgtLang: "hin_Deva",
+        }
+      );
+
+      res.json({
+        success: true,
+        connected: true,
+        enabled: true,
+        message: "NLLB-200 model loaded and ready",
+        testTranslation: testResult.substring(0, 50), // First 50 chars for verification
+      });
+    } catch (error) {
+      res.json({
+        success: false,
+        connected: false,
+        enabled: env.NLLB_ENABLED,
+        error: error instanceof Error ? error.message : "NLLB service unavailable",
+      });
+    }
+  }
+
   /**
    * Build comprehensive content generation prompt
+   * Content is always generated in English for translation
    */
   private buildContentPrompt(params: {
     topic: string;
-    language: string;
     grade: string;
     subject: string;
-    curriculum: string;
-    culturalContext: boolean;
   }): string {
-    const languageNames: Record<string, string> = {
-      hi: "Hindi (हिंदी)",
-      bn: "Bengali (বাংলা)",
-      ta: "Tamil (தமிழ்)",
-      te: "Telugu (తెలుగు)",
-      kn: "Kannada (ಕನ್ನಡ)",
-      ml: "Malayalam (മലയാളം)",
-      mr: "Marathi (मराठी)",
-      gu: "Gujarati (ગુજરાતી)",
-      pa: "Punjabi (ਪੰਜਾਬੀ)",
-      ur: "Urdu (اردو)",
-      or: "Odia (ଓଡ଼ିଆ)",
-      as: "Assamese (অসমীয়া)",
-      en: "English",
-    };
-
     const subjectNames: Record<string, string> = {
       mathematics: "Mathematics",
       science: "Science",
       social: "Social Studies",
-      language: "Language",
     };
 
-    const curriculumNames: Record<string, string> = {
-      ncert: "NCERT",
-      cbse: "CBSE",
-      state: "State Board",
-    };
-
-    const languageName = languageNames[params.language] || params.language;
+    // Use subject name if it's a known subject, otherwise use the custom value directly
     const subjectName = subjectNames[params.subject] || params.subject;
-    const curriculumName = curriculumNames[params.curriculum] || params.curriculum;
 
     let prompt = `
-You are an expert Indian educator and curriculum designer.
+You are an expert Indian educator and curriculum designer specializing in NCERT, CBSE, and State Board curricula.
 
-Generate educational content with the following details:
+Generate comprehensive educational content with the following details:
 
 Topic: ${params.topic}
 Subject: ${subjectName}
 Grade Level: Class ${params.grade}
-Curriculum: ${curriculumName}
-Target Language: ${languageName}
+Curriculum Alignment: Follow NCERT, CBSE, and State Board standards
 
-Primary Goal:
-Create accurate, age-appropriate, curriculum-aligned educational content that is easy to translate into Indian languages without loss of meaning.
+IMPORTANT: This content will be translated into multiple Indian languages. Write in clear, translation-friendly English.
 
-Content Guidelines:
-- Write in clear, simple, and direct sentences.
-- Avoid complex grammar, idioms, metaphors, or poetic language.
-- Prefer short sentences over long or compound sentences.
-- Do NOT use unnecessary conjunctions such as "although", "however", "therefore", or "whereas".
-- Keep factual accuracy extremely high (NCERT-safe).
+Content Requirements:
+- Provide comprehensive, detailed explanations suitable for Class ${params.grade} level
+- Use clear, simple sentences that are easy to translate
+- Include sufficient context and detail - aim for thorough coverage of the topic
+- Maintain high factual accuracy aligned with NCERT, CBSE, and State Board curricula
+- Structure content with clear sections and logical flow
 
-Pedagogical Requirements:
-- Adjust depth, vocabulary, and examples strictly according to Class ${params.grade}.
-- Explain concepts step-by-step.
-- Use definitions, explanations, and examples where appropriate.
-- Maintain a neutral, teacher-friendly tone suitable for textbooks, worksheets, and lesson plans.
+Formatting Rules:
+- Output MUST be plain text only - NO markdown, bullets, numbering, asterisks, or special formatting characters
+- Use simple line breaks to separate sentences and paragraphs
+- Do NOT use any markdown syntax (no #, *, -, [], (), etc.)
+- Write naturally but ensure each major idea is clearly separated
 
-Structure Requirements:
-- Use clear section headings.
-- Use bullet points where helpful.
-- Keep paragraphs short (2–4 lines max).
-- Ensure logical flow between sections.
+Pedagogical Approach:
+- Adjust depth and complexity appropriately for Class ${params.grade}
+- Include relevant examples and real-world applications
+- Explain concepts thoroughly with adequate detail
+- Use definitions, step-by-step explanations, and illustrative examples
+- Maintain an educational, teacher-friendly tone suitable for classroom use
 
 Scientific & Mathematical Accuracy:
-- Use correct scientific and mathematical terminology.
-- Preserve symbols, formulas, units, and notation exactly.
-- Do NOT invent facts or simplify incorrectly.
+- Use correct scientific and mathematical terminology
+- Preserve all symbols, formulas, units, and notation exactly
+- Ensure all facts are accurate and curriculum-aligned
+- Do NOT simplify or modify established scientific facts
 
-Translation & Multilingual Safety Rules:
-- Avoid ambiguous pronouns.
-- Repeat key nouns instead of using "it", "this", or "that".
-- Keep terminology consistent throughout the content.
-- Prefer explicit statements over implied meaning.
+Content Scope:
+- Generate comprehensive content that thoroughly covers the topic
+- Include multiple aspects, examples, and explanations
+- Provide enough detail for students to understand the concept fully
+- Cover the topic from introduction through key concepts to applications
 
-${params.culturalContext ? `
-Cultural Context Instructions:
-- Include simple, relevant regional or Indian examples (festivals, daily life, local environment).
-- Ensure cultural references support learning and do not distract from the core concept.
-- Keep cultural examples optional and clearly separated from core explanations.
-` : ``}
+Educational Guardrails:
+- ONLY generate content related to educational topics
+- Reject any requests for non-educational content
+- Focus strictly on curriculum-aligned educational material
+- Maintain professional, appropriate tone throughout
 
-Output Expectations:
-- Content must be easy to copy into lesson plans or worksheets.
-- Output must be suitable for offline use.
-- Avoid emojis, slang, or informal expressions.
-- Do not include meta explanations about how the content was generated.
+Output Style:
+- Write in clear, professional English
+- Avoid emojis, slang, or overly casual expressions
+- Do not include meta-commentary about the generation process
+- Ensure content is ready for direct use in educational contexts
 
-Begin generating the content now.
+Begin generating the comprehensive educational content now.
 `;
 
     return prompt.trim();
