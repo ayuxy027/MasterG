@@ -10,45 +10,46 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { CheckCircle2, XCircle, AlertTriangle, Check, X } from 'lucide-react';
 
 const BenchmarksPage: React.FC = () => {
   // LLM Benchmark Data
   const llmReasoningData = [
-    { name: 'DeepSeek-R1\n1.5B', score: 78, fill: '#10b981' },
-    { name: 'Llama 3.2\n3B', score: 72, fill: '#3b82f6' },
-    { name: 'Gemma 2\n2B', score: 55, fill: '#f59e0b' },
-    { name: 'Qwen 2.5\n0.5B', score: 35, fill: '#ef4444' },
+    { name: 'DeepSeek-R1\n1.5B', score: 78, fill: '#f97316' },
+    { name: 'Llama 3.2\n3B', score: 72, fill: '#fb923c' },
+    { name: 'Gemma 2\n2B', score: 55, fill: '#fdba74' },
+    { name: 'Qwen 2.5\n0.5B', score: 35, fill: '#fed7aa' },
   ];
 
   const llmInferenceSpeedData = [
-    { name: 'DeepSeek-R1', speed: 40, fill: '#10b981' },
-    { name: 'Llama 3.2', speed: 20, fill: '#3b82f6' },
-    { name: 'Gemma 2', speed: 27, fill: '#f59e0b' },
-    { name: 'Qwen 2.5', speed: 65, fill: '#ef4444' },
+    { name: 'DeepSeek-R1', speed: 40, fill: '#f97316' },
+    { name: 'Llama 3.2', speed: 20, fill: '#fb923c' },
+    { name: 'Gemma 2', speed: 27, fill: '#fdba74' },
+    { name: 'Qwen 2.5', speed: 65, fill: '#fed7aa' },
   ];
 
   const llmMemoryData = [
-    { name: 'DeepSeek-R1', disk: 1.1, ram: 2.2, fill: '#10b981' },
-    { name: 'Llama 3.2', disk: 2.4, ram: 4.1, fill: '#3b82f6' },
-    { name: 'Gemma 2', disk: 1.6, ram: 3.0, fill: '#f59e0b' },
-    { name: 'Qwen 2.5', disk: 0.4, ram: 0.8, fill: '#ef4444' },
+    { name: 'DeepSeek-R1', disk: 1.1, ram: 2.2 },
+    { name: 'Llama 3.2', disk: 2.4, ram: 4.1 },
+    { name: 'Gemma 2', disk: 1.6, ram: 3.0 },
+    { name: 'Qwen 2.5', disk: 0.4, ram: 0.8 },
   ];
 
   // Translation Benchmark Data
   const translationLanguageData = [
-    { name: 'NLLB-200\n600M', languages: 200, indic: 22, fill: '#10b981' },
-    { name: 'IndicTrans2\n1.1B', languages: 22, indic: 22, fill: '#3b82f6' },
-    { name: 'IndicTrans2\n200M', languages: 15, indic: 15, fill: '#f59e0b' },
-    { name: 'DeepSeek-R1', languages: 2, indic: 2, fill: '#ef4444' },
-    { name: 'Gemma\n270M', languages: 1, indic: 1, fill: '#ef4444' },
+    { name: 'NLLB-200\n600M', languages: 200, indic: 22, fill: '#f97316' },
+    { name: 'IndicTrans2\n1.1B', languages: 22, indic: 22, fill: '#fb923c' },
+    { name: 'IndicTrans2\n200M', languages: 15, indic: 15, fill: '#fdba74' },
+    { name: 'DeepSeek-R1', languages: 2, indic: 0, fill: '#fed7aa' },
+    { name: 'Gemma\n270M', languages: 1, indic: 0, fill: '#fed7aa' },
   ];
 
   const translationSizeData = [
-    { name: 'NLLB-200', modelSize: 0.6, diskUsage: 1.2, fill: '#10b981' },
-    { name: 'IndicTrans2 1.1B', modelSize: 1.1, diskUsage: 5.0, fill: '#3b82f6' },
-    { name: 'IndicTrans2 200M', modelSize: 0.2, diskUsage: 3.0, fill: '#f59e0b' },
-    { name: 'DeepSeek-R1', modelSize: 1.3, diskUsage: 3.0, fill: '#ef4444' },
-    { name: 'Gemma', modelSize: 0.27, diskUsage: 2.0, fill: '#ef4444' },
+    { name: 'NLLB-200', modelSize: 0.6, diskUsage: 1.2 },
+    { name: 'IndicTrans2 1.1B', modelSize: 1.1, diskUsage: 5.0 },
+    { name: 'IndicTrans2 200M', modelSize: 0.2, diskUsage: 3.0 },
+    { name: 'DeepSeek-R1', modelSize: 1.3, diskUsage: 3.0 },
+    { name: 'Gemma', modelSize: 0.27, diskUsage: 2.0 },
   ];
 
   return (
@@ -65,8 +66,8 @@ const BenchmarksPage: React.FC = () => {
         </div>
 
         {/* LLM Benchmarks Section */}
-        <section className="mb-12">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 mb-6">
+        <section className="mb-8">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               1. Small Language Models (SLM) Evaluation
             </h2>
@@ -91,7 +92,7 @@ const BenchmarksPage: React.FC = () => {
             </div>
 
             {/* Comparative Data Table */}
-            <div className="mb-8">
+            <div className="mb-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Comparative Benchmark Data</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm border-collapse">
@@ -149,11 +150,11 @@ const BenchmarksPage: React.FC = () => {
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
               {/* Reasoning Score Chart */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <h4 className="text-base font-bold text-gray-900 mb-4">Reasoning Score (Est. GSM8K)</h4>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={llmReasoningData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis 
@@ -173,7 +174,7 @@ const BenchmarksPage: React.FC = () => {
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}
                       formatter={(value: number) => [`${value}%`, 'Reasoning Score']}
                     />
-                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="score" fill="#f97316" radius={[4, 4, 0, 0]}>
                       {llmReasoningData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
@@ -185,7 +186,7 @@ const BenchmarksPage: React.FC = () => {
               {/* Inference Speed Chart */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <h4 className="text-base font-bold text-gray-900 mb-4">Inference Speed (CPU, tokens/sec)</h4>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={llmInferenceSpeedData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis 
@@ -204,7 +205,7 @@ const BenchmarksPage: React.FC = () => {
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}
                       formatter={(value: number) => [`${value} t/s`, 'Inference Speed']}
                     />
-                    <Bar dataKey="speed" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="speed" fill="#f97316" radius={[4, 4, 0, 0]}>
                       {llmInferenceSpeedData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
@@ -214,10 +215,10 @@ const BenchmarksPage: React.FC = () => {
               </div>
 
               {/* Memory Footprint Chart */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 lg:col-span-2">
-                <h4 className="text-base font-bold text-gray-900 mb-4">Memory Footprint (GB)</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={llmMemoryData}>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 lg:col-span-2 mb-4">
+                <h4 className="text-base font-bold text-gray-900 mb-4">Memory Footprint: Disk Size vs RAM Usage (GB)</h4>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={llmMemoryData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="name" 
@@ -229,10 +230,10 @@ const BenchmarksPage: React.FC = () => {
                     />
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-                      formatter={(value: number, name: string) => [`${value} GB`, name === 'disk' ? 'Disk Size' : 'RAM Usage']}
+                      formatter={(value: number, name: string) => [`${value} GB`, name === 'disk' ? 'Disk Size (Quantized)' : 'RAM Usage']}
                     />
                     <Legend />
-                    <Bar dataKey="disk" fill="#3b82f6" name="Disk Size" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="disk" fill="#3b82f6" name="Disk Size (Quantized)" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="ram" fill="#8b5cf6" name="RAM Usage" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -240,7 +241,7 @@ const BenchmarksPage: React.FC = () => {
             </div>
 
             {/* Decision Matrix */}
-            <div className="mb-6">
+            <div className="mb-3">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Decision Matrix: Reasoning-to-RAM Ratio</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm border-collapse">
@@ -320,7 +321,7 @@ const BenchmarksPage: React.FC = () => {
         </section>
 
         {/* Translation Benchmarks Section */}
-        <section className="mb-12">
+        <section className="mb-8">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               2. Translation & Multilingual Model Evaluation
@@ -337,7 +338,7 @@ const BenchmarksPage: React.FC = () => {
             </div>
 
             {/* Model Comparison Table */}
-            <div className="mb-8">
+            <div className="mb-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Model Comparison Table</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm border-collapse">
@@ -380,7 +381,7 @@ const BenchmarksPage: React.FC = () => {
                       <td className="p-3 border border-gray-300 font-medium text-gray-900">DeepSeek-R1</td>
                       <td className="p-3 border border-gray-300 text-gray-700">Reasoning + Generation</td>
                       <td className="p-3 border border-gray-300 text-center text-gray-700">~2</td>
-                      <td className="p-3 border border-gray-300 text-center text-gray-700">2</td>
+                      <td className="p-3 border border-gray-300 text-center text-gray-700">0</td>
                       <td className="p-3 border border-gray-300 text-center text-gray-700">~1.3 GB</td>
                       <td className="p-3 border border-gray-300 text-center text-gray-700">~3 GB</td>
                     </tr>
@@ -388,7 +389,7 @@ const BenchmarksPage: React.FC = () => {
                       <td className="p-3 border border-gray-300 font-medium text-gray-900">Gemma</td>
                       <td className="p-3 border border-gray-300 text-gray-700">General LLM</td>
                       <td className="p-3 border border-gray-300 text-center text-gray-700">~1</td>
-                      <td className="p-3 border border-gray-300 text-center text-gray-700">1</td>
+                      <td className="p-3 border border-gray-300 text-center text-gray-700">0</td>
                       <td className="p-3 border border-gray-300 text-center text-gray-700">~270 MB</td>
                       <td className="p-3 border border-gray-300 text-center text-gray-700">~2 GB</td>
                     </tr>
@@ -419,14 +420,9 @@ const BenchmarksPage: React.FC = () => {
                     />
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-                      formatter={(value: number, name: string) => [
-                        `${value}${name === 'languages' ? ' total' : ' Indic'}`, 
-                        name === 'languages' ? 'Total Languages' : 'Indic Languages'
-                      ]}
+                      formatter={(value: number) => [`${value} languages`, 'Total Languages']}
                     />
-                    <Legend />
-                    <Bar dataKey="languages" fill="#3b82f6" name="Total Languages" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="indic" fill="#8b5cf6" name="Indic Languages" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="languages" fill="#f97316" name="Total Languages" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -434,7 +430,7 @@ const BenchmarksPage: React.FC = () => {
               {/* Model Size Chart */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <h4 className="text-base font-bold text-gray-900 mb-4">Model Size vs Disk Usage (GB)</h4>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={translationSizeData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis 
@@ -454,15 +450,15 @@ const BenchmarksPage: React.FC = () => {
                       formatter={(value: number, name: string) => [`${value} GB`, name === 'modelSize' ? 'Model Size' : 'Disk Usage']}
                     />
                     <Legend />
-                    <Bar dataKey="modelSize" fill="#3b82f6" name="Model Size" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="diskUsage" fill="#8b5cf6" name="Disk Usage" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="modelSize" fill="#f97316" name="Model Size" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="diskUsage" fill="#fb923c" name="Disk Usage" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* Resource Efficiency */}
-            <div className="mb-6">
+            <div className="mb-4">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Resource Efficiency (CPU & Offline)</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm border-collapse">
@@ -477,32 +473,52 @@ const BenchmarksPage: React.FC = () => {
                   <tbody>
                     <tr className="bg-green-50">
                       <td className="p-3 border border-gray-300 font-medium text-gray-900">NLLB-200 600M</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">✅</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">✅</td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
+                      </td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
+                      </td>
                       <td className="p-3 border border-gray-300 text-gray-700">Best quality-to-size ratio</td>
                     </tr>
                     <tr>
                       <td className="p-3 border border-gray-300 font-medium text-gray-900">IndicTrans2 200M</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">✅</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">✅</td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
+                      </td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
+                      </td>
                       <td className="p-3 border border-gray-300 text-gray-700">Lightweight but fragile</td>
                     </tr>
                     <tr className="bg-gray-50">
                       <td className="p-3 border border-gray-300 font-medium text-gray-900">IndicTrans2 1.1B</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">⚠️</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">⚠️</td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <AlertTriangle className="w-5 h-5 text-yellow-600 mx-auto" />
+                      </td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <AlertTriangle className="w-5 h-5 text-yellow-600 mx-auto" />
+                      </td>
                       <td className="p-3 border border-gray-300 text-gray-700">Quality gain but heavy</td>
                     </tr>
                     <tr>
                       <td className="p-3 border border-gray-300 font-medium text-gray-900">DeepSeek-R1</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">⚠️</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">❌</td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <AlertTriangle className="w-5 h-5 text-yellow-600 mx-auto" />
+                      </td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <XCircle className="w-5 h-5 text-red-600 mx-auto" />
+                      </td>
                       <td className="p-3 border border-gray-300 text-gray-700">Heavy, not optimized for MT</td>
                     </tr>
                     <tr className="bg-gray-50">
                       <td className="p-3 border border-gray-300 font-medium text-gray-900">Gemma 270M</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">⚠️</td>
-                      <td className="p-3 border border-gray-300 text-center text-lg">❌</td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <AlertTriangle className="w-5 h-5 text-yellow-600 mx-auto" />
+                      </td>
+                      <td className="p-3 border border-gray-300 text-center">
+                        <XCircle className="w-5 h-5 text-red-600 mx-auto" />
+                      </td>
                       <td className="p-3 border border-gray-300 text-gray-700">Not translation-focused</td>
                     </tr>
                   </tbody>
@@ -511,7 +527,7 @@ const BenchmarksPage: React.FC = () => {
             </div>
 
             {/* SOTA Positioning */}
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
               <h3 className="font-bold text-gray-900 mb-2">State-of-the-Art (SOTA) Positioning</h3>
               <p className="text-sm text-gray-800 leading-relaxed mb-2">
                 <strong>NLLB-200 is considered SOTA</strong> among open-source translation models for:
