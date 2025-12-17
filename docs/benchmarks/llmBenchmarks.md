@@ -4,13 +4,13 @@
 
 This report benchmarks four Small Language Models (SLMs) to determine the optimal engine for a local content generation and reasoning system. The evaluation prioritizes **reasoning capability (Chain of Thought)**, **factual adherence**, and **auditable logic** over raw inference speed.
 
-**Final Recommendation:** **DeepSeek-R1-Distill-Qwen-1.5B** is selected as the production model. It demonstrates a superior balance of reasoning density and memory efficiency, outperforming larger general-purpose models in logical consistency while maintaining a sub-1.5GB footprint.
+**Final Recommendation:** **DeepSeek-R1 1.5B** is selected as the production model. It demonstrates a superior balance of reasoning density and memory efficiency, outperforming larger general-purpose models in logical consistency while maintaining a sub-1.5GB footprint.
 
 ## 2. Evaluation Scope & Criteria
 
 The models were evaluated in a constrained offline environment (CPU Inference).
 
-* **DeepSeek-R1-Distill-Qwen-1.5B:** Distilled reasoning model based on Qwen 2.5 architecture.
+* **DeepSeek-R1 1.5B:** Reasoning-focused model designed for strong chain-of-thought performance.
 * **Llama 3.2 3B (Instruct):** Meta’s latest optimized instruction-following model (Quantized).
 * **Gemma 2 2B (Instruct):** Google’s lightweight open model.
 * **Qwen 2.5 0.5B:** A nano-sized general model for extreme resource constraints.
@@ -25,7 +25,7 @@ The models were evaluated in a constrained offline environment (CPU Inference).
 
 | Model | Variant | Disk Size (Quantized) | Est. RAM Usage | Reasoning Score (Est. GSM8K) | Inference Speed (CPU) | Primary Architecture |
 | --- | --- | --- | --- | --- | --- | --- |
-| **DeepSeek-R1** | Distill-Qwen-1.5B | **~1.1 GB** | ~2.2 GB | **High (~78%)** | 35-45 t/s | **Reasoning (CoT)** |
+| **DeepSeek-R1** | 1.5B | **~1.1 GB** | ~2.2 GB | **High (~78%)** | 35-45 t/s | **Reasoning (CoT)** |
 | **Llama 3.2** | 3B Instruct | ~2.4 GB | ~4.1 GB | Med-High (~72%) | 15-25 t/s | General Purpose |
 | **Gemma 2** | 2B Instruct | ~1.6 GB | ~3.0 GB | Moderate (~55%) | 25-30 t/s | General Purpose |
 | **Qwen 2.5** | 0.5B Instruct | ~0.4 GB | ~0.8 GB | Low (<40%) | **60+ t/s** | General Purpose |
@@ -34,7 +34,7 @@ The models were evaluated in a constrained offline environment (CPU Inference).
 
 ## 4. Deep Dive Analysis
 
-### ✅ Winner: DeepSeek-R1-Distill-1.5B
+### ✅ Winner: DeepSeek-R1 1.5B
 
 **Classification:** Specialized Reasoning Model
 
@@ -93,6 +93,6 @@ The decision is driven by the **Reasoning-to-RAM Ratio**:
 
 ## 6. Conclusion
 
-**DeepSeek-R1-Distill-Qwen-1.5B** is the only model that satisfies the project's requirement for auditable reasoning within the hardware constraints. Its ability to self-correct via Chain-of-Thought (CoT) processing makes it uniquely suited for the content generation layer, minimizing the risk of unverified hallucinations common in standard small language models.
+**DeepSeek-R1 1.5B** is the only model that satisfies the project's requirement for auditable reasoning within the hardware constraints. Its ability to self-correct via Chain-of-Thought (CoT) processing makes it uniquely suited for the content generation layer, minimizing the risk of unverified hallucinations common in standard small language models.
 
 **Next Step:** Proceed with full integration of the DeepSeek-R1 1.5B GGUF (Q4_K_M) variant.

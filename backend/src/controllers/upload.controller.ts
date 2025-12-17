@@ -136,15 +136,15 @@ export class UploadController {
         `✅ Created ${allChunks.length} chunks total`
       );
 
-      // Step 3: Generate embeddings page-wise (ONLINE/OFFLINE)
-      const isOfflineMode = env.USE_OFFLINE_MODE === 'offline' || env.USE_OFFLINE_MODE === 'true';
-      console.log(`🔧 Mode: ${isOfflineMode ? 'OFFLINE (Ollama)' : 'ONLINE (Google)'}`);
+      // Step 3: Generate embeddings page-wise (prefer Ollama if configured)
+      const useOllama = !!env.OLLAMA_URL;
+      console.log(`🔧 Mode: ${useOllama ? 'OFFLINE (Ollama)' : 'ONLINE (Google)'}`);
       console.log(
         `🔄 Generating embeddings page-wise for ${allChunks.length} pages...`
       );
 
       let embeddingResults;
-      if (isOfflineMode) {
+      if (useOllama) {
         // Use Ollama for embeddings (offline)
         embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
           allChunks.map((chunk) => chunk.content)

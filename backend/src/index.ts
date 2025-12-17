@@ -13,6 +13,7 @@ import stitchRoutes from "./routes/stitch.routes";
 import filesRoutes from "./routes/files.routes";
 import speechRoutes from "./routes/speech.routes";
 import analyzeRoutes from "./routes/analyze.routes";
+import boardRoutes from "./routes/board.routes";
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use("/api/stitch", stitchRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/speech", speechRoutes);
 app.use("/api/analyze", analyzeRoutes);
+app.use("/api/board", boardRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

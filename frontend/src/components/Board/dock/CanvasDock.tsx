@@ -1,9 +1,8 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { HiOutlineCursorClick } from 'react-icons/hi';
-import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuChevronDown, LuSparkles } from 'react-icons/lu';
+import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser } from 'react-icons/lu';
 import { MdOutlineEventNote } from 'react-icons/md';
-import { IoText } from 'react-icons/io5';
-import { Bot, X, List, Target, GitBranch, Layers } from 'lucide-react';
+import { Bot, X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 interface CanvasDockProps {
   currentTool: string;
@@ -15,12 +14,11 @@ interface CanvasDockProps {
   onUndo: () => void;
   onClear: () => void;
   sidebarOpen?: boolean;
-  query?: string;
-  setQuery?: (query: string) => void;
-  onQuerySubmit?: (e: React.FormEvent) => void;
-  isLoading?: boolean;
-  activeToolbarOption?: string;
-  onToolbarOptionChange?: (option: string) => void;
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
+  onZoomReset?: () => void;
+  onGenerateCards?: (prompt: string, count: number) => void;
+  isGenerating?: boolean;
 }
 
 const CanvasDock: React.FC<CanvasDockProps> = ({
@@ -33,37 +31,36 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
   onUndo,
   onClear,
   sidebarOpen = true,
-  query = '',
-  setQuery,
-  onQuerySubmit,
-  isLoading = false,
-  activeToolbarOption = 'summarise',
-  onToolbarOptionChange
+  zoom = 1,
+  onZoomChange,
+  onZoomReset,
+  onGenerateCards,
+  isGenerating = false,
 }) => {
-  const [isOverflowOpen, setIsOverflowOpen] = useState(false);
-  const [isQueryPanelOpen, setIsQueryPanelOpen] = useState(false);
-  const [isToolbarOpen, setIsToolbarOpen] = useState(false);
-  const overflowRef = useRef<HTMLDivElement | null>(null);
-  const queryPanelRef = useRef<HTMLDivElement | null>(null);
-  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
+  const [generatePrompt, setGeneratePrompt] = useState('');
+  const [cardCount, setCardCount] = useState(3);
+  const generatePanelRef = useRef<HTMLDivElement | null>(null);
   const colorInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
-      if (overflowRef.current && !overflowRef.current.contains(target)) {
-        setIsOverflowOpen(false);
-      }
-      if (queryPanelRef.current && !queryPanelRef.current.contains(target)) {
-        setIsQueryPanelOpen(false);
-      }
-      if (toolbarRef.current && !toolbarRef.current.contains(target)) {
-        setIsToolbarOpen(false);
+      if (generatePanelRef.current && !generatePanelRef.current.contains(target)) {
+        setIsGeneratePanelOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!generatePrompt.trim() || isGenerating) return;
+    await onGenerateCards?.(generatePrompt, cardCount);
+    setGeneratePrompt('');
+    setIsGeneratePanelOpen(false);
+  };
 
   const primaryTools = useMemo(
     () => [
@@ -71,270 +68,194 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
       { id: 'pen', icon: LuPencil, label: 'Pen' },
       { id: 'eraser', icon: LuEraser, label: 'Eraser' },
       { id: 'sticky-note', icon: MdOutlineEventNote, label: 'Note' },
-      { id: 'text', icon: IoText, label: 'Text' }
-    ],
-    []
-  );
-
-  const overflowTools = useMemo(
-    () => [
-      { id: 'query', icon: Bot, label: 'Generate', action: 'query' },
-      { id: 'toolbar', icon: LuSparkles, label: 'Modes', action: 'toolbar' }
-    ],
-    []
-  );
-
-  const toolbarOptions = useMemo(
-    () => [
-      { id: 'summarise', label: 'Summarise', icon: List },
-      { id: 'action-points', label: 'Action points', icon: Target },
-      { id: 'timeline', label: 'Timeline', icon: GitBranch },
-      { id: 'breakdown', label: 'Breakdown', icon: Layers }
     ],
     []
   );
 
   return (
-    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-[margin] duration-500 ease-out ${sidebarOpen ? 'ml-[80px]' : 'ml-[10px]'}`}>
-      <div className="relative">
-        {/* Outer gradient border for premium matte ring */}
-        <div className="rounded-2xl bg-gradient-to-br from-orange-100/50 to-orange-50/30 p-[2px] shadow-xl border border-orange-200/60">
-          {/* Inner frosted glass panel */}
-          <div
-            className="rounded-2xl px-6 py-4 backdrop-blur-xl bg-white/90 shadow-lg"
-          >
-            <div className="flex items-center justify-between gap-8">
-              {/* Left Section - Primary Tools */}
-              <div className="flex items-center gap-2">
-                {primaryTools.map((tool) => {
-                  const IconComponent = tool.icon as React.ComponentType<{ size?: number; className?: string }>;
-                  const isActive = currentTool === tool.id;
-                  return (
-                    <button
-                      key={tool.id}
-                      onClick={() => onToolChange(tool.id)}
-                      className={`group flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 ease-out focus:outline-none ${
-                        isActive 
-                          ? 'bg-orange-400 text-white shadow-[0_8px_24px_rgba(249,115,22,0.25)]' 
-                          : 'text-orange-500 hover:bg-orange-50'
-                      }`}
-                      title={tool.label}
-                      style={{ transform: isActive ? 'translateY(-2px)' : 'translateY(0px)' }}
-                    >
-                      <IconComponent size={18} />
-                      <span className={`text-[11px] leading-none font-medium ${isActive ? 'text-white' : 'opacity-80'}`}>{tool.label}</span>
-                    </button>
-                  );
-                })}
-
-                {/* Overflow tools */}
-                <div className="relative" ref={overflowRef}>
-                  <button
-                    onClick={() => setIsOverflowOpen((v) => !v)}
-                    className={`ml-1 flex items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 ${
-                      isOverflowOpen 
-                        ? 'bg-orange-400 text-white shadow-md' 
-                        : 'text-orange-500 hover:bg-orange-50'
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${sidebarOpen ? 'ml-20' : 'ml-2.5'}`}>
+      <div className="rounded-2xl bg-white/95 backdrop-blur-xl shadow-xl border border-orange-200/60 px-4 py-3">
+        <div className="flex items-center gap-6">
+          {/* Tools */}
+          <div className="flex items-center gap-1">
+            {primaryTools.map((tool) => {
+              const IconComponent = tool.icon as React.ComponentType<{ size?: number; className?: string }>;
+              const isActive = currentTool === tool.id;
+              return (
+                <button
+                  key={tool.id}
+                  onClick={() => onToolChange(tool.id)}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${isActive
+                      ? 'bg-orange-500 text-white shadow-lg'
+                      : 'text-orange-600 hover:bg-orange-50'
                     }`}
-                    title="More tools"
-                  >
-                    <LuChevronDown size={16} className={isOverflowOpen ? 'rotate-180 transition-transform' : ''} />
-                    <span className="text-[11px] font-medium opacity-80">More</span>
-                  </button>
-
-                  {isOverflowOpen && (
-                    <div
-                      className="absolute bottom-12 left-0 min-w-[160px] rounded-xl p-2 backdrop-blur-xl bg-white/95 shadow-xl border border-orange-200/60"
-                      ref={overflowRef}
-                    >
-                      <div className="grid grid-cols-3 gap-2">
-                        {overflowTools.map((tool) => {
-                          const Icon = tool.icon as React.ComponentType<{ size?: number; className?: string }>;
-                          const isActive = currentTool === tool.id;
-                          const isAction = (tool as any).action;
-                          
-                          return (
-                            <button
-                              key={tool.id}
-                              onClick={() => {
-                                if (isAction === 'query') {
-                                  setIsQueryPanelOpen(true);
-                                  setIsOverflowOpen(false);
-                                } else if (isAction === 'toolbar') {
-                                  setIsToolbarOpen(true);
-                                  setIsOverflowOpen(false);
-                                } else {
-                                  onToolChange(tool.id);
-                                  setIsOverflowOpen(false);
-                                }
-                              }}
-                              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all ${
-                                isActive 
-                                  ? 'bg-orange-400 text-white shadow-md' 
-                                  : 'text-orange-500 hover:bg-orange-50'
-                              }`}
-                              title={tool.label}
-                            >
-                              <Icon size={18} />
-                              <span className="text-[10px] leading-none">{tool.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Query Panel */}
-                  {isQueryPanelOpen && (
-                    <div
-                      ref={queryPanelRef}
-                      className="absolute bottom-12 left-0 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-orange-200/60 p-4 z-[60]"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Bot size={20} className="text-orange-500" />
-                          <h3 className="text-sm font-semibold text-gray-800">Generate Cards</h3>
-                        </div>
-                        <button
-                          onClick={() => setIsQueryPanelOpen(false)}
-                          className="text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-gray-100 rounded-lg"
-                          title="Close"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-                      
-                      <form onSubmit={onQuerySubmit} className="space-y-3">
-                        <textarea
-                          value={query}
-                          onChange={(e) => setQuery?.(e.target.value)}
-                          placeholder="Type your query to generate cards..."
-                          className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg outline-none text-gray-800 placeholder-gray-400 resize-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 transition-all"
-                          rows={4}
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="submit"
-                          disabled={isLoading || !query.trim()}
-                          className="w-full px-4 py-2 bg-orange-400 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
-                        >
-                          {isLoading ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Generating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Bot size={16} />
-                              <span>Generate</span>
-                            </>
-                          )}
-                        </button>
-                      </form>
-                    </div>
-                  )}
-
-                  {/* Toolbar Panel */}
-                  {isToolbarOpen && (
-                    <div
-                      ref={toolbarRef}
-                      className="absolute bottom-12 left-0 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-orange-200/60 p-3 z-[60]"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-gray-800">Content Modes</h3>
-                        <button
-                          onClick={() => setIsToolbarOpen(false)}
-                          className="text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-gray-100 rounded-lg"
-                          title="Close"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {toolbarOptions.map((option) => {
-                          const IconComponent = option.icon;
-                          const isActive = activeToolbarOption === option.id;
-                          return (
-                            <button
-                              key={option.id}
-                              onClick={() => {
-                                onToolbarOptionChange?.(option.id);
-                                setIsToolbarOpen(false);
-                              }}
-                              className={`group flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 ease-out focus:outline-none ${
-                                isActive
-                                  ? 'bg-orange-400 text-white shadow-[0_8px_24px_rgba(249,115,22,0.25)]'
-                                  : 'text-orange-500 hover:bg-orange-50'
-                              }`}
-                              style={{ transform: isActive ? 'translateY(-1px)' : 'translateY(0px)' }}
-                            >
-                              <IconComponent size={14} />
-                              <span className="text-xs font-medium">{option.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Center Section - Color and Size */}
-              <div className="flex items-center gap-6">
-                {/* Color Picker */}
-                <div className="flex items-center gap-2">
-                  <LuPalette size={18} className="text-orange-500" />
-                  <button
-                    type="button"
-                    aria-label="Pick color"
-                    onClick={() => colorInputRef.current?.click()}
-                    className="w-[24px] h-[24px] rounded-full border-2 border-orange-300 cursor-pointer shadow-sm hover:shadow-md transition-all hover:scale-110"
-                    style={{ backgroundColor: currentColor }}
-                  />
-                  <input
-                    ref={colorInputRef}
-                    type="color"
-                    value={currentColor}
-                    onChange={(e) => onColorChange(e.target.value)}
-                    className="sr-only"
-                  />
-                </div>
-
-                {/* Stroke Width */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-orange-500 font-medium">Size</span>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={strokeWidth}
-                    onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
-                    className="w-24 accent-orange-500 cursor-pointer"
-                  />
-                  <span className="text-sm text-orange-500 w-6 font-semibold tabular-nums">{strokeWidth}</span>
-                </div>
-              </div>
-
-              {/* Right Section - Actions */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={onUndo}
-                  className="flex items-center gap-2 px-3 py-2 text-orange-500 hover:bg-orange-50 rounded-xl transition-all duration-300 hover:scale-105"
-                  title="Undo"
+                  title={tool.label}
                 >
-                  <LuRotateCcw size={16} />
-                  <span className="text-sm font-medium">Undo</span>
+                  <IconComponent size={18} />
+                  <span className="text-xs font-medium">{tool.label}</span>
                 </button>
-                <button
-                  onClick={onClear}
-                  className="flex items-center gap-2 px-3 py-2 text-orange-500 hover:bg-orange-50 rounded-xl transition-all duration-300 hover:scale-105"
-                  title="Clear Canvas"
-                >
-                  <LuTrash2 size={16} />
-                  <span className="text-sm font-medium">Clear</span>
-                </button>
-              </div>
+              );
+            })}
+
+            {/* AI Generate Button */}
+            <div className="relative" ref={generatePanelRef}>
+              <button
+                onClick={() => setIsGeneratePanelOpen(!isGeneratePanelOpen)}
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${isGeneratePanelOpen
+                    ? 'bg-purple-500 text-white shadow-lg'
+                    : 'text-purple-600 hover:bg-purple-50'
+                  }`}
+                title="Generate AI Cards"
+              >
+                <Bot size={18} />
+                <span className="text-xs font-medium">AI</span>
+              </button>
+
+              {/* Generate Panel */}
+              {isGeneratePanelOpen && (
+                <div className="absolute bottom-14 left-0 w-80 bg-white rounded-xl shadow-xl border border-orange-200 p-4 z-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Bot size={20} className="text-purple-500" />
+                      <h3 className="font-semibold text-gray-800">Generate Cards</h3>
+                    </div>
+                    <button
+                      onClick={() => setIsGeneratePanelOpen(false)}
+                      className="p-1 hover:bg-gray-100 rounded-lg"
+                    >
+                      <X size={16} className="text-gray-500" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleGenerate} className="space-y-3">
+                    <textarea
+                      value={generatePrompt}
+                      onChange={(e) => setGeneratePrompt(e.target.value)}
+                      placeholder="What would you like to learn about?"
+                      className="w-full px-3 py-2 border-2 border-orange-200 rounded-lg resize-none focus:border-orange-400 focus:outline-none"
+                      rows={3}
+                      disabled={isGenerating}
+                    />
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-600">Cards:</label>
+                      <select
+                        value={cardCount}
+                        onChange={(e) => setCardCount(Number(e.target.value))}
+                        className="px-2 py-1 border border-gray-200 rounded-lg text-sm"
+                        disabled={isGenerating}
+                      >
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isGenerating || !generatePrompt.trim()}
+                      className="w-full py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Bot size={16} />
+                          Generate
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-8 bg-orange-200" />
+
+          {/* Color & Size */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <LuPalette size={16} className="text-orange-500" />
+              <button
+                onClick={() => colorInputRef.current?.click()}
+                className="w-6 h-6 rounded-full border-2 border-orange-300 shadow-sm hover:scale-110 transition-transform"
+                style={{ backgroundColor: currentColor }}
+              />
+              <input
+                ref={colorInputRef}
+                type="color"
+                value={currentColor}
+                onChange={(e) => onColorChange(e.target.value)}
+                className="sr-only"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={strokeWidth}
+                onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
+                className="w-20 accent-orange-500"
+              />
+              <span className="text-sm text-orange-600 font-medium w-5">{strokeWidth}</span>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-8 bg-orange-200" />
+
+          {/* Zoom */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onZoomChange?.(Math.max(0.25, zoom - 0.1))}
+              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+              title="Zoom Out"
+            >
+              <ZoomOut size={16} />
+            </button>
+            <span className="text-sm text-orange-600 font-medium w-12 text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={() => onZoomChange?.(Math.min(3, zoom + 0.1))}
+              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+              title="Zoom In"
+            >
+              <ZoomIn size={16} />
+            </button>
+            <button
+              onClick={onZoomReset}
+              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+              title="Reset View"
+            >
+              <Maximize2 size={16} />
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-8 bg-orange-200" />
+
+          {/* Actions */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onUndo}
+              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+              title="Undo"
+            >
+              <LuRotateCcw size={16} />
+            </button>
+            <button
+              onClick={onClear}
+              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="Clear All"
+            >
+              <LuTrash2 size={16} />
+            </button>
           </div>
         </div>
       </div>
@@ -343,4 +264,3 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
 };
 
 export default CanvasDock;
-

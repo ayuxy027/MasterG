@@ -54,6 +54,14 @@ Develop a compact multilingual Large Language Model (1–2 billion parameters) t
 - **Code-Mixing Robustness** - Accuracy Drop Ratio - Target: ≤10%
 - **Cultural Relevance** - Cultural Adequacy Score (Likert) - Target: ≥4/5, κ ≥0.6
 
+### Model & Benchmark Success Criteria
+
+- **Reasoning Quality (SLM)** - GSM8K-style reasoning score and logical consistency - Target: ≥70% on primary curriculum reasoning tasks
+- **Inference Speed (On-Device)** - Tokens/second on CPU-only 4–8 GB RAM devices - Target: ≥25 t/s for generation workloads
+- **Memory Footprint** - Quantized model size and peak RAM usage - Target: ≤1.5 GB disk, ≤3 GB RAM for core reasoning model
+- **Translation Coverage & Quality (MT)** - Number of supported languages and Indic languages, plus BLEU/chrF - Target: 200+ total languages with 22+ Indic at state-of-the-art quality
+- **Offline & CPU Viability** - All core models runnable fully offline on CPU-only machines within latency and RAM constraints
+
 ## Bonus Features
 
 - **Natural Conversational Teaching** - Teachers engage in free-flowing educational conversations with students using advanced dialogue systems

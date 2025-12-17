@@ -2,7 +2,6 @@ export * from './types';
 export * from './Pencil';
 export * from './Eraser';
 export * from './Select';
-export { default as TextSettings } from './TextSettings';
 
 import { PenTool } from './Pencil';
 import { EraserTool } from './Eraser';

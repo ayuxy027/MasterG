@@ -18,6 +18,7 @@ interface StickyNoteProps {
   isBold?: boolean;
   isItalic?: boolean;
   isUnderline?: boolean;
+  zoom?: number;
   onUpdate: (id: string, updates: Partial<StickyNoteProps>) => void;
   onDelete: (id: string) => void;
 }
@@ -38,6 +39,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
   isBold = false,
   isItalic = false,
   isUnderline = false,
+  zoom = 1,
   onUpdate,
   onDelete
 }) => {
@@ -46,6 +48,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
   const noteRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -62,19 +65,21 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     '#E6E6FA', // lavender
   ];
 
-  // Simple drag handling
+  // Simple drag handling (with zoom support)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!selectionMode) return;
     e.preventDefault();
     setIsDragging(true);
-    setDragStart({ x: e.clientX - x, y: e.clientY - y });
+    setDragStart({ x: e.clientX, y: e.clientY });
+    setStartPos({ x, y });
   };
 
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging) return;
-    const newX = e.clientX - dragStart.x;
-    const newY = e.clientY - dragStart.y;
-    onUpdate(id, { x: newX, y: newY });
+    // Account for zoom when calculating delta
+    const deltaX = (e.clientX - dragStart.x) / zoom;
+    const deltaY = (e.clientY - dragStart.y) / zoom;
+    onUpdate(id, { x: startPos.x + deltaX, y: startPos.y + deltaY });
   };
 
   const handleMouseUp = () => {
@@ -221,16 +226,14 @@ const StickyNote: React.FC<StickyNoteProps> = ({
               <label className="flex items-center justify-between text-xs text-gray-700 mb-1">
                 <span>Ruled Lines</span>
                 <button
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    ruled ? 'bg-orange-500' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${ruled ? 'bg-orange-500' : 'bg-gray-300'
+                    }`}
                   onClick={() => onUpdate(id, { ruled: !ruled })}
                   title={ruled ? 'Disable ruled lines' : 'Enable ruled lines'}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      ruled ? 'translate-x-4' : 'translate-x-0.5'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${ruled ? 'translate-x-4' : 'translate-x-0.5'
+                      }`}
                   />
                 </button>
               </label>

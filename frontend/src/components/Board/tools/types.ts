@@ -10,16 +10,6 @@ export interface DrawingPath {
   tool: string;
 }
 
-export interface ToolProps {
-  currentColor: string;
-  strokeWidth: number;
-  isDrawing: boolean;
-  currentPath: Point[];
-  onPathUpdate: (path: Point[]) => void;
-  onPathComplete: (path: DrawingPath) => void;
-  getMousePos: (e: React.MouseEvent<HTMLCanvasElement>) => Point;
-}
-
 export interface Tool {
   id: string;
   name: string;

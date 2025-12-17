@@ -159,7 +159,7 @@ The IndicTrans2 experiment wasn't a failure - it was a learning experience that 
 ---
 
 **Final Architecture:**
-- **LLM**: DeepSeek-R1-Distill-Qwen-1.5B (via Ollama) → Content Generation
+- **LLM**: DeepSeek-R1 1.5B (via Ollama) → Content Generation
 - **Translation**: NLLB-200-distilled-600M → Multilingual Translation
 - **Total Footprint**: <5GB (models + dependencies)
 - **Offline**: 100% air-gapped operation
