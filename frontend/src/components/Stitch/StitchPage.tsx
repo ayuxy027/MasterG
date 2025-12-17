@@ -306,13 +306,13 @@ const StitchPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            <span className="text-orange-500">Stitch</span> - Offline Content Generator
+        <div className="mb-6 sm:mb-8 text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-800 mb-2 sm:mb-3">
+            <span className="text-orange-400">Stitch</span> - Offline Content Generator
           </h1>
-          <p className="text-gray-600 text-lg">
+          <p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
             Generate comprehensive, curriculum-aligned educational content offline using DeepSeek R1
           </p>
         </div>
@@ -321,10 +321,10 @@ const StitchPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Panel - Configuration */}
           <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-6">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-5 sm:p-6">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6">
                 <svg
-                  className="w-6 h-6 text-orange-500"
+                  className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -342,13 +342,13 @@ const StitchPage: React.FC = () => {
                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                <h2 className="text-xl font-semibold text-gray-900">Configuration</h2>
+                <h2 className="text-sm sm:text-base font-semibold text-gray-800">Configuration</h2>
               </div>
 
               <div className="space-y-6">
                 {/* Grade Level */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Grade Level
                   </label>
                   <div className="space-y-2">
@@ -397,7 +397,7 @@ const StitchPage: React.FC = () => {
 
                 {/* Subject */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Subject
                   </label>
                   <select
@@ -434,7 +434,7 @@ const StitchPage: React.FC = () => {
 
                 {/* Topic */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Topic / Lesson Title
                   </label>
                   <input
@@ -490,17 +490,51 @@ const StitchPage: React.FC = () => {
 
                 {/* Error Display */}
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{error}</p>
+                  <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-start gap-3">
+                    <svg
+                      className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-red-800 text-xs sm:text-sm">Error</p>
+                      <p className="text-xs sm:text-sm text-red-700">{error}</p>
+                    </div>
+                    <button
+                      onClick={() => setError(null)}
+                      className="ml-auto text-red-500 hover:text-red-700"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Ollama Status */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-4 sm:p-5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">Ollama Status</span>
+                <span className="text-xs sm:text-sm font-semibold text-gray-800">Ollama Status</span>
                 {ollamaStatus.checking ? (
                   <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
                     Checking...
@@ -547,7 +581,7 @@ const StitchPage: React.FC = () => {
                     d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                   />
                 </svg>
-                <h3 className="text-lg font-semibold text-gray-900">Thinking Process</h3>
+                <h3 className="text-sm sm:text-base font-semibold text-gray-800">Thinking Process</h3>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 {!thinkingText && !isGenerating ? (
@@ -568,11 +602,11 @@ const StitchPage: React.FC = () => {
             </div>
 
             {/* Content Preview with Tabs */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex flex-col">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center gap-3">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
+              <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-orange-200/60">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <svg
-                    className="w-5 h-5 text-orange-500"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -584,7 +618,7 @@ const StitchPage: React.FC = () => {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <h3 className="text-lg font-semibold text-gray-900">Content Preview</h3>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-800">Content Preview</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <select
@@ -621,13 +655,13 @@ const StitchPage: React.FC = () => {
 
               {/* Tabs */}
               {englishContent && (
-                <div className="flex border-b border-gray-200 px-6">
+                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6">
                   <button
                     onClick={() => setActiveTab("english")}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
                       activeTab === "english"
-                        ? "border-orange-500 text-orange-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        ? "border-orange-400 text-orange-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
                     }`}
                   >
                     English
@@ -636,10 +670,10 @@ const StitchPage: React.FC = () => {
                     <button
                       key={langCode}
                       onClick={() => setActiveTab(langCode)}
-                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
                         activeTab === langCode
-                          ? "border-orange-500 text-orange-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                          ? "border-orange-400 text-orange-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
                       }`}
                     >
                       {getLanguageName(langCode)}
