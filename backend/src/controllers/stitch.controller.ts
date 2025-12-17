@@ -41,7 +41,6 @@ export class StitchController {
         topic,
         grade,
         subject,
-        culturalContext,
         stream,
       } = req.body;
 
@@ -58,7 +57,6 @@ export class StitchController {
         topic,
         grade: grade || "8",
         subject: subject || "mathematics",
-        culturalContext: culturalContext || false,
       });
 
       // If streaming requested, use SSE
@@ -334,7 +332,6 @@ export class StitchController {
     topic: string;
     grade: string;
     subject: string;
-    culturalContext: boolean;
   }): string {
     const subjectNames: Record<string, string> = {
       mathematics: "Mathematics",
@@ -388,13 +385,6 @@ Content Scope:
 - Include multiple aspects, examples, and explanations
 - Provide enough detail for students to understand the concept fully
 - Cover the topic from introduction through key concepts to applications
-
-${params.culturalContext ? `
-Cultural Context:
-- Include relevant Indian examples and cultural references where appropriate
-- Relate concepts to familiar contexts (festivals, daily life, local environment)
-- Ensure cultural examples enhance learning without distracting from core concepts
-` : ``}
 
 Educational Guardrails:
 - ONLY generate content related to educational topics

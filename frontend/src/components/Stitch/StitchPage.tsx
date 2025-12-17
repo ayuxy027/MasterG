@@ -172,7 +172,6 @@ const StitchPage: React.FC = () => {
           topic: topic.trim(),
           grade: finalGrade,
           subject: finalSubject,
-          culturalContext: false,
           stream: true,
         }),
       });
