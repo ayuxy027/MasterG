@@ -50,6 +50,32 @@ const Navbar: React.FC = () => {
         <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-orange-500 text-sm font-medium">
           <a
             className="hover:text-orange-600 flex items-center gap-2 transition-colors"
+            href="/stitch"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66"
+              ></path>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"
+              ></path>
+            </svg>
+            Stitch
+          </a>
+          <a
+            className="hover:text-orange-600 flex items-center gap-2 transition-colors"
             href="/chat"
           >
             <svg
@@ -96,52 +122,6 @@ const Navbar: React.FC = () => {
               ></path>
             </svg>
             LMR
-          </a>
-          <a
-            className="hover:text-orange-600 flex items-center gap-2 transition-colors"
-            href="/posters"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-              ></path>
-            </svg>
-            Posters
-          </a>
-          <a
-            className="hover:text-orange-600 flex items-center gap-2 transition-colors"
-            href="/stitch"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66"
-              ></path>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"
-              ></path>
-            </svg>
-            Stitch
           </a>
           <a
             className="hover:text-orange-600 flex items-center gap-2 transition-colors"
@@ -192,6 +172,26 @@ const Navbar: React.FC = () => {
               ></path>
             </svg>
             Whiteboard
+          </a>
+          <a
+            className="hover:text-orange-600 flex items-center gap-2 transition-colors"
+            href="/posters"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              ></path>
+            </svg>
+            Posters
           </a>
         </nav>
 
@@ -248,6 +248,33 @@ const Navbar: React.FC = () => {
           }`}
         >
           <nav className="flex flex-col gap-1">
+            <a
+              className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
+              href="/stitch"
+              onClick={closeMenu}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66"
+                ></path>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"
+                ></path>
+              </svg>
+              Stitch
+            </a>
             <a
               className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
               href="/chat"
@@ -317,54 +344,6 @@ const Navbar: React.FC = () => {
             </a>
             <a
               className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
-              href="/posters"
-              onClick={closeMenu}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                ></path>
-              </svg>
-              Posters
-            </a>
-            <a
-              className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
-              href="/stitch"
-              onClick={closeMenu}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66"
-                ></path>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178"
-                ></path>
-              </svg>
-              Stitch
-            </a>
-            <a
-              className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
               href="/board"
               onClick={closeMenu}
             >
@@ -413,6 +392,27 @@ const Navbar: React.FC = () => {
                 ></path>
               </svg>
               Whiteboard
+            </a>
+            <a
+              className="flex items-center gap-2.5 px-3 py-2 text-orange-500 text-sm font-medium rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-all"
+              href="/posters"
+              onClick={closeMenu}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                ></path>
+              </svg>
+              Posters
             </a>
             <a
               className="flex items-center justify-center gap-2 mt-1.5 px-3 py-2 bg-orange-400 text-white text-sm font-semibold rounded-lg hover:bg-orange-500 transition-all shadow-md"

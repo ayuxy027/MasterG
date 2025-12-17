@@ -39,6 +39,7 @@ const CORE_SUBJECTS = [
   { value: "mathematics", label: "Mathematics" },
   { value: "science", label: "Science" },
   { value: "social", label: "Social Studies" },
+  { value: "custom", label: "Custom" },
 ];
 
 interface ContentPreviewProps {
@@ -362,48 +363,31 @@ const StitchPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Subject
                   </label>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2">
-                      {CORE_SUBJECTS.map((subject) => (
-                        <button
-                          key={subject.value}
-                          onClick={() => {
-                            setSelectedSubject(subject.value);
-                            setCustomSubject("");
-                          }}
-                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
-                            selectedSubject === subject.value && selectedSubject !== "custom"
-                              ? "border-orange-500 bg-orange-50 text-orange-700"
-                              : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
-                          }`}
-                        >
-                          {subject.label.split(" ")[0]}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedSubject("custom");
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      if (e.target.value !== "custom") {
                         setCustomSubject("");
-                      }}
-                      className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
-                        selectedSubject === "custom"
-                          ? "border-orange-500 bg-orange-50 text-orange-700"
-                          : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white"
-                      }`}
-                    >
-                      Custom
-                    </button>
-                    {selectedSubject === "custom" && (
-                      <input
-                        type="text"
-                        value={customSubject}
-                        onChange={(e) => setCustomSubject(e.target.value)}
-                        placeholder="Enter subject name..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
-                      />
-                    )}
-                  </div>
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900"
+                  >
+                    {CORE_SUBJECTS.map((subject) => (
+                      <option key={subject.value} value={subject.value}>
+                        {subject.label}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedSubject === "custom" && (
+                    <input
+                      type="text"
+                      value={customSubject}
+                      onChange={(e) => setCustomSubject(e.target.value)}
+                      placeholder="Enter subject name..."
+                      className="w-full mt-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white text-gray-900 placeholder-gray-400"
+                    />
+                  )}
                 </div>
 
                 {/* Topic */}
