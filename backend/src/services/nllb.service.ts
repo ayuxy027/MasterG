@@ -22,14 +22,16 @@ export class NLLBService {
       "nllb_server.py"
     );
     // Use venv python - CRITICAL for torch and other dependencies
+    // On Windows, venv uses Scripts/python.exe; on Unix/Mac, it's bin/python
+    const isWindows = process.platform === "win32";
     const venvPython = path.resolve(
       __dirname,
       "..",
       "..",
       "proxy",
       "venv",
-      "bin",
-      "python"
+      isWindows ? "Scripts" : "bin",
+      isWindows ? "python.exe" : "python"
     );
     // Always prioritize venv python if it exists (has torch and all deps)
     if (fs.existsSync(venvPython)) {
@@ -39,7 +41,7 @@ export class NLLBService {
       this.pythonExecutable = env.PYTHON_EXECUTABLE || "python3";
       console.warn(`⚠️  NLLB venv not found at ${venvPython}, using ${this.pythonExecutable}. Translation may fail without proper dependencies.`);
     }
-    
+
     // Start persistent Python server only if enabled
     if (env.NLLB_ENABLED) {
       this.startServer();
