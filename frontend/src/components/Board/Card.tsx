@@ -32,6 +32,7 @@ const Card: React.FC<CardProps> = ({
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPointerDown, setIsPointerDown] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, cardX: 0, cardY: 0 });
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -40,23 +41,35 @@ const Card: React.FC<CardProps> = ({
     // Handle selection
     onSelect(id, e.shiftKey || e.ctrlKey || e.metaKey);
 
-    // Start dragging
-    setIsDragging(true);
+    // Track pointer down but don't start dragging yet
+    setIsPointerDown(true);
     dragStartRef.current = { x: e.clientX, y: e.clientY, cardX: x, cardY: y };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }, [id, x, y, onSelect]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging) return;
+    if (!isPointerDown) return;
 
-    // Account for zoom when calculating delta
-    const deltaX = (e.clientX - dragStartRef.current.x) / zoom;
-    const deltaY = (e.clientY - dragStartRef.current.y) / zoom;
-    onMove(id, dragStartRef.current.cardX + deltaX, dragStartRef.current.cardY + deltaY);
-  }, [isDragging, id, onMove, zoom]);
+    // Start dragging only after pointer moves a bit (threshold: 5px)
+    const deltaX = Math.abs(e.clientX - dragStartRef.current.x);
+    const deltaY = Math.abs(e.clientY - dragStartRef.current.y);
+    const threshold = 5;
+
+    if (!isDragging && (deltaX > threshold || deltaY > threshold)) {
+      setIsDragging(true);
+    }
+
+    if (isDragging || (deltaX > threshold || deltaY > threshold)) {
+      // Account for zoom when calculating delta
+      const moveDeltaX = (e.clientX - dragStartRef.current.x) / zoom;
+      const moveDeltaY = (e.clientY - dragStartRef.current.y) / zoom;
+      onMove(id, dragStartRef.current.cardX + moveDeltaX, dragStartRef.current.cardY + moveDeltaY);
+    }
+  }, [isPointerDown, isDragging, id, onMove, zoom]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     setIsDragging(false);
+    setIsPointerDown(false);
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   }, []);
 
