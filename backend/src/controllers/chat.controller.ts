@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { chatService } from "../services/chat.service";
 import { vectorDBService } from "../services/vectordb.service";
 import { asyncRAGOrchestratorService } from "../services/asyncRAGOrchestrator.service";
-import logger from "../services/logger.service";
+
 
 export class ChatController {
   /**

@@ -1,7 +1,6 @@
 import { ollamaChatService } from "./ollamaChat.service";
 import { vectorDBService } from "./vectordb.service";
 import { documentService } from "./document.service";
-import { embeddingService } from "./embedding.service";
 import { LanguageCode, SUPPORTED_LANGUAGES } from "../config/constants";
 
 export interface LMRSummary {

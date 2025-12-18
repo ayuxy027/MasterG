@@ -1,8 +1,7 @@
 import { decisionEngineService } from "./decisionEngine.service";
 import { vectorDBService } from "./vectordb.service";
-import { ollamaChatService } from "./ollamaChat.service";
+import { smartClassifierService } from "./smartClassifier.service";
 import { ChatMessage } from "../types";
-import logger from "./logger.service";
 import { v4 as uuidv4 } from "uuid";
 
 export interface RAGResponse {
@@ -19,17 +18,21 @@ export interface RAGResponse {
 }
 
 /**
- * Simplified RAG Orchestrator Service
- * Uses only Ollama (DeepSeek R1) - Completely Offline
+ * OPTIMIZED RAG Orchestrator Service
  * 
- * Architecture:
- * 1. Preprocess → Classify query type
- * 2. Decision → Choose strategy (SIMPLE vs RAG)
- * 3. Execute → Use Ollama for response
+ * New Architecture (Faster for Simple Queries):
+ * 1. Query → Smart Classifier (DeepSeek) → Either:
+ *    a) Direct Answer (for greetings, simple queries) ← FAST PATH
+ *    b) Optimized Retrieval Prompt + RAG → Precise retrieval ← SMART PATH
+ * 
+ * Removed:
+ * - Cache service (simplified)
+ * - Logger service (using console)
+ * - Online APIs (fully offline with Ollama)
  */
 export class AsyncRAGOrchestratorService {
   /**
-   * Process query through simplified pipeline
+   * Process query through optimized pipeline
    */
   async processQuery(
     query: string,
@@ -39,58 +42,59 @@ export class AsyncRAGOrchestratorService {
     const correlationId = uuidv4();
     const startTime = Date.now();
 
-    logger.info(
-      `🎬 [${correlationId}] Starting RAG pipeline for query: "${query.substring(0, 50)}..."`
+    console.log(
+      `🎬 [${correlationId}] Processing query: "${query.substring(0, 50)}..."`
     );
 
     try {
-      // PHASE 1: Quick Query Classification (no LLM, just rules)
-      logger.info(`📋 [${correlationId}] Phase 1: Classifying query`);
-      const classification = this.classifyQuery(query);
+      // ═══════════════════════════════════════════════════════════════
+      // OPTIMIZATION: Smart Classification with DeepSeek (Single LLM Call)
+      // Does TWO jobs:
+      // 1. Provides direct answer for simple queries (FAST)
+      // 2. Optimizes retrieval prompt for RAG queries (SMART)
+      // ═══════════════════════════════════════════════════════════════
 
-      logger.info(
-        `🎯 [${correlationId}] Query type: ${classification.type}`
+      console.log(`🧠 [${correlationId}] Smart classification in progress...`);
+      const classification = await smartClassifierService.classifyAndRoute(
+        query,
+        chatHistory
       );
 
-      // PHASE 2: Handle based on type
-      if (classification.type === "GREETING") {
-        // Handle greetings directly - no RAG, no sources
-        const greeting = await this.handleGreeting(query, chatHistory);
-        return {
-          answer: greeting,
-          sources: [],
-          metadata: {
-            correlationId,
-            strategy: "GREETING",
-            language: "en",
-            queryType: "GREETING",
-            duration: Date.now() - startTime,
-          },
-        };
-      }
+      console.log(
+        `🎯 [${correlationId}] Classification: ${classification.needsRAG ? "RAG" : "DIRECT"
+        }`
+      );
 
-      if (classification.type === "SIMPLE") {
-        // Handle simple questions without RAG
-        const answer = await this.handleSimpleQuery(query, chatHistory);
+      // FAST PATH: Direct answer (no RAG needed)
+      if (!classification.needsRAG && classification.directAnswer) {
+        console.log(`⚡ [${correlationId}] Fast path: Direct answer`);
+
         return {
-          answer,
+          answer: classification.directAnswer,
           sources: [],
           metadata: {
             correlationId,
-            strategy: "SIMPLE",
+            strategy: "DIRECT",
             language: "en",
             queryType: "SIMPLE",
             duration: Date.now() - startTime,
+            reasoning: classification.reasoning,
           },
         };
       }
 
-      // PHASE 3: RAG Query - Check documents
+      // SMART PATH: RAG with optimized retrieval
+      console.log(
+        `🔍 [${correlationId}] Smart path: RAG with optimized prompt`
+      );
+
+      // Check if documents exist
       const hasDocuments = await this.checkDocumentsExist(chromaCollectionName);
 
       if (!hasDocuments) {
         return {
-          answer: "Please upload some documents first, then ask me questions about them.",
+          answer:
+            "Please upload some documents first, then ask me questions about them.",
           sources: [],
           metadata: {
             correlationId,
@@ -102,13 +106,18 @@ export class AsyncRAGOrchestratorService {
         };
       }
 
-      // PHASE 4: Execute RAG Strategy
-      logger.info(`🚀 [${correlationId}] Phase 2: Executing RAG strategy`);
+      // Use optimized retrieval prompt if classifier provided one
+      const retrievalQuery = classification.retrievalPrompt || query;
+      console.log(
+        `📝 [${correlationId}] Using retrieval prompt: "${retrievalQuery.substring(0, 50)}..."`
+      );
 
+      // Execute RAG with optimized prompt
       const result = await decisionEngineService.handleRAGQuery(
-        query,
+        retrievalQuery,
         chatHistory,
-        chromaCollectionName
+        chromaCollectionName,
+        query // Pass original query for answer generation
       );
 
       const response: RAGResponse = {
@@ -120,98 +129,26 @@ export class AsyncRAGOrchestratorService {
           language: "en",
           queryType: "RAG",
           duration: Date.now() - startTime,
+          retrievalPrompt: retrievalQuery,
+          originalQuery: query,
+          reasoning: classification.reasoning,
           ...result.metadata,
         },
       };
 
-      logger.info(
-        `✅ [${correlationId}] RAG pipeline completed in ${response.metadata.duration}ms`
+      console.log(
+        `✅ [${correlationId}] Pipeline completed in ${response.metadata.duration}ms`
       );
 
       return response;
     } catch (error: any) {
-      logger.error(`❌ [${correlationId}] RAG pipeline error:`, error);
+      console.error(`❌ [${correlationId}] Pipeline error:`, error.message);
 
       return this.buildErrorResponse(
         error.message,
         correlationId,
         Date.now() - startTime
       );
-    }
-  }
-
-  /**
-   * Simple rule-based query classification (no LLM needed)
-   */
-  private classifyQuery(query: string): { type: "GREETING" | "SIMPLE" | "RAG" } {
-    const trimmed = query.trim().toLowerCase();
-
-    // Greeting patterns
-    const greetings = [
-      "hi", "hello", "hey", "hola", "namaste", "greetings",
-      "good morning", "good afternoon", "good evening", "good night",
-      "thanks", "thank you", "thx", "bye", "goodbye", "see you",
-      "how are you", "what's up", "wassup", "sup"
-    ];
-
-    if (greetings.some(g => trimmed === g || trimmed.startsWith(g + " ") || trimmed.startsWith(g + "!"))) {
-      return { type: "GREETING" };
-    }
-
-    // Simple questions that don't need documents
-    const simplePatterns = [
-      /^who are you/i,
-      /^what can you do/i,
-      /^help$/i,
-      /^what is your name/i,
-      /^how do you work/i,
-    ];
-
-    if (simplePatterns.some(p => p.test(trimmed))) {
-      return { type: "SIMPLE" };
-    }
-
-    // Default: RAG query (needs documents)
-    return { type: "RAG" };
-  }
-
-  /**
-   * Handle greetings with Ollama
-   */
-  private async handleGreeting(
-    query: string,
-    chatHistory: ChatMessage[]
-  ): Promise<string> {
-    try {
-      const response = await ollamaChatService.handleSimpleQuery(
-        query,
-        "en",
-        chatHistory
-      );
-      return response;
-    } catch (error) {
-      logger.error("Greeting handler error:", error);
-      return "Hello! How can I help you today? Feel free to upload documents and ask me questions about them.";
-    }
-  }
-
-  /**
-   * Handle simple queries with Ollama (no RAG)
-   */
-  private async handleSimpleQuery(
-    query: string,
-    chatHistory: ChatMessage[]
-  ): Promise<string> {
-    try {
-      const response = await ollamaChatService.handleSimpleQuery(
-        query,
-        "en",
-        chatHistory
-      );
-      return response;
-    } catch (error) {
-      logger.error("Simple query handler error:", error);
-      return "I'm an AI assistant that helps you understand your documents. Upload PDFs or images and ask me questions about them!";
     }
   }
 
@@ -224,7 +161,7 @@ export class AsyncRAGOrchestratorService {
       const count = await collection.count();
       return count > 0;
     } catch (error) {
-      logger.warn("Failed to check document count");
+      console.warn("⚠️  Failed to check document count");
       return false;
     }
   }
@@ -255,13 +192,23 @@ export class AsyncRAGOrchestratorService {
    * Get system health status
    */
   async getHealthStatus() {
-    const ollamaStatus = await ollamaChatService.checkConnection();
+    try {
+      // Simple health check - just verify Ollama is accessible
+      const { ollamaChatService } = await import("./ollamaChat.service");
+      const ollamaStatus = await ollamaChatService.checkConnection();
 
-    return {
-      status: ollamaStatus ? "operational" : "degraded",
-      ollama: ollamaStatus,
-      timestamp: new Date().toISOString(),
-    };
+      return {
+        status: ollamaStatus ? "operational" : "degraded",
+        ollama: ollamaStatus,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      return {
+        status: "degraded",
+        ollama: false,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 }
 
