@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import type { DocumentInfo, Topic, AnalysisResult } from '../../../types/topic';
-import { getDocuments, extractTopics } from '../../../services/analyzeApi';
-import TopicCard from './TopicCard';
+import type { DocumentInfo } from '../../../types/topic';
+import { getDocuments } from '../../../services/analyzeApi';
+import DocumentTree from './DocumentTree';
 
 interface PlanDashboardProps {
     userId: string;
@@ -15,10 +15,9 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
     onSwitchToStudy,
 }) => {
     const [documents, setDocuments] = useState<DocumentInfo[]>([]);
-    const [analyses, setAnalyses] = useState<Record<string, AnalysisResult>>({});
-    const [analyzingId, setAnalyzingId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
     useEffect(() => {
         loadDocuments();
@@ -36,36 +35,54 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
         }
     };
 
-    const handleAnalyze = async (doc: DocumentInfo) => {
-        setAnalyzingId(doc.id);
-        setError(null);
-        try {
-            const result = await extractTopics(userId, sessionId, doc.id, doc.fileName);
-            setAnalyses((prev) => ({ ...prev, [doc.id]: result }));
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setAnalyzingId(null);
-        }
-    };
-
-    const handleStudyTopic = (topic: Topic, documentName: string) => {
-        onSwitchToStudy(`@${documentName} Explain: ${topic.title}`);
-    };
-
     if (isLoading) {
         return (
             <div className="h-full flex items-center justify-center">
-                <div className="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+                <div className="text-center">
+                    <div className="w-12 h-12 mx-auto mb-4 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+                    <p className="text-gray-600">Loading documents...</p>
+                </div>
             </div>
         );
     }
 
     return (
         <div className="h-full overflow-y-auto p-6 bg-gradient-to-b from-white to-orange-50/30">
+            {/* Header */}
             <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">📋 Plan Mode</h2>
-                <p className="text-gray-600 mt-1">Analyze documents to extract main topics</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">
+                            Knowledge Tree
+                        </h2>
+                        <p className="text-gray-600 mt-1">
+                            Build hierarchical learning paths from your documents
+                        </p>
+                    </div>
+
+                    {documents.length > 0 && (
+                        <div className="flex items-center gap-2 bg-white rounded-lg p-1 border border-gray-200">
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'list'
+                                    ? 'bg-orange-100 text-orange-700'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                List
+                            </button>
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'grid'
+                                    ? 'bg-orange-100 text-orange-700'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Grid
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {error && (
@@ -74,73 +91,35 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
                 </div>
             )}
 
+            {/* Empty State */}
             {documents.length === 0 ? (
                 <div className="text-center py-16">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
-                        <span className="text-2xl">📄</span>
+                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-orange-100 to-amber-100 rounded-full flex items-center justify-center">
+                        <span className="text-4xl">📄</span>
                     </div>
-                    <p className="text-gray-600">No documents yet. Upload in Study mode first.</p>
+                    <h3 className="text-xl font-semibold text-gray-800 mb-2">No documents yet</h3>
+                    <p className="text-gray-600 mb-4">
+                        Upload documents in Study mode to create knowledge trees
+                    </p>
+                    <button
+                        onClick={() => onSwitchToStudy('')}
+                        className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                    >
+                        Go to Study Mode
+                    </button>
                 </div>
             ) : (
-                <div className="space-y-6">
-                    {documents.map((doc) => {
-                        const analysis = analyses[doc.id];
-                        const isAnalyzing = analyzingId === doc.id;
-
-                        return (
-                            <div key={doc.id} className="bg-white rounded-xl border-2 border-orange-100 overflow-hidden">
-                                {/* Document Header */}
-                                <div className="p-4 flex items-center justify-between bg-orange-50/50">
-                                    <div>
-                                        <h3 className="font-semibold text-gray-800">{doc.title}</h3>
-                                        <p className="text-sm text-gray-500">{doc.chunkCount} sections</p>
-                                    </div>
-
-                                    {!analysis && (
-                                        <button
-                                            onClick={() => handleAnalyze(doc)}
-                                            disabled={isAnalyzing}
-                                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isAnalyzing
-                                                    ? 'bg-gray-100 text-gray-400'
-                                                    : 'bg-orange-500 text-white hover:bg-orange-600'
-                                                }`}
-                                        >
-                                            {isAnalyzing ? (
-                                                <span className="flex items-center gap-2">
-                                                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                                    </svg>
-                                                    Analyzing...
-                                                </span>
-                                            ) : (
-                                                '🔍 Analyze'
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Topics Grid */}
-                                {analysis && (
-                                    <div className="p-4 border-t border-orange-100">
-                                        <p className="text-sm text-gray-500 mb-3">
-                                            {analysis.topics.length} topics found • Click to study
-                                        </p>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                            {analysis.topics.map((topic) => (
-                                                <TopicCard
-                                                    key={topic.id}
-                                                    topic={topic}
-                                                    documentName={doc.fileName}
-                                                    onStudy={handleStudyTopic}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                /* Document Trees */
+                <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'space-y-6'}`}>
+                    {documents.map((doc) => (
+                        <DocumentTree
+                            key={doc.id}
+                            document={doc}
+                            userId={userId}
+                            sessionId={sessionId}
+                            onSwitchToStudy={onSwitchToStudy}
+                        />
+                    ))}
                 </div>
             )}
         </div>
