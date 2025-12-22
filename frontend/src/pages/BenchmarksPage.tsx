@@ -4,6 +4,8 @@ import {
   Bar,
   LineChart,
   Line,
+  Area,
+  AreaChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -629,7 +631,13 @@ const BenchmarksPage: React.FC = () => {
                 <div className="mb-6">
                   <h4 className="text-base font-bold text-gray-900 mb-3">Translation Time Evolution</h4>
                   <ResponsiveContainer width="100%" height={400}>
-                    <LineChart data={performanceEvolutionData} margin={{ top: 20, right: 30, bottom: 80, left: 20 }}>
+                    <AreaChart data={performanceEvolutionData} margin={{ top: 20, right: 30, bottom: 80, left: 20 }}>
+                      <defs>
+                        <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#fed7aa" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#fed7aa" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis
                         dataKey="phase"
@@ -659,16 +667,17 @@ const BenchmarksPage: React.FC = () => {
                         }}
                         cursor={{ stroke: '#f97316', strokeWidth: 2 }}
                       />
-                      <Line
+                      <Area
                         type="monotone"
                         dataKey="time"
                         stroke="#f97316"
                         strokeWidth={3}
+                        fill="url(#colorTime)"
                         dot={{ fill: '#f97316', r: 6 }}
                         activeDot={{ r: 8 }}
                         name="Translation Time"
                       />
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
 
