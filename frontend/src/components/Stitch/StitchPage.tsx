@@ -708,7 +708,7 @@ const StitchPage: React.FC = () => {
     if (currentSessionId && currentSessionId !== previousSessionIdRef.current) {
       localStorage.setItem("masterji_stitch_sessionId", currentSessionId);
       previousSessionIdRef.current = currentSessionId;
-      
+
       // Only load if it's not a newly created session
       if (!isNewSessionRef.current) {
         loadSessionData(currentSessionId);
@@ -753,7 +753,7 @@ const StitchPage: React.FC = () => {
   // Create new session
   const handleNewSession = useCallback(() => {
     const newSessionId = generateSessionId();
-    
+
     // Mark as new session so we don't try to load it from backend
     isNewSessionRef.current = true;
     setCurrentSessionId(newSessionId);
