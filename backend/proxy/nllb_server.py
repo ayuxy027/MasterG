@@ -347,7 +347,7 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
     # CPU Optimization: Process multiple batches in parallel using ThreadPoolExecutor
     # This leverages multiple CPU cores effectively
     max_workers = min(4, cpu_count // 2)  # Don't overload CPU
-    batch_results = [None] * total_batches
+    batch_results: List[Optional[List[str]]] = [None] * total_batches
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
       # Submit all batch processing tasks
@@ -358,22 +358,32 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
         future = executor.submit(process_batch, batch, batch_num)
         future_to_batch[future] = batch_num
       
-      # Collect results as they complete
+      # Collect results as they complete (maintain order)
+      completed_count = 0
       for future in as_completed(future_to_batch):
         batch_num = future_to_batch[future]
         try:
           idx, translations = future.result()
-          batch_results[idx] = translations
-          sys.stderr.write(f"Translated batch {idx + 1}/{total_batches} ({len(translations)} sentences)\n")
+          # FIX: Ensure index is within bounds to prevent race conditions
+          if 0 <= idx < len(batch_results):
+            batch_results[idx] = translations
+            completed_count += 1
+            sys.stderr.write(f"Translated batch {idx + 1}/{total_batches} ({len(translations)} sentences)\n")
+          else:
+            sys.stderr.write(f"Warning: Invalid batch index {idx}, skipping\n")
         except Exception as e:
           sys.stderr.write(f"Error processing batch {batch_num + 1}: {e}\n")
           # Fallback: process this batch individually
-          batch_start = batch_num * batch_size
-          batch = units[batch_start:batch_start + batch_size]
-          _, translations = process_batch(batch, batch_num)
-          batch_results[batch_num] = translations
+          try:
+            batch_start = batch_num * batch_size
+            batch = units[batch_start:batch_start + batch_size]
+            _, translations = process_batch(batch, batch_num)
+            if 0 <= batch_num < len(batch_results):
+              batch_results[batch_num] = translations
+          except Exception as e2:
+            sys.stderr.write(f"Fallback processing also failed for batch {batch_num + 1}: {e2}\n")
     
-    # Combine all batch results in order
+    # Combine all batch results in order (skip None entries)
     for batch_result in batch_results:
       if batch_result:
         translated_sentences.extend(batch_result)

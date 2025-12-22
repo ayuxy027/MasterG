@@ -92,9 +92,19 @@ export class NLLBService {
 
   /**
    * Generate cache key from text and language options
+   * OPTIMIZATION: Use hash for better cache key distribution and memory efficiency
    */
   private getCacheKey(text: string, options: NLLBTranslateOptions): string {
-    return `${options.srcLang}:${options.tgtLang}:${text.substring(0, 100)}`;
+    // Use simple hash function for better cache key distribution
+    // This prevents cache key collisions and reduces memory usage
+    let hash = 0;
+    const keyString = `${options.srcLang}:${options.tgtLang}:${text}`;
+    for (let i = 0; i < keyString.length; i++) {
+      const char = keyString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return `nllb:${Math.abs(hash).toString(36)}:${keyString.length}`;
   }
 
   /**

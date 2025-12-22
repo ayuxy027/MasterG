@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
 
 // All 22 scheduled Indian languages + English (from language service)
@@ -45,7 +45,8 @@ interface ContentPreviewProps {
   content: string;
 }
 
-const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
+// OPTIMIZATION: Memoize ContentPreview to prevent unnecessary re-renders
+const ContentPreview: React.FC<ContentPreviewProps> = React.memo(({ content }) => {
   if (!content) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 bg-gray-50 rounded-lg">
@@ -80,7 +81,7 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
       </div>
     </div>
   );
-};
+});
 
 const StitchPage: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState("8");
@@ -90,6 +91,7 @@ const StitchPage: React.FC = () => {
   const [topic, setTopic] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const translationAbortControllersRef = useRef<Map<string, AbortController>>(new Map()); // Track translation abort controllers
   const [generatedContent, setGeneratedContent] = useState("");
   const [englishContent, setEnglishContent] = useState(""); // Store original English content
   const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
@@ -107,6 +109,20 @@ const StitchPage: React.FC = () => {
   // Check Ollama status on mount
   useEffect(() => {
     checkOllamaStatus();
+    
+    // Cleanup: Cancel all ongoing translations on unmount
+    return () => {
+      // Cancel content generation
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Cancel all translations
+      translationAbortControllersRef.current.forEach((controller) => {
+        controller.abort();
+      });
+      translationAbortControllersRef.current.clear();
+    };
   }, []);
 
   const checkOllamaStatus = async () => {
@@ -263,11 +279,28 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // Input validation: Check content length (prevent extremely long texts)
+    if (englishContent.length > 50000) {
+      setError("Content too long. Please limit to 50,000 characters.");
+      return;
+    }
+
     // Check if already translated
-    if (translatedContent[targetLang]) {
+    if (translatedContent[targetLang] && !translatingLanguages.has(targetLang)) {
       setActiveTab(targetLang);
       return;
     }
+
+    // Cancel any existing translation for this language
+    const existingController = translationAbortControllersRef.current.get(targetLang);
+    if (existingController) {
+      existingController.abort();
+      translationAbortControllersRef.current.delete(targetLang);
+    }
+
+    // Create new abort controller for this translation
+    const controller = new AbortController();
+    translationAbortControllersRef.current.set(targetLang, controller);
 
     // UX IMPROVEMENT: Create tab immediately with skeleton UI
     setTranslatingLanguages(prev => new Set(prev).add(targetLang));
@@ -289,6 +322,7 @@ const StitchPage: React.FC = () => {
         headers: {
           "Content-Type": "application/json",
         },
+        signal: controller.signal, // Add abort signal for cancellation
         body: JSON.stringify({
           text: englishContent,
           sourceLanguage: "en",
@@ -310,8 +344,21 @@ const StitchPage: React.FC = () => {
 
       let buffer = "";
       let accumulatedTranslation = "";
+      const TIMEOUT_MS = 300000; // 5 minutes timeout
+      const startTime = Date.now();
 
       while (true) {
+        // Check timeout
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          throw new Error("Translation timeout. The content may be too long.");
+        }
+
+        // Check if cancelled
+        if (controller.signal.aborted) {
+          reader.cancel();
+          throw new DOMException("Translation cancelled", "AbortError");
+        }
+
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -355,8 +402,26 @@ const StitchPage: React.FC = () => {
         newSet.delete(targetLang);
         return newSet;
       });
+      translationAbortControllersRef.current.delete(targetLang);
       setError(null);
     } catch (err) {
+      // Don't show error if it was cancelled by user
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // Cleanup on cancellation
+        setTranslatingLanguages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(targetLang);
+          return newSet;
+        });
+        setTranslatedContent(prev => {
+          const newPrev = { ...prev };
+          delete newPrev[targetLang];
+          return newPrev;
+        });
+        translationAbortControllersRef.current.delete(targetLang);
+        return;
+      }
+
       const msg =
         err instanceof StitchApiError
           ? err.message
@@ -378,15 +443,23 @@ const StitchPage: React.FC = () => {
         delete newPrev[targetLang];
         return newPrev;
       });
+      
+      translationAbortControllersRef.current.delete(targetLang);
     } finally {
       setIsTranslating(prev => ({ ...prev, [targetLang]: false }));
     }
   };
 
-  const getLanguageName = (code: string) => {
+  // OPTIMIZATION: Memoize language name lookup
+  const getLanguageName = useCallback((code: string) => {
     const lang = ALL_LANGUAGES.find(l => l.code === code);
     return lang ? `${lang.name} (${lang.native})` : code;
-  };
+  }, []);
+
+  // OPTIMIZATION: Memoize available tabs list
+  const availableTabs = useMemo(() => {
+    return Array.from(new Set([...Object.keys(translatedContent), ...Array.from(translatingLanguages)]));
+  }, [translatedContent, translatingLanguages]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
@@ -751,7 +824,7 @@ const StitchPage: React.FC = () => {
                     English
                   </button>
                   {/* Show all languages that are either translated or currently translating */}
-                  {Array.from(new Set([...Object.keys(translatedContent), ...Array.from(translatingLanguages)])).map((langCode) => (
+                  {availableTabs.map((langCode) => (
                     <button
                       key={langCode}
                       onClick={() => setActiveTab(langCode)}
