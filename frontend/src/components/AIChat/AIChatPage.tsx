@@ -28,6 +28,7 @@ const AIChatPage: React.FC = () => {
 
   // Chat State
   const [messages, setMessages] = useState<MessageUI[]>([]);
+  const [pendingStudyPrompt, setPendingStudyPrompt] = useState<string | null>(null);
 
   // UI State
   const [activeTab, setActiveTab] = useState<TabType>("chat");
@@ -295,6 +296,8 @@ const AIChatPage: React.FC = () => {
               messages={messages}
               setMessages={setMessages}
               onSessionUpdate={handleSessionUpdate}
+              initialPrompt={pendingStudyPrompt}
+              onInitialPromptConsumed={() => setPendingStudyPrompt(null)}
             />
           ) : activeTab === "resources" && currentSessionId ? (
             <ResourcesPanel userId={userId} sessionId={currentSessionId} />
@@ -303,8 +306,8 @@ const AIChatPage: React.FC = () => {
               userId={userId}
               sessionId={currentSessionId}
               onSwitchToStudy={(prompt) => {
+                setPendingStudyPrompt(prompt);
                 setActiveTab("chat");
-                // Optionally set prompt for new message
               }}
             />
           ) : (

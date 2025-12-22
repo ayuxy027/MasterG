@@ -26,7 +26,7 @@ export class LMRController {
             sessionId: req.body.sessionId,
             language: "english",
             tone: "professional",
-          }).catch((err) => console.error("Failed to save LMR history:", err));
+          }).catch(() => { });
         }
         return originalJson(body);
       };
@@ -34,7 +34,6 @@ export class LMRController {
       // Delegate to existing upload controller
       await uploadController.uploadFile(req, res);
     } catch (error) {
-      console.error("❌ LMR upload error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -58,10 +57,6 @@ export class LMRController {
         return;
       }
 
-      console.log(
-        `📝 Generating summary for fileId: ${fileId}, language: ${language}`
-      );
-
       // Check if we have cached content in history
       const history = await LMRHistoryModel.findOne({ fileId });
       if (
@@ -70,7 +65,6 @@ export class LMRController {
         history.language === language &&
         history.tone === tone
       ) {
-        console.log("✅ Returning cached summary from history");
         res.status(200).json({
           success: true,
           data: history.summary,
@@ -89,14 +83,13 @@ export class LMRController {
         { fileId },
         { hasSummary: true, summary, language, tone, updatedAt: new Date() },
         { upsert: false }
-      ).catch((err) => console.error("Failed to update LMR history:", err));
+      ).catch(() => { });
 
       res.status(200).json({
         success: true,
         data: summary,
       });
     } catch (error) {
-      console.error("❌ Generate summary error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -120,10 +113,6 @@ export class LMRController {
         return;
       }
 
-      console.log(
-        `❓ Generating questions for fileId: ${fileId}, language: ${language}`
-      );
-
       // Check if we have cached content in history
       const history = await LMRHistoryModel.findOne({ fileId });
       if (
@@ -132,7 +121,6 @@ export class LMRController {
         history.questions.length > 0 &&
         history.language === language
       ) {
-        console.log("✅ Returning cached questions from history");
         res.status(200).json({
           success: true,
           data: history.questions,
@@ -151,14 +139,13 @@ export class LMRController {
         { fileId },
         { hasQuestions: true, questions, language, updatedAt: new Date() },
         { upsert: false }
-      ).catch((err) => console.error("Failed to update LMR history:", err));
+      ).catch(() => { });
 
       res.status(200).json({
         success: true,
         data: questions,
       });
     } catch (error) {
-      console.error("❌ Generate questions error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -184,10 +171,6 @@ export class LMRController {
         return;
       }
 
-      console.log(
-        `📝 Generating quiz for fileId: ${fileId}, language: ${language}`
-      );
-
       // Check if we have cached content in history
       const history = await LMRHistoryModel.findOne({ fileId });
       if (
@@ -196,7 +179,6 @@ export class LMRController {
         history.quiz.length > 0 &&
         history.language === language
       ) {
-        console.log("✅ Returning cached quiz from history");
         res.status(200).json({
           success: true,
           data: history.quiz,
@@ -215,14 +197,13 @@ export class LMRController {
         { fileId },
         { hasQuiz: true, quiz, language, updatedAt: new Date() },
         { upsert: false }
-      ).catch((err) => console.error("Failed to update LMR history:", err));
+      ).catch(() => { });
 
       res.status(200).json({
         success: true,
         data: quiz,
       });
     } catch (error) {
-      console.error("❌ Generate quiz error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -246,10 +227,6 @@ export class LMRController {
         return;
       }
 
-      console.log(
-        `🎯 Generating recall notes for fileId: ${fileId}, language: ${language}`
-      );
-
       // Check if we have cached content in history
       const history = await LMRHistoryModel.findOne({ fileId });
       if (
@@ -258,7 +235,6 @@ export class LMRController {
         history.recallNotes.length > 0 &&
         history.language === language
       ) {
-        console.log("✅ Returning cached recall notes from history");
         res.status(200).json({
           success: true,
           data: history.recallNotes,
@@ -276,14 +252,13 @@ export class LMRController {
         { fileId },
         { hasRecallNotes: true, recallNotes, language, updatedAt: new Date() },
         { upsert: false }
-      ).catch((err) => console.error("Failed to update LMR history:", err));
+      ).catch(() => { });
 
       res.status(200).json({
         success: true,
         data: recallNotes,
       });
     } catch (error) {
-      console.error("❌ Generate recall notes error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -309,9 +284,7 @@ export class LMRController {
         return;
       }
 
-      console.log(
-        `🚀 Generating all content for fileId: ${fileId}, language: ${language}`
-      );
+
 
       const content = await lmrService.getAllContent(
         fileId,
@@ -323,7 +296,6 @@ export class LMRController {
         data: content,
       });
     } catch (error) {
-      console.error("❌ Generate all content error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -347,7 +319,7 @@ export class LMRController {
         return;
       }
 
-      console.log(`📥 Generating PDF for fileId: ${fileId}`);
+
 
       // Generate all content
       const content = await lmrService.getAllContent(
@@ -374,7 +346,6 @@ export class LMRController {
 
       res.send(pdfBuffer);
     } catch (error) {
-      console.error("❌ Download PDF error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -412,7 +383,6 @@ export class LMRController {
         data: history,
       });
     } catch (error) {
-      console.error("❌ Get history error:", error);
       res.status(500).json({
         success: false,
         error:
@@ -451,7 +421,6 @@ export class LMRController {
         message: "History entry deleted successfully",
       });
     } catch (error) {
-      console.error("❌ Delete history error:", error);
       res.status(500).json({
         success: false,
         error:

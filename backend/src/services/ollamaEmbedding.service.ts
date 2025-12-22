@@ -1,6 +1,5 @@
 import axios from "axios";
 import { EmbeddingResult } from "../types";
-import logger from "./logger.service";
 
 /**
  * Ollama Embedding Service

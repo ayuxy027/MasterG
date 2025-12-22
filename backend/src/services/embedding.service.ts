@@ -2,8 +2,6 @@ import axios from "axios";
 import { API_ENDPOINTS } from "../config/constants";
 import env from "../config/env";
 import { EmbeddingResult } from "../types";
-import { cacheService } from "./cache.service";
-import logger from "./logger.service";
 
 export class EmbeddingService {
   private apiKey: string;
@@ -26,16 +24,9 @@ export class EmbeddingService {
   }
 
   /**
-   * Generate embedding for a single text with retry logic and caching
+   * Generate embedding for a single text with retry logic
    */
   async generateEmbedding(text: string, retryCount = 0): Promise<number[]> {
-    // Check cache first
-    const cached = cacheService.getEmbedding(text);
-    if (cached) {
-      logger.debug("✨ Using cached embedding");
-      return cached;
-    }
-
     try {
       const response = await axios.post(
         `${this.apiUrl}?key=${this.apiKey}`,
@@ -58,9 +49,6 @@ export class EmbeddingService {
       if (!embedding || !Array.isArray(embedding)) {
         throw new Error("Invalid embedding response");
       }
-
-      // Cache the embedding
-      cacheService.setEmbedding(text, embedding);
 
       return embedding;
     } catch (error: any) {
@@ -98,8 +86,7 @@ export class EmbeddingService {
           statusCode === 503)
       ) {
         console.warn(
-          `⚠️  Retry ${retryCount + 1}/${
-            this.MAX_RETRIES
+          `⚠️  Retry ${retryCount + 1}/${this.MAX_RETRIES
           } for embedding generation...`
         );
         await this.sleep(this.RETRY_DELAY * (retryCount + 1)); // Exponential backoff

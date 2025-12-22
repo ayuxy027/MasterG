@@ -4,7 +4,7 @@ import { vectorDBService } from '../services/vectordb.service';
 import { ollamaChatService } from '../services/ollamaChat.service';
 import { ollamaEmbeddingService } from '../services/ollamaEmbedding.service';
 import { QueryRequest, QueryResponse } from '../types';
-import logger from '../services/logger.service';
+
 
 /**
  * Query Controller with AI-Powered Classification
@@ -24,7 +24,7 @@ export class QueryController {
     try {
       return await ollamaChatService.handleSimpleQuery(query, "en", chatHistory);
     } catch (error) {
-      logger.error("Greeting handler error:", error);
+      console.error("Greeting handler error:", error);
       return "Hello! How can I help you today? Feel free to upload documents and ask me questions about them.";
     }
   }
@@ -36,7 +36,7 @@ export class QueryController {
     try {
       return await ollamaChatService.handleSimpleQuery(query, "en", chatHistory);
     } catch (error) {
-      logger.error("Simple query handler error:", error);
+      console.error("Simple query handler error:", error);
       return "I'm an AI assistant that helps you understand your documents. Upload PDFs or images and ask me questions about them!";
     }
   }
@@ -63,10 +63,10 @@ export class QueryController {
     }
 
     // Generate embedding and search
-    logger.info("📝 Generating embedding...");
+
     const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(query);
 
-    logger.info("🔍 Searching documents...");
+
     const searchResults = await vectorDBService.queryChunksWithFilter(
       queryEmbedding, 8, chromaCollectionName, mentionedFileIds
     );
@@ -87,7 +87,7 @@ export class QueryController {
     }));
 
     // Generate answer
-    logger.info("🤖 Generating answer...");
+
     const result = await ollamaChatService.generateEducationalAnswer(
       context, chatHistory, query, "en", sources
     );
@@ -113,9 +113,7 @@ export class QueryController {
       }
 
       const startTime = Date.now();
-      logger.info(`\n${'='.repeat(60)}`);
-      logger.info(`💬 Query: "${query}"`);
-      logger.info(`👤 User: ${userId} | Session: ${sessionId}`);
+      console.log(`💬 Query: "${query}"`);
 
       // Get chat context
       const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
@@ -130,22 +128,22 @@ export class QueryController {
       await chatService.addMessage(userId, sessionId, { role: 'user', content: query });
 
       // ========== LAYER 1: AI CLASSIFICATION ==========
-      logger.info(`🧠 Layer 1: AI Classification...`);
+
       const classification = await ollamaChatService.classifyQuery(query, hasDocuments, chatHistory);
-      logger.info(`🎯 Classification: ${classification.type} - ${classification.reason}`);
+      console.log(`🎯 Classification: ${classification.type} - ${classification.reason}`);
 
       // ========== LAYER 2: EXECUTE BASED ON TYPE ==========
       let answer: string;
       let sources: any[] = [];
 
       if (classification.type === "GREETING") {
-        logger.info(`💬 Handling as GREETING (no sources)`);
+
         answer = await this.handleGreeting(query, chatHistory);
       } else if (classification.type === "SIMPLE") {
-        logger.info(`💬 Handling as SIMPLE (no sources)`);
+
         answer = await this.handleSimple(query, chatHistory);
       } else {
-        logger.info(`📚 Handling as RAG (with document search)`);
+
         const ragResult = await this.handleRAG(query, chatHistory, chromaCollectionName, mentionedFileIds);
         answer = ragResult.answer;
         sources = ragResult.sources;
@@ -159,8 +157,7 @@ export class QueryController {
       });
 
       const responseTime = Date.now() - startTime;
-      logger.info(`✅ Response in ${responseTime}ms | Type: ${classification.type}`);
-      logger.info(`${'='.repeat(60)}\n`);
+      console.log(`✅ Response in ${responseTime}ms | Type: ${classification.type}`);
 
       res.json({
         success: true,
@@ -174,7 +171,7 @@ export class QueryController {
       });
 
     } catch (error: any) {
-      logger.error('Query error:', error);
+      console.error('Query error:', error);
       res.status(500).json({ success: false, error: error.message || 'Query failed' });
     }
   }
@@ -202,9 +199,7 @@ export class QueryController {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
 
-      logger.info(`\n${'='.repeat(60)}`);
-      logger.info(`🚀 Stream Query: "${query}"`);
-      logger.info(`👤 User: ${userId}`);
+      console.log(`🚀 Stream Query: "${query}"`);
 
       // Get chat context
       const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
@@ -222,9 +217,9 @@ export class QueryController {
       res.write(`data: ${JSON.stringify({ type: 'layer', layer: 'classifying' })}\n\n`);
 
       // ========== LAYER 1: AI CLASSIFICATION ==========
-      logger.info(`🧠 Layer 1: AI Classification...`);
+
       const classification = await ollamaChatService.classifyQuery(query, hasDocuments, chatHistory);
-      logger.info(`🎯 Classification: ${classification.type} - ${classification.reason}`);
+      console.log(`🎯 Classification: ${classification.type} - ${classification.reason}`);
 
       // Send classification result
       res.write(`data: ${JSON.stringify({ type: 'layer', layer: classification.type })}\n\n`);
@@ -249,7 +244,7 @@ export class QueryController {
             await new Promise(r => setTimeout(r, 15));
           }
         } catch (error: any) {
-          logger.error('Handler error:', error);
+          console.error('Handler error:', error);
           fullAnswer = "Hello! How can I help you today?";
           res.write(`data: ${JSON.stringify({ type: 'text', content: fullAnswer })}\n\n`);
         }
@@ -310,7 +305,7 @@ export class QueryController {
               res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
 
             } catch (ollamaError: any) {
-              logger.error('Ollama error:', ollamaError);
+              console.error('Ollama error:', ollamaError);
               res.write(`data: ${JSON.stringify({ type: 'error', error: ollamaError.message })}\n\n`);
             }
           }
@@ -326,12 +321,11 @@ export class QueryController {
         });
       }
 
-      logger.info(`✅ Stream complete | Type: ${classification.type} | Length: ${fullAnswer.length}`);
-      logger.info(`${'='.repeat(60)}\n`);
+      console.log(`✅ Stream complete | Type: ${classification.type} | Length: ${fullAnswer.length}`);
       res.end();
 
     } catch (error: any) {
-      logger.error('Streaming error:', error);
+      console.error('Streaming error:', error);
       res.write(`data: ${JSON.stringify({ type: 'error', error: error.message || 'Streaming failed' })}\n\n`);
       res.end();
     }
