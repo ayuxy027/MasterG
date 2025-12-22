@@ -7,6 +7,7 @@ interface GenerationResultsProps {
   count: number;
   onDownload: (poster: GeneratedPoster, index: number) => void;
   onDownloadAll: () => void;
+  onClearHistory?: () => void;
 }
 
 const GenerationResults: React.FC<GenerationResultsProps> = ({
@@ -15,6 +16,7 @@ const GenerationResults: React.FC<GenerationResultsProps> = ({
   count,
   onDownload,
   onDownloadAll,
+  onClearHistory,
 }) => {
   // Determine grid columns based on number of images
   const getGridClass = () => {
@@ -84,27 +86,51 @@ const GenerationResults: React.FC<GenerationResultsProps> = ({
             successfully
           </p>
         </div>
-        {posters.length > 1 && (
-          <button
-            onClick={onDownloadAll}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-md"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        <div className="flex items-center gap-2">
+          {onClearHistory && (
+            <button
+              onClick={onClearHistory}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors shadow-sm border border-gray-200"
+              title="Clear poster history"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            Download All
-          </button>
-        )}
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              <span className="hidden sm:inline">Clear History</span>
+            </button>
+          )}
+          {posters.length > 1 && (
+            <button
+              onClick={onDownloadAll}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-md"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Download All
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Posters Grid */}
