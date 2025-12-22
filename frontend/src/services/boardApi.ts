@@ -53,17 +53,18 @@ export async function checkOllamaStatus(): Promise<OllamaStatus> {
 }
 
 /**
- * Generate educational cards from a prompt
+ * Generate educational cards from a prompt (with streaming support)
  */
 export async function generateCards(
   prompt: string,
-  cardCount: number = 3
+  cardCount: number = 3,
+  onThinkingUpdate?: (text: string) => void
 ): Promise<CardData[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/board/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, cardCount }),
+      body: JSON.stringify({ prompt, cardCount, stream: true }),
     });
 
     if (!response.ok) {
@@ -71,12 +72,60 @@ export async function generateCards(
       throw new Error(err.message || "Failed to generate cards");
     }
 
-    const data: GenerateResponse = await response.json();
-    if (!data.success || !data.cards) {
-      throw new Error(data.message || "Failed to generate cards");
+    // Handle streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      throw new Error("No response body for streaming");
     }
 
-    return data.cards;
+    let buffer = "";
+    let accumulatedThinking = "";
+    let cards: CardData[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          try {
+            const parsed = JSON.parse(data);
+
+            if (parsed.type === "thinking") {
+              accumulatedThinking += parsed.content;
+              if (onThinkingUpdate) {
+                onThinkingUpdate(accumulatedThinking);
+              }
+            } else if (parsed.type === "complete") {
+              if (parsed.cards) {
+                cards = parsed.cards;
+              }
+              if (parsed.thinkingText && onThinkingUpdate) {
+                onThinkingUpdate(parsed.thinkingText);
+              }
+            } else if (parsed.type === "error") {
+              throw new Error(parsed.error);
+            }
+          } catch (e) {
+            // Skip invalid JSON
+            continue;
+          }
+        }
+      }
+    }
+
+    if (cards.length === 0) {
+      throw new Error("No cards generated");
+    }
+
+    return cards;
   } catch (error: any) {
     console.error("Board API: Generate error:", error);
     throw error;

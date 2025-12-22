@@ -186,7 +186,12 @@ const StickyNote: React.FC<StickyNoteProps> = ({
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="absolute top-8 right-0 bg-white rounded-md shadow-lg p-3 border border-gray-200 min-w-[180px]" style={{ zIndex: 99999 }}>
+        <div 
+          className="absolute top-8 right-0 bg-white rounded-md shadow-lg p-3 border border-gray-200 min-w-[180px]" 
+          style={{ zIndex: 99999 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="space-y-3">
             {/* Color Picker */}
             <div>
@@ -197,7 +202,11 @@ const StickyNote: React.FC<StickyNoteProps> = ({
                     key={colorOption}
                     className={`w-6 h-6 rounded-full border ${color === colorOption ? 'border-gray-700' : 'border-gray-200'}`}
                     style={{ backgroundColor: colorOption }}
-                    onClick={() => onUpdate(id, { color: colorOption })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdate(id, { color: colorOption });
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
                     title={colorOption}
                   />
                 ))}
@@ -209,7 +218,10 @@ const StickyNote: React.FC<StickyNoteProps> = ({
               <label className="block text-xs text-gray-700 mb-1">Text Size</label>
               <select
                 value={fontSize}
-                onChange={(e) => onUpdate(id, { fontSize: Number(e.target.value) })}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onUpdate(id, { fontSize: Number(e.target.value) });
+                }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
@@ -228,7 +240,11 @@ const StickyNote: React.FC<StickyNoteProps> = ({
                 <button
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${ruled ? 'bg-orange-500' : 'bg-gray-300'
                     }`}
-                  onClick={() => onUpdate(id, { ruled: !ruled })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdate(id, { ruled: !ruled });
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                   title={ruled ? 'Disable ruled lines' : 'Enable ruled lines'}
                 >
                   <span
@@ -242,11 +258,13 @@ const StickyNote: React.FC<StickyNoteProps> = ({
             {/* Delete */}
             <button
               className="w-full text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (window.confirm('Delete this note?')) {
                   onDelete(id);
                 }
               }}
+              onMouseDown={(e) => e.stopPropagation()}
             >
               Delete
             </button>

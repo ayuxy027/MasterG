@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import axios from "axios";
 import env from "../config/env";
+import { ollamaService } from "../services/ollama.service";
 
 const router = express.Router();
 
@@ -39,11 +40,11 @@ interface CardActionRequest {
 
 /**
  * POST /api/board/generate
- * Generate educational cards from a prompt
+ * Generate educational cards from a query/prompt (with streaming thinking text)
  */
 router.post("/generate", async (req: Request, res: Response) => {
   try {
-    const { prompt, cardCount = 3 }: GenerateRequest = req.body;
+    const { prompt, cardCount = 3, stream = true }: GenerateRequest & { stream?: boolean } = req.body;
 
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({
@@ -52,77 +53,108 @@ router.post("/generate", async (req: Request, res: Response) => {
       });
     }
 
-    console.log(`📝 Board: Generating ${cardCount} cards for prompt...`);
+    console.log(`📝 Board: Generating ${cardCount} cards for query: "${prompt}"...`);
 
-    const systemPrompt = `You are an educational content creator. Generate exactly ${cardCount} educational cards based on the user's prompt.
+    // Updated prompt to generate results based on query, not prompts
+    const systemPrompt = `You are an educational content creator. The user has asked a question or provided a topic. Generate exactly ${cardCount} educational cards that answer their query or explain the topic.
 
 RULES:
-1. Each card must have a clear title and concise content (50-80 words max)
-2. Content should be educational and informative
-3. Use simple language suitable for students
-4. Return ONLY valid JSON array, no other text
+1. Each card must have a clear, descriptive title (3-8 words)
+2. Content should directly address the user's query/topic (20-50 words per card)
+3. Content should be informative, educational, and well-structured
+4. Use simple, clear language suitable for students
+5. Each card should cover a different aspect or subtopic related to the query
+6. Return ONLY valid JSON array, no other text
 
 OUTPUT FORMAT (strict JSON):
 [
-  {"title": "Card Title 1", "content": "Educational content here..."},
-  {"title": "Card Title 2", "content": "Educational content here..."},
-  {"title": "Card Title 3", "content": "Educational content here..."}
+  {"title": "Card Title 1", "content": "Content that answers the query (20-50 words)..."},
+  {"title": "Card Title 2", "content": "Content that answers the query (20-50 words)..."},
+  {"title": "Card Title 3", "content": "Content that answers the query (20-50 words)..."}
 ]
 
-User prompt: ${prompt}
+User's query/topic: ${prompt}
 
-Generate ${cardCount} cards as JSON array:`;
+Generate exactly ${cardCount} cards as JSON array:`;
 
-    const response = await axios.post(
-      `${OLLAMA_URL}/api/generate`,
-      {
-        model: OLLAMA_MODEL,
-        prompt: systemPrompt,
-        stream: false,
-        options: { temperature: 0.7, num_predict: 2000 },
-      },
-      { timeout: 120000 }
-    );
+    // Set up streaming headers
+    if (stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+    }
 
-    let cards = [];
-    const aiResponse = response.data.response || "";
+    let thinkingText = "";
+    let responseText = "";
 
-    // Parse JSON from response
     try {
-      let cleanResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-      const match = cleanResponse.match(/\[[\s\S]*\]/);
-      if (match) {
-        cards = JSON.parse(match[0]);
+      // Use streaming generation
+      for await (const chunk of ollamaService.generateStream(systemPrompt, {
+        model: OLLAMA_MODEL,
+        temperature: 0.7,
+      })) {
+        if (chunk.type === "thinking") {
+          thinkingText += chunk.content;
+          if (stream) {
+            res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
+          }
+        } else if (chunk.type === "response") {
+          responseText += chunk.content;
+        }
       }
-    } catch (e) {
-      console.log("Failed to parse AI response, using fallback");
+
+      // Parse JSON from response
+      let cards: any[] = [];
+      try {
+        let cleanResponse = responseText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        const match = cleanResponse.match(/\[[\s\S]*\]/);
+        if (match) {
+          cards = JSON.parse(match[0]);
+        }
+      } catch (e) {
+        console.log("Failed to parse AI response, using fallback");
+      }
+
+      // Fallback if parsing failed
+      if (!Array.isArray(cards) || cards.length === 0) {
+        cards = Array.from({ length: cardCount }, (_, idx) => ({
+          title: `Key Point ${idx + 1}`,
+          content: `Information about: ${prompt.slice(0, 50)}...`,
+        }));
+      }
+
+      // Normalize cards
+      cards = cards.slice(0, cardCount).map((c: any, idx: number) => ({
+        id: `card-${Date.now()}-${idx}`,
+        title: c.title || `Card ${idx + 1}`,
+        content: c.content || "",
+      }));
+
+      console.log(`✅ Board: Generated ${cards.length} cards`);
+
+      if (stream) {
+        res.write(`data: ${JSON.stringify({ type: "complete", cards, thinkingText })}\n\n`);
+        res.end();
+      } else {
+        res.json({ success: true, cards, thinkingText });
+      }
+    } catch (streamError: any) {
+      console.error("Streaming error:", streamError.message);
+      if (stream) {
+        res.write(`data: ${JSON.stringify({ type: "error", error: streamError.message })}\n\n`);
+        res.end();
+      } else {
+        throw streamError;
+      }
     }
-
-    // Fallback if parsing failed
-    if (!Array.isArray(cards) || cards.length === 0) {
-      cards = [
-        { title: "Overview", content: `Summary of: ${prompt.slice(0, 100)}...` },
-        { title: "Key Points", content: "Main concepts and ideas covered in this topic." },
-        { title: "Summary", content: "Review the key takeaways from this material." },
-      ];
-    }
-
-    // Normalize cards
-    cards = cards.slice(0, cardCount).map((c: any, idx: number) => ({
-      id: `card-${Date.now()}-${idx}`,
-      title: c.title || `Card ${idx + 1}`,
-      content: c.content || "",
-    }));
-
-    console.log(`✅ Board: Generated ${cards.length} cards`);
-
-    res.json({ success: true, cards });
   } catch (error: any) {
     console.error("Board generate error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to generate cards",
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to generate cards",
+      });
+    }
   }
 });
 
