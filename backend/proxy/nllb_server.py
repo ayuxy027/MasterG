@@ -619,7 +619,11 @@ def main():
         src_lang = str(req.get("src_lang") or "eng_Latn")
         tgt_lang = str(req.get("tgt_lang") or "hin_Deva")
         stream = bool(req.get("stream") or False)
-        batch_size = int(req.get("batch_size") or 8)  # Default batch size of 8
+        batch_size = req.get("batch_size")
+        if batch_size is not None:
+          batch_size = int(batch_size)
+        else:
+          batch_size = None  # Auto-detect based on device
         
         if not text:
           result = {"success": False, "error": "Missing or empty 'text' field"}
