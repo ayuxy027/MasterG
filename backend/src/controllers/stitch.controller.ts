@@ -185,11 +185,12 @@ export class StitchController {
         return;
       }
 
-      const { text, sourceLanguage, targetLanguage } = req.body as {
+      const { text, sourceLanguage, targetLanguage, batchSize } = req.body as {
         text?: string;
         sourceLanguage?: string;
         targetLanguage?: string;
         stream?: boolean;
+        batchSize?: number;
       };
 
       if (!text || !text.trim()) {
@@ -234,6 +235,7 @@ export class StitchController {
             {
               srcLang: srcLang,
               tgtLang: tgtLang,
+              batchSize: batchSize || 8, // Use provided batch size or default to 8
             },
             (chunk) => {
               // Forward chunk as SSE event
@@ -260,10 +262,12 @@ export class StitchController {
         return;
       }
 
-      // Non-streaming: single-shot translation
+      // Non-streaming: single-shot translation with batch processing
       const translated = await nllbService.translate(text, {
         srcLang: srcLang,
         tgtLang: tgtLang,
+        batchSize: batchSize || 8, // Use provided batch size or default to 8
+        useCache: true, // Enable caching for repeated translations
       });
 
       res.json({

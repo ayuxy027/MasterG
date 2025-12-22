@@ -6,12 +6,16 @@ import { env } from "../config/env";
 export interface NLLBTranslateOptions {
   srcLang: string; // e.g. eng_Latn
   tgtLang: string; // e.g. hin_Deva
+  batchSize?: number; // Batch size for translation (default: 8)
+  useCache?: boolean; // Whether to use cache (default: true)
 }
 
 export class NLLBService {
   private scriptPath: string;
   private pythonExecutable: string;
   private pythonProcess: ChildProcess | null = null; // Persistent Python process
+  private translationCache: Map<string, string> = new Map(); // Simple in-memory cache
+  private readonly CACHE_MAX_SIZE = 1000; // Limit cache size
 
   constructor() {
     this.scriptPath = path.resolve(
@@ -86,6 +90,27 @@ export class NLLBService {
     });
   }
 
+  /**
+   * Generate cache key from text and language options
+   */
+  private getCacheKey(text: string, options: NLLBTranslateOptions): string {
+    return `${options.srcLang}:${options.tgtLang}:${text.substring(0, 100)}`;
+  }
+
+  /**
+   * Clear cache if it exceeds max size
+   */
+  private manageCache(): void {
+    if (this.translationCache.size > this.CACHE_MAX_SIZE) {
+      // Remove oldest 20% of entries (simple LRU approximation)
+      const entriesToRemove = Math.floor(this.CACHE_MAX_SIZE * 0.2);
+      const keys = Array.from(this.translationCache.keys());
+      for (let i = 0; i < entriesToRemove; i++) {
+        this.translationCache.delete(keys[i]);
+      }
+    }
+  }
+
   async translate(
     text: string,
     options: NLLBTranslateOptions
@@ -94,12 +119,29 @@ export class NLLBService {
       throw new Error("NLLB-200 is not enabled. Set NLLB_ENABLED=true to enable.");
     }
 
+    // Check cache if enabled (default: true)
+    const useCache = options.useCache !== false;
+    if (useCache) {
+      const cacheKey = this.getCacheKey(text, options);
+      const cached = this.translationCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const result = await this.runPython(text, options);
 
     if (!result.success || !result.translated) {
       throw new Error(
         result.error || "NLLB translation failed for unknown reasons"
       );
+    }
+
+    // Store in cache
+    if (useCache) {
+      const cacheKey = this.getCacheKey(text, options);
+      this.translationCache.set(cacheKey, result.translated);
+      this.manageCache();
     }
 
     return result.translated;
@@ -157,6 +199,7 @@ export class NLLBService {
         src_lang: options.srcLang,
         tgt_lang: options.tgtLang,
         stream: true,
+        batch_size: options.batchSize || 8, // Default batch size of 8
       }) + "\n";
 
       let stdoutBuffer = "";
@@ -249,6 +292,7 @@ export class NLLBService {
       text,
       src_lang: options.srcLang,
       tgt_lang: options.tgtLang,
+      batch_size: options.batchSize || 8, // Default batch size of 8
     }) + "\n";
 
     let stdoutBuffer = "";
