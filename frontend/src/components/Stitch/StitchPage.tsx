@@ -47,6 +47,83 @@ interface ContentPreviewProps {
   content: string;
 }
 
+// Error boundary component for markdown rendering
+class MarkdownErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Markdown rendering error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+// Safe markdown renderer component with content validation
+const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+  // Validate and sanitize content
+  if (!content || typeof content !== 'string') {
+    return null;
+  }
+
+  // Ensure content is a valid string (handle edge cases)
+  const safeContent = String(content).trim();
+  if (!safeContent) {
+    return null;
+  }
+
+  try {
+    return (
+      <ReactMarkdown
+        className="markdown-content"
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children, ...props }) => <h1 {...props} className="text-3xl font-bold mb-4 mt-6 text-gray-900">{children}</h1>,
+          h2: ({ children, ...props }) => <h2 {...props} className="text-2xl font-semibold mb-3 mt-5 text-gray-900">{children}</h2>,
+          h3: ({ children, ...props }) => <h3 {...props} className="text-xl font-semibold mb-2 mt-4 text-gray-900">{children}</h3>,
+          h4: ({ children, ...props }) => <h4 {...props} className="text-lg font-semibold mb-2 mt-3 text-gray-800">{children}</h4>,
+          p: ({ children, ...props }) => <p {...props} className="mb-4 leading-relaxed text-gray-700">{children}</p>,
+          ul: ({ children, ...props }) => <ul {...props} className="list-disc list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ul>,
+          ol: ({ children, ...props }) => <ol {...props} className="list-decimal list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ol>,
+          li: ({ children, ...props }) => <li {...props} className="ml-2">{children}</li>,
+          strong: ({ children, ...props }) => <strong {...props} className="font-semibold text-gray-900">{children}</strong>,
+          em: ({ children, ...props }) => <em {...props} className="italic text-gray-800">{children}</em>,
+          code: ({ children, className: codeClassName, ...props }) => {
+            const isInline = !codeClassName;
+            return isInline ? (
+              <code {...props} className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
+            ) : (
+              <code {...props} className={codeClassName} style={{ display: 'block', backgroundColor: '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', overflowX: 'auto', marginBottom: '1rem', fontSize: '0.875rem', fontFamily: 'monospace' }}>{children}</code>
+            );
+          },
+          pre: ({ children, ...props }) => <pre {...props} className="bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">{children}</pre>,
+          blockquote: ({ children, ...props }) => <blockquote {...props} className="border-l-4 border-orange-300 pl-4 italic my-4 text-gray-600">{children}</blockquote>,
+          hr: ({ ...props }) => <hr {...props} className="my-6 border-gray-300" />,
+        }}
+      >
+        {safeContent}
+      </ReactMarkdown>
+    );
+  } catch (error) {
+    console.error("Error rendering markdown:", error);
+    return null; // Will trigger fallback in error boundary
+  }
+};
+
 // OPTIMIZATION: Memoize ContentPreview to prevent unnecessary re-renders
 const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> = React.memo(({ content, isMarkdown = false }) => {
   if (!content) {
@@ -72,45 +149,24 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
     );
   }
 
+  // Fallback component for when markdown fails
+  const fallbackContent = (
+    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+        {content}
+      </pre>
+    </div>
+  );
+
   return (
     <div className="h-full overflow-auto p-6 bg-white">
       <div className="prose max-w-none prose-headings:text-gray-800 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700 prose-li:text-gray-700">
         {isMarkdown ? (
-          <ReactMarkdown
-            className="markdown-content"
-            remarkPlugins={[remarkGfm]}
-            components={{
-              h1: ({ children, ...props }) => <h1 {...props} className="text-3xl font-bold mb-4 mt-6 text-gray-900">{children}</h1>,
-              h2: ({ children, ...props }) => <h2 {...props} className="text-2xl font-semibold mb-3 mt-5 text-gray-900">{children}</h2>,
-              h3: ({ children, ...props }) => <h3 {...props} className="text-xl font-semibold mb-2 mt-4 text-gray-900">{children}</h3>,
-              h4: ({ children, ...props }) => <h4 {...props} className="text-lg font-semibold mb-2 mt-3 text-gray-800">{children}</h4>,
-              p: ({ children, ...props }) => <p {...props} className="mb-4 leading-relaxed text-gray-700">{children}</p>,
-              ul: ({ children, ...props }) => <ul {...props} className="list-disc list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ul>,
-              ol: ({ children, ...props }) => <ol {...props} className="list-decimal list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ol>,
-              li: ({ children, ...props }) => <li {...props} className="ml-2">{children}</li>,
-              strong: ({ children, ...props }) => <strong {...props} className="font-semibold text-gray-900">{children}</strong>,
-              em: ({ children, ...props }) => <em {...props} className="italic text-gray-800">{children}</em>,
-              code: ({ children, className: codeClassName, ...props }) => {
-                const isInline = !codeClassName;
-                return isInline ? (
-                  <code {...props} className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
-                ) : (
-                  <code {...props} className={codeClassName} style={{ display: 'block', backgroundColor: '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', overflowX: 'auto', marginBottom: '1rem', fontSize: '0.875rem', fontFamily: 'monospace' }}>{children}</code>
-                );
-              },
-              pre: ({ children, ...props }) => <pre {...props} className="bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">{children}</pre>,
-              blockquote: ({ children, ...props }) => <blockquote {...props} className="border-l-4 border-orange-300 pl-4 italic my-4 text-gray-600">{children}</blockquote>,
-              hr: ({ ...props }) => <hr {...props} className="my-6 border-gray-300" />,
-            }}
-          >
-            {content}
-          </ReactMarkdown>
+          <MarkdownErrorBoundary fallback={fallbackContent}>
+            <SafeMarkdownRenderer content={content} />
+          </MarkdownErrorBoundary>
         ) : (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
-            {content}
-          </pre>
-        </div>
+          fallbackContent
         )}
       </div>
     </div>
