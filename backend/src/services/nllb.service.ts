@@ -6,12 +6,16 @@ import { env } from "../config/env";
 export interface NLLBTranslateOptions {
   srcLang: string; // e.g. eng_Latn
   tgtLang: string; // e.g. hin_Deva
+  batchSize?: number; // Batch size for translation (auto-detected based on CPU/GPU)
+  useCache?: boolean; // Whether to use cache (default: true)
 }
 
 export class NLLBService {
   private scriptPath: string;
   private pythonExecutable: string;
   private pythonProcess: ChildProcess | null = null; // Persistent Python process
+  private translationCache: Map<string, string> = new Map(); // Simple in-memory cache
+  private readonly CACHE_MAX_SIZE = 1000; // Limit cache size
 
   constructor() {
     this.scriptPath = path.resolve(
@@ -86,6 +90,37 @@ export class NLLBService {
     });
   }
 
+  /**
+   * Generate cache key from text and language options
+   * OPTIMIZATION: Use hash for better cache key distribution and memory efficiency
+   */
+  private getCacheKey(text: string, options: NLLBTranslateOptions): string {
+    // Use simple hash function for better cache key distribution
+    // This prevents cache key collisions and reduces memory usage
+    let hash = 0;
+    const keyString = `${options.srcLang}:${options.tgtLang}:${text}`;
+    for (let i = 0; i < keyString.length; i++) {
+      const char = keyString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return `nllb:${Math.abs(hash).toString(36)}:${keyString.length}`;
+  }
+
+  /**
+   * Clear cache if it exceeds max size
+   */
+  private manageCache(): void {
+    if (this.translationCache.size > this.CACHE_MAX_SIZE) {
+      // Remove oldest 20% of entries (simple LRU approximation)
+      const entriesToRemove = Math.floor(this.CACHE_MAX_SIZE * 0.2);
+      const keys = Array.from(this.translationCache.keys());
+      for (let i = 0; i < entriesToRemove; i++) {
+        this.translationCache.delete(keys[i]);
+      }
+    }
+  }
+
   async translate(
     text: string,
     options: NLLBTranslateOptions
@@ -94,12 +129,29 @@ export class NLLBService {
       throw new Error("NLLB-200 is not enabled. Set NLLB_ENABLED=true to enable.");
     }
 
+    // Check cache if enabled (default: true)
+    const useCache = options.useCache !== false;
+    if (useCache) {
+      const cacheKey = this.getCacheKey(text, options);
+      const cached = this.translationCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const result = await this.runPython(text, options);
 
     if (!result.success || !result.translated) {
       throw new Error(
         result.error || "NLLB translation failed for unknown reasons"
       );
+    }
+
+    // Store in cache
+    if (useCache) {
+      const cacheKey = this.getCacheKey(text, options);
+      this.translationCache.set(cacheKey, result.translated);
+      this.manageCache();
     }
 
     return result.translated;
@@ -157,6 +209,7 @@ export class NLLBService {
         src_lang: options.srcLang,
         tgt_lang: options.tgtLang,
         stream: true,
+        batch_size: options.batchSize || undefined, // Auto-detect if not specified
       }) + "\n";
 
       let stdoutBuffer = "";
@@ -237,11 +290,20 @@ export class NLLBService {
     options: NLLBTranslateOptions,
     resolve: (value: { success: boolean; translated?: string; error?: string }) => void
   ) {
+    // ROBUST: Ensure server is running, start if needed
     if (!this.pythonProcess) {
-      resolve({
-        success: false,
-        error: "NLLB server is not running",
-      });
+      this.startServer();
+      // Wait a bit longer for server to be ready
+      setTimeout(() => {
+        if (!this.pythonProcess) {
+          resolve({
+            success: false,
+            error: "NLLB server failed to start. Please check Python environment.",
+          });
+          return;
+        }
+        this.sendRequest(text, options, resolve);
+      }, 3000); // Increased wait time
       return;
     }
 
@@ -249,6 +311,7 @@ export class NLLBService {
       text,
       src_lang: options.srcLang,
       tgt_lang: options.tgtLang,
+      batch_size: options.batchSize || undefined, // Auto-detect if not specified
     }) + "\n";
 
     let stdoutBuffer = "";
@@ -262,6 +325,7 @@ export class NLLBService {
         stdoutBuffer = lines.slice(1).join("\n");
 
         this.pythonProcess!.stdout.removeListener("data", dataHandler);
+        this.pythonProcess!.stderr.removeListener("data", errorHandler);
 
         try {
           const parsed = JSON.parse(responseLine);

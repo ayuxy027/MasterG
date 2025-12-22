@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Component, ErrorInfo, ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
 
 // All 22 scheduled Indian languages + English (from language service)
@@ -26,6 +28,7 @@ const ALL_LANGUAGES = [
   { code: "sat", name: "Santali", native: "ᱥᱟᱱᱛᱟᱲᱤ" },
   { code: "brx", name: "Bodo", native: "बर'" },
   { code: "doi", name: "Dogri", native: "डोगरी" },
+  { code: "bho", name: "Bhojpuri", native: "भोजपुरी" },
 ];
 
 const GRADE_LEVELS = [
@@ -41,11 +44,244 @@ const CORE_SUBJECTS = [
   { value: "social", label: "Social Studies" },
 ];
 
+// Error Boundary for StitchPage
+class StitchErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("StitchPage error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-red-200 p-8 max-w-md w-full">
+            <div className="text-center">
+              <svg
+                className="w-16 h-16 mx-auto mb-4 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+              <p className="text-gray-600 mb-4">
+                An error occurred in the Stitch feature. Please refresh the page to try again.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                Refresh Page
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 interface ContentPreviewProps {
   content: string;
 }
 
-const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
+// Error boundary component for markdown rendering
+class MarkdownErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Markdown rendering error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+// Safe markdown renderer component with minimal, professional styling
+const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+  // Validate and sanitize content
+  if (!content || typeof content !== 'string') {
+    return null;
+  }
+
+  // Ensure content is a valid string (handle edge cases)
+  const safeContent = String(content).trim();
+  if (!safeContent) {
+    return null;
+  }
+
+  try {
+    return (
+      <div className="markdown-content">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            // Minimal, professional heading styles
+            h1: ({ children, ...props }) => (
+              <h1 {...props} className="text-2xl font-semibold text-gray-900 mb-3 mt-6 first:mt-0">
+                {children}
+              </h1>
+            ),
+            h2: ({ children, ...props }) => (
+              <h2 {...props} className="text-xl font-semibold text-gray-900 mb-2.5 mt-5">
+                {children}
+              </h2>
+            ),
+            h3: ({ children, ...props }) => (
+              <h3 {...props} className="text-lg font-semibold text-gray-800 mb-2 mt-4">
+                {children}
+              </h3>
+            ),
+            h4: ({ children, ...props }) => (
+              <h4 {...props} className="text-base font-semibold text-gray-800 mb-2 mt-3">
+                {children}
+              </h4>
+            ),
+            // Clean paragraph styling
+            p: ({ children, ...props }) => (
+              <p {...props} className="text-gray-700 leading-7 mb-4">
+                {children}
+              </p>
+            ),
+            // Clean list styling
+            ul: ({ children, ...props }) => (
+              <ul {...props} className="list-disc list-outside mb-4 ml-6 space-y-1.5 text-gray-700">
+                {children}
+              </ul>
+            ),
+            ol: ({ children, ...props }) => (
+              <ol {...props} className="list-decimal list-outside mb-4 ml-6 space-y-1.5 text-gray-700">
+                {children}
+              </ol>
+            ),
+            li: ({ children, ...props }) => (
+              <li {...props} className="leading-7">
+                {children}
+              </li>
+            ),
+            // Emphasis
+            strong: ({ children, ...props }) => (
+              <strong {...props} className="font-semibold text-gray-900">
+                {children}
+              </strong>
+            ),
+            em: ({ children, ...props }) => (
+              <em {...props} className="italic text-gray-800">
+                {children}
+              </em>
+            ),
+            // Code blocks
+            code: ({ children, className: codeClassName, ...props }) => {
+              const isInline = !codeClassName;
+              if (isInline) {
+                return (
+                  <code {...props} className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+                    {children}
+                  </code>
+                );
+              }
+              return (
+                <code {...props} className={codeClassName}>
+                  <pre className="bg-gray-50 border border-gray-200 rounded-md p-3 overflow-x-auto text-sm font-mono text-gray-800 my-3">
+                    {children}
+                  </pre>
+                </code>
+              );
+            },
+            pre: ({ children, ...props }) => (
+              <pre {...props} className="bg-gray-50 border border-gray-200 rounded-md p-3 overflow-x-auto text-sm font-mono text-gray-800 my-3">
+                {children}
+              </pre>
+            ),
+            // Blockquote
+            blockquote: ({ children, ...props }) => (
+              <blockquote {...props} className="border-l-4 border-gray-300 pl-4 my-4 text-gray-600 italic">
+                {children}
+              </blockquote>
+            ),
+            // Horizontal rule
+            hr: ({ ...props }) => (
+              <hr {...props} className="my-6 border-0 border-t border-gray-200" />
+            ),
+          }}
+        >
+          {safeContent}
+        </ReactMarkdown>
+      </div>
+    );
+  } catch (error) {
+    console.error("Error rendering markdown:", error);
+    throw error; // Let error boundary handle it
+  }
+};
+
+// Toast Notification Component
+interface Toast {
+  id: string;
+  message: string;
+  type: "success" | "error" | "info";
+}
+
+const ToastNotification: React.FC<{ toast: Toast; onClose: () => void }> = ({ toast, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = toast.type === "success" ? "bg-green-500" : toast.type === "error" ? "bg-red-500" : "bg-blue-500";
+  const icon = toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : "ℹ";
+
+  return (
+    <div className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slideIn`}>
+      <span className="text-xl font-bold">{icon}</span>
+      <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      <button onClick={onClose} className="text-white hover:text-gray-200">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+};
+
+// ContentPreview component - NOT memoized to ensure re-renders when isMarkdown changes
+const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> = ({ content, isMarkdown = false }) => {
   if (!content) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 bg-gray-50 rounded-lg">
@@ -69,15 +305,28 @@ const ContentPreview: React.FC<ContentPreviewProps> = ({ content }) => {
     );
   }
 
-  return (
-    <div className="h-full overflow-auto p-6 bg-white">
-      <div className="prose max-w-none">
+  // Fallback component for when markdown fails
+  const fallbackContent = (
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
           <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
             {content}
           </pre>
         </div>
+  );
+
+  return (
+    <div className="h-full overflow-auto bg-white">
+      {isMarkdown ? (
+        <MarkdownErrorBoundary fallback={fallbackContent}>
+          <div className="p-6">
+            <SafeMarkdownRenderer content={content} />
       </div>
+        </MarkdownErrorBoundary>
+      ) : (
+        <div className="p-6">
+          {fallbackContent}
+        </div>
+      )}
     </div>
   );
 };
@@ -93,19 +342,259 @@ const StitchPage: React.FC = () => {
   const [generatedContent, setGeneratedContent] = useState("");
   const [englishContent, setEnglishContent] = useState(""); // Store original English content
   const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
+  const [translatingLanguages, setTranslatingLanguages] = useState<Set<string>>(new Set()); // Track languages currently being translated
   const [targetLanguageForTranslation, setTargetLanguageForTranslation] = useState("hi");
+  const [markdownEnabled, setMarkdownEnabled] = useState(false); // Toggle for markdown rendering in English tab ONLY (ONLY after generation completes, never during streaming)
   const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: "success" | "error" | "info" }>>([]);
+  const contentPreviewRef = useRef<HTMLDivElement>(null); // Ref for auto-scroll
   const [ollamaStatus, setOllamaStatus] = useState<{
     connected: boolean;
     checking: boolean;
   }>({ connected: false, checking: true });
 
+  // OPTIMIZATION: Memoize language name lookup (define early to avoid hoisting issues)
+  const getLanguageName = useCallback((code: string) => {
+    const lang = ALL_LANGUAGES.find(l => l.code === code);
+    return lang ? `${lang.name} (${lang.native})` : code;
+  }, []);
+
+  // Toast notification helpers
+  const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    setToasts((prev) => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  // Copy to clipboard
+  const handleCopy = useCallback(async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      showToast("Copied to clipboard!", "success");
+    } catch (err) {
+      showToast("Failed to copy to clipboard", "error");
+    }
+  }, [showToast]);
+
+  // Download as file
+  const handleDownload = useCallback((content: string, filename: string) => {
+    try {
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}-content-${new Date().toISOString().split("T")[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("File downloaded successfully!", "success");
+    } catch (err) {
+      showToast("Failed to download file", "error");
+    }
+  }, [showToast]);
+
+  // Clear all content
+  const handleClear = useCallback(() => {
+    setGeneratedContent("");
+    setEnglishContent("");
+    setTranslatedContent({});
+    setThinkingText("");
+    setActiveTab("english");
+    setMarkdownEnabled(false);
+    setError(null);
+    showToast("Content cleared", "info");
+  }, [showToast]);
+
+  // Word and character count
+  const getWordCount = useCallback((text: string): number => {
+    if (!text.trim()) return 0;
+    return text.trim().split(/\s+/).filter((word) => word.length > 0).length;
+  }, []);
+
+  const getCharacterCount = useCallback((text: string): number => {
+    return text.length;
+  }, []);
+
+  // Get active content for stats
+  const getActiveContent = useCallback((): string => {
+    return activeTab === "english" ? englishContent : translatedContent[activeTab] || "";
+  }, [activeTab, englishContent, translatedContent]);
+  
+  // Reset markdown toggle when switching away from English tab
+  useEffect(() => {
+    if (activeTab !== "english") {
+      setMarkdownEnabled(false);
+    }
+  }, [activeTab]);
+
+  // Auto-scroll to content when generation completes
+  useEffect(() => {
+    if (!isGenerating && englishContent && contentPreviewRef.current) {
+      setTimeout(() => {
+        contentPreviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 300);
+    }
+  }, [isGenerating, englishContent]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + C to copy active tab content
+      if ((e.metaKey || e.ctrlKey) && e.key === "c" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
+        if (activeContent) {
+          e.preventDefault();
+          handleCopy(activeContent);
+        }
+      }
+      // Cmd/Ctrl + S to download active tab content
+      if ((e.metaKey || e.ctrlKey) && e.key === "s" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
+        if (activeContent) {
+          e.preventDefault();
+          handleDownload(activeContent, activeTab === "english" ? "english" : getLanguageName(activeTab));
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, englishContent, translatedContent, handleCopy, handleDownload, getLanguageName]);
+
+  // Handle translation
+  const handleTranslate = async (targetLang: string) => {
+    if (!englishContent.trim()) {
+      setError("No content to translate");
+      return;
+    }
+
+    // Input validation: Only warn for extremely long texts, don't block
+    if (englishContent.length > 100000) {
+      console.warn("Very long content detected. Translation may take longer.");
+    }
+
+    // Check if already translated
+    if (translatedContent[targetLang] && !translatingLanguages.has(targetLang)) {
+      setActiveTab(targetLang);
+      return;
+    }
+
+    // UX IMPROVEMENT: Create tab immediately with skeleton UI
+    setTranslatingLanguages(prev => new Set(prev).add(targetLang));
+    setActiveTab(targetLang); // Switch to the new tab immediately
+    setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
+    setError(null);
+
+    try {
+      // Use simple non-streaming translation (reliable and correct)
+      const resp = await stitchAPI.translateContent({
+        text: englishContent,
+        sourceLanguage: "en",
+        targetLanguage: targetLang,
+      });
+
+      if (resp.success && resp.translated) {
+        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
+        setActiveTab(targetLang);
+        setError(null);
+        showToast(`Translation to ${getLanguageName(targetLang)} completed!`, "success");
+      } else {
+        const errorMsg = resp.error || "Translation failed. Please try again.";
+        setError(errorMsg);
+        showToast(`Translation failed: ${errorMsg}`, "error");
+      }
+
+      // Translation complete
+      setTranslatingLanguages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(targetLang);
+        return newSet;
+      });
+    } catch (err) {
+      const msg =
+        err instanceof StitchApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : "Translation failed. Please try again.";
+      setError(msg);
+      showToast(`Translation failed: ${msg}`, "error");
+      
+      // Remove from translating set on error
+      setTranslatingLanguages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(targetLang);
+        return newSet;
+      });
+      setIsTranslating(prev => {
+        const newPrev = { ...prev };
+        delete newPrev[targetLang];
+        return newPrev;
+      });
+      
+      // If translation failed and no content was set, remove the tab
+      if (!translatedContent[targetLang]) {
+        setTranslatedContent(prev => {
+          const newPrev = { ...prev };
+          delete newPrev[targetLang];
+          return newPrev;
+        });
+        // If the active tab was the one that failed, switch to English
+        if (activeTab === targetLang) {
+          setActiveTab("english");
+        }
+      }
+    } finally {
+      setIsTranslating(prev => {
+        const newPrev = { ...prev };
+        delete newPrev[targetLang];
+        return newPrev;
+      });
+    }
+  };
+
+  // Bulk translate to all languages
+  const handleBulkTranslate = useCallback(async () => {
+    if (!englishContent.trim()) {
+      showToast("No content to translate", "error");
+      return;
+    }
+
+    const languagesToTranslate = ALL_LANGUAGES.filter((lang) => lang.code !== "en" && !translatedContent[lang.code] && !translatingLanguages.has(lang.code));
+    
+    if (languagesToTranslate.length === 0) {
+      showToast("All languages already translated!", "info");
+      return;
+    }
+
+    showToast(`Starting translation to ${languagesToTranslate.length} languages...`, "info");
+
+    for (const lang of languagesToTranslate) {
+      await handleTranslate(lang.code);
+      // Small delay between translations to avoid overwhelming the system
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    showToast("Bulk translation completed!", "success");
+  }, [englishContent, translatedContent, translatingLanguages, showToast, handleTranslate]);
+
   // Check Ollama status on mount
   useEffect(() => {
     checkOllamaStatus();
+    
+    // Cleanup: Cancel content generation on unmount
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   const checkOllamaStatus = async () => {
@@ -216,6 +705,8 @@ const StitchPage: React.FC = () => {
                 const finalContent = parsed.content || accumulatedResponse;
                 setGeneratedContent(finalContent);
                 setEnglishContent(finalContent); // Store English version
+                // Reset markdown toggle to false when new content is generated
+                setMarkdownEnabled(false); // Always start with plain text view after generation
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }
@@ -256,56 +747,24 @@ const StitchPage: React.FC = () => {
     }
   };
 
-  const handleTranslate = async (targetLang: string) => {
-    if (!englishContent.trim()) {
-      setError("No content to translate");
-      return;
-    }
-
-    // Check if already translated
-    if (translatedContent[targetLang]) {
-      setActiveTab(targetLang);
-      return;
-    }
-
-    setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
-    setError(null);
-
-    try {
-      const resp = await stitchAPI.translateContent({
-        text: englishContent,
-        sourceLanguage: "en",
-        targetLanguage: targetLang,
-      });
-
-      if (resp.success && resp.translated) {
-        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
-        setActiveTab(targetLang);
-        setError(null);
-      } else {
-        const errorMsg = resp.error || "Translation failed. Please try again.";
-        setError(errorMsg);
-      }
-    } catch (err) {
-      const msg =
-        err instanceof StitchApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : "Translation failed. Please try again.";
-      setError(msg);
-    } finally {
-      setIsTranslating(prev => ({ ...prev, [targetLang]: false }));
-    }
-  };
-
-  const getLanguageName = (code: string) => {
-    const lang = ALL_LANGUAGES.find(l => l.code === code);
-    return lang ? `${lang.name} (${lang.native})` : code;
-  };
+  // OPTIMIZATION: Memoize available tabs list
+  const availableTabs = useMemo(() => {
+    return Array.from(new Set([...Object.keys(translatedContent), ...Array.from(translatingLanguages)]));
+  }, [translatedContent, translatingLanguages]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <ToastNotification
+            key={toast.id}
+            toast={toast}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
+
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-6 sm:mb-8 text-center">
@@ -602,7 +1061,7 @@ const StitchPage: React.FC = () => {
             </div>
 
             {/* Content Preview with Tabs */}
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
+            <div ref={contentPreviewRef} className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
               <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-orange-200/60">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <svg
@@ -619,8 +1078,60 @@ const StitchPage: React.FC = () => {
                     />
                   </svg>
                   <h3 className="text-sm sm:text-base font-semibold text-gray-800">Content Preview</h3>
+                  {/* Word/Character Count */}
+                  {getActiveContent() && (
+                    <div className="text-xs text-gray-500 ml-2">
+                      {getWordCount(getActiveContent())} words • {getCharacterCount(getActiveContent())} chars
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Quick Actions Bar */}
+                  {getActiveContent() && (
+                    <div className="flex items-center gap-1 mr-2 border-r border-orange-200 pr-2">
+                      <button
+                        onClick={() => handleCopy(getActiveContent())}
+                        className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                        title="Copy to clipboard (Cmd/Ctrl+C)"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDownload(getActiveContent(), activeTab === "english" ? "english" : getLanguageName(activeTab))}
+                        className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                        title="Download as file (Cmd/Ctrl+S)"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={handleClear}
+                        className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Clear all content"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {/* Bulk Translate Button */}
+                  {englishContent && Object.keys(translatedContent).length < ALL_LANGUAGES.length - 1 && (
+                    <button
+                      onClick={handleBulkTranslate}
+                      disabled={isGenerating || Object.values(isTranslating).some(v => v)}
+                      className="text-xs px-2 py-1.5 rounded-lg bg-blue-100 text-blue-700 font-medium hover:bg-blue-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      title="Translate to all languages"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                      </svg>
+                      Bulk
+                    </button>
+                  )}
                   <select
                     value={targetLanguageForTranslation}
                     onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
@@ -655,10 +1166,10 @@ const StitchPage: React.FC = () => {
 
               {/* Tabs */}
               {englishContent && (
-                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6">
+                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6 overflow-x-auto items-center">
                   <button
                     onClick={() => setActiveTab("english")}
-                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === "english"
                         ? "border-orange-400 text-orange-600"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
@@ -666,17 +1177,64 @@ const StitchPage: React.FC = () => {
                   >
                     English
                   </button>
-                  {Object.keys(translatedContent).map((langCode) => (
+                  {/* Markdown Toggle - Only show when English tab is active AND generation is complete */}
+                  {activeTab === "english" && !isGenerating && englishContent && (
+                    <div className="ml-4 flex items-center gap-2 border-l border-orange-200 pl-4">
+                      <span className="text-xs text-gray-600 font-medium">Markdown:</span>
+                      <button
+                        onClick={() => setMarkdownEnabled(!markdownEnabled)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                          markdownEnabled ? "bg-orange-500" : "bg-gray-300"
+                        }`}
+                        role="switch"
+                        aria-checked={markdownEnabled}
+                        aria-label="Toggle markdown rendering (only available after generation completes)"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            markdownEnabled ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                      <span className="text-xs text-gray-500 font-medium">
+                        {markdownEnabled ? "On" : "Off"}
+                      </span>
+                    </div>
+                  )}
+                  {/* Show all languages that are either translated or currently translating */}
+                  {availableTabs.map((langCode) => (
                     <button
                       key={langCode}
                       onClick={() => setActiveTab(langCode)}
-                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
                         activeTab === langCode
                           ? "border-orange-400 text-orange-600"
                           : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
                       }`}
                     >
                       {getLanguageName(langCode)}
+                      {translatingLanguages.has(langCode) && (
+                        <svg
+                          className="animate-spin h-3 w-3 text-orange-500"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -685,9 +1243,57 @@ const StitchPage: React.FC = () => {
               {/* Tab Content */}
               <div className="flex-1 overflow-hidden">
                 {activeTab === "english" ? (
-                  <ContentPreview content={englishContent} />
+                  // Only allow markdown rendering after generation completes (not during streaming)
+                  // During generation (isGenerating), always show plain text
+                  <ContentPreview 
+                    content={englishContent} 
+                    isMarkdown={markdownEnabled && !isGenerating && activeTab === "english"} 
+                  />
+                ) : translatingLanguages.has(activeTab) ? (
+                  // UX IMPROVEMENT: Show skeleton/loading UI while translating
+                  <div className="h-full overflow-auto p-6 bg-white">
+                    <div className="space-y-4">
+                      {/* Skeleton loading animation */}
+                      <div className="space-y-3">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div key={i} className="animate-pulse">
+                            <div className="h-4 bg-gray-200 rounded w-full"></div>
+                            <div className="h-4 bg-gray-200 rounded w-5/6 mt-2"></div>
+                            <div className="h-4 bg-gray-200 rounded w-4/6 mt-2"></div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Loading indicator */}
+                      <div className="flex items-center justify-center gap-2 text-orange-500 mt-4">
+                        <svg
+                          className="animate-spin h-5 w-5"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        <span className="text-sm font-medium">
+                          Translating to {getLanguageName(activeTab)}...
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 ) : translatedContent[activeTab] ? (
-                  <ContentPreview content={translatedContent[activeTab]} />
+                  // Translated content always shows as plain text (no markdown rendering - markdown toggle is English-only)
+                  <ContentPreview content={translatedContent[activeTab]} isMarkdown={false} />
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-400">
                     <p className="text-sm">No translation available for this language yet</p>
@@ -702,4 +1308,13 @@ const StitchPage: React.FC = () => {
   );
 };
 
-export default StitchPage;
+// Wrap StitchPage with Error Boundary
+const StitchPageWithErrorBoundary: React.FC = () => {
+  return (
+    <StitchErrorBoundary>
+      <StitchPage />
+    </StitchErrorBoundary>
+  );
+};
+
+export default StitchPageWithErrorBoundary;

@@ -44,17 +44,46 @@ export class StitchController {
         stream,
       } = req.body;
 
-      if (!topic) {
+      // Input validation and sanitization
+      if (!topic || typeof topic !== "string") {
         res.status(400).json({
           success: false,
-          error: "Topic is required",
+          error: "Topic is required and must be a string",
+        });
+        return;
+      }
+
+      // Sanitize topic (remove excessive whitespace, limit length)
+      const sanitizedTopic = topic.trim().slice(0, 500);
+      if (!sanitizedTopic) {
+        res.status(400).json({
+          success: false,
+          error: "Topic cannot be empty",
+        });
+        return;
+      }
+
+      // Validate grade
+      if (grade && (typeof grade !== "string" || grade.length > 50)) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid grade format",
+        });
+        return;
+      }
+
+      // Validate subject
+      if (subject && (typeof subject !== "string" || subject.length > 100)) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid subject format",
         });
         return;
       }
 
       // Build comprehensive prompt (content is always generated in English)
       const prompt = this.buildContentPrompt({
-        topic,
+        topic: sanitizedTopic,
         grade: grade || "8",
         subject: subject || "mathematics",
       });
@@ -185,17 +214,38 @@ export class StitchController {
         return;
       }
 
-      const { text, sourceLanguage, targetLanguage } = req.body as {
+      const { text, sourceLanguage, targetLanguage, batchSize } = req.body as {
         text?: string;
         sourceLanguage?: string;
         targetLanguage?: string;
         stream?: boolean;
+        batchSize?: number;
       };
 
-      if (!text || !text.trim()) {
+      // Input validation and sanitization
+      if (!text || typeof text !== "string" || !text.trim()) {
         res.status(400).json({
           success: false,
-          error: "Text is required for translation",
+          error: "Text is required for translation and must be a non-empty string",
+        });
+        return;
+      }
+
+      // Limit text length to prevent memory issues
+      const MAX_TEXT_LENGTH = 50000;
+      if (text.length > MAX_TEXT_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: `Text too long. Maximum length is ${MAX_TEXT_LENGTH} characters.`,
+        });
+        return;
+      }
+
+      // Validate batch size if provided
+      if (batchSize !== undefined && (typeof batchSize !== "number" || batchSize < 1 || batchSize > 32)) {
+        res.status(400).json({
+          success: false,
+          error: "Batch size must be between 1 and 32",
         });
         return;
       }
@@ -234,6 +284,7 @@ export class StitchController {
             {
               srcLang: srcLang,
               tgtLang: tgtLang,
+              batchSize: batchSize, // Auto-detected if not provided (CPU vs GPU optimized)
             },
             (chunk) => {
               // Forward chunk as SSE event
@@ -260,10 +311,12 @@ export class StitchController {
         return;
       }
 
-      // Non-streaming: single-shot translation
+      // Non-streaming: single-shot translation with batch processing
       const translated = await nllbService.translate(text, {
         srcLang: srcLang,
         tgtLang: tgtLang,
+        batchSize: batchSize, // Auto-detected if not provided (CPU vs GPU optimized)
+        useCache: true, // Enable caching for repeated translations
       });
 
       res.json({
