@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Component, ErrorInfo, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
@@ -43,6 +43,63 @@ const CORE_SUBJECTS = [
   { value: "science", label: "Science" },
   { value: "social", label: "Social Studies" },
 ];
+
+// Error Boundary for StitchPage
+class StitchErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("StitchPage error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-red-200 p-8 max-w-md w-full">
+            <div className="text-center">
+              <svg
+                className="w-16 h-16 mx-auto mb-4 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+              <p className="text-gray-600 mb-4">
+                An error occurred in the Stitch feature. Please refresh the page to try again.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                Refresh Page
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 interface ContentPreviewProps {
   content: string;
@@ -289,47 +346,21 @@ const StitchPage: React.FC = () => {
   const [targetLanguageForTranslation, setTargetLanguageForTranslation] = useState("hi");
   const [markdownEnabled, setMarkdownEnabled] = useState(false); // Toggle for markdown rendering in English tab ONLY (ONLY after generation completes, never during streaming)
   const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
-  
-  // Reset markdown toggle when switching away from English tab
-  useEffect(() => {
-    if (activeTab !== "english") {
-      setMarkdownEnabled(false);
-    }
-  }, [activeTab]);
+  const [thinkingText, setThinkingText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: "success" | "error" | "info" }>>([]);
+  const contentPreviewRef = useRef<HTMLDivElement>(null); // Ref for auto-scroll
+  const [ollamaStatus, setOllamaStatus] = useState<{
+    connected: boolean;
+    checking: boolean;
+  }>({ connected: false, checking: true });
 
-  // Auto-scroll to content when generation completes
-  useEffect(() => {
-    if (!isGenerating && englishContent && contentPreviewRef.current) {
-      setTimeout(() => {
-        contentPreviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 300);
-    }
-  }, [isGenerating, englishContent]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + C to copy active tab content
-      if ((e.metaKey || e.ctrlKey) && e.key === "c" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
-        if (activeContent) {
-          e.preventDefault();
-          handleCopy(activeContent);
-        }
-      }
-      // Cmd/Ctrl + S to download active tab content
-      if ((e.metaKey || e.ctrlKey) && e.key === "s" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
-        if (activeContent) {
-          e.preventDefault();
-          handleDownload(activeContent, activeTab === "english" ? "english" : getLanguageName(activeTab));
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, englishContent, translatedContent, handleCopy, handleDownload]);
+  // OPTIMIZATION: Memoize language name lookup (define early to avoid hoisting issues)
+  const getLanguageName = useCallback((code: string) => {
+    const lang = ALL_LANGUAGES.find(l => l.code === code);
+    return lang ? `${lang.name} (${lang.native})` : code;
+  }, []);
 
   // Toast notification helpers
   const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
@@ -337,9 +368,9 @@ const StitchPage: React.FC = () => {
     setToasts((prev) => [...prev, { id, message, type }]);
   }, []);
 
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+  }, []);
 
   // Copy to clipboard
   const handleCopy = useCallback(async (content: string) => {
@@ -382,22 +413,155 @@ const StitchPage: React.FC = () => {
   }, [showToast]);
 
   // Word and character count
-  const getWordCount = (text: string): number => {
+  const getWordCount = useCallback((text: string): number => {
     if (!text.trim()) return 0;
     return text.trim().split(/\s+/).filter((word) => word.length > 0).length;
-  };
+  }, []);
 
-  const getCharacterCount = (text: string): number => {
+  const getCharacterCount = useCallback((text: string): number => {
     return text.length;
-  };
+  }, []);
 
   // Get active content for stats
-  const getActiveContent = (): string => {
+  const getActiveContent = useCallback((): string => {
     return activeTab === "english" ? englishContent : translatedContent[activeTab] || "";
+  }, [activeTab, englishContent, translatedContent]);
+  
+  // Reset markdown toggle when switching away from English tab
+  useEffect(() => {
+    if (activeTab !== "english") {
+      setMarkdownEnabled(false);
+    }
+  }, [activeTab]);
+
+  // Auto-scroll to content when generation completes
+  useEffect(() => {
+    if (!isGenerating && englishContent && contentPreviewRef.current) {
+      setTimeout(() => {
+        contentPreviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 300);
+    }
+  }, [isGenerating, englishContent]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + C to copy active tab content
+      if ((e.metaKey || e.ctrlKey) && e.key === "c" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
+        if (activeContent) {
+          e.preventDefault();
+          handleCopy(activeContent);
+        }
+      }
+      // Cmd/Ctrl + S to download active tab content
+      if ((e.metaKey || e.ctrlKey) && e.key === "s" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
+        if (activeContent) {
+          e.preventDefault();
+          handleDownload(activeContent, activeTab === "english" ? "english" : getLanguageName(activeTab));
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, englishContent, translatedContent, handleCopy, handleDownload, getLanguageName]);
+
+  // Handle translation
+  const handleTranslate = async (targetLang: string) => {
+    if (!englishContent.trim()) {
+      setError("No content to translate");
+      return;
+    }
+
+    // Input validation: Only warn for extremely long texts, don't block
+    if (englishContent.length > 100000) {
+      console.warn("Very long content detected. Translation may take longer.");
+    }
+
+    // Check if already translated
+    if (translatedContent[targetLang] && !translatingLanguages.has(targetLang)) {
+      setActiveTab(targetLang);
+      return;
+    }
+
+    // UX IMPROVEMENT: Create tab immediately with skeleton UI
+    setTranslatingLanguages(prev => new Set(prev).add(targetLang));
+    setActiveTab(targetLang); // Switch to the new tab immediately
+    setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
+    setError(null);
+
+    try {
+      // Use simple non-streaming translation (reliable and correct)
+      const resp = await stitchAPI.translateContent({
+        text: englishContent,
+        sourceLanguage: "en",
+        targetLanguage: targetLang,
+      });
+
+      if (resp.success && resp.translated) {
+        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
+        setActiveTab(targetLang);
+        setError(null);
+        showToast(`Translation to ${getLanguageName(targetLang)} completed!`, "success");
+      } else {
+        const errorMsg = resp.error || "Translation failed. Please try again.";
+        setError(errorMsg);
+        showToast(`Translation failed: ${errorMsg}`, "error");
+      }
+
+      // Translation complete
+      setTranslatingLanguages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(targetLang);
+        return newSet;
+      });
+    } catch (err) {
+      const msg =
+        err instanceof StitchApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : "Translation failed. Please try again.";
+      setError(msg);
+      showToast(`Translation failed: ${msg}`, "error");
+      
+      // Remove from translating set on error
+      setTranslatingLanguages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(targetLang);
+        return newSet;
+      });
+      setIsTranslating(prev => {
+        const newPrev = { ...prev };
+        delete newPrev[targetLang];
+        return newPrev;
+      });
+      
+      // If translation failed and no content was set, remove the tab
+      if (!translatedContent[targetLang]) {
+        setTranslatedContent(prev => {
+          const newPrev = { ...prev };
+          delete newPrev[targetLang];
+          return newPrev;
+        });
+        // If the active tab was the one that failed, switch to English
+        if (activeTab === targetLang) {
+          setActiveTab("english");
+        }
+      }
+    } finally {
+      setIsTranslating(prev => {
+        const newPrev = { ...prev };
+        delete newPrev[targetLang];
+        return newPrev;
+      });
+    }
   };
 
   // Bulk translate to all languages
-  const handleBulkTranslate = async () => {
+  const handleBulkTranslate = useCallback(async () => {
     if (!englishContent.trim()) {
       showToast("No content to translate", "error");
       return;
@@ -419,15 +583,7 @@ const StitchPage: React.FC = () => {
     }
 
     showToast("Bulk translation completed!", "success");
-  };
-
-  const [thinkingText, setThinkingText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
-  const [ollamaStatus, setOllamaStatus] = useState<{
-    connected: boolean;
-    checking: boolean;
-  }>({ connected: false, checking: true });
+  }, [englishContent, translatedContent, translatingLanguages, showToast, handleTranslate]);
 
   // Check Ollama status on mount
   useEffect(() => {
@@ -590,90 +746,6 @@ const StitchPage: React.FC = () => {
       setThinkingText("Generation stopped.");
     }
   };
-
-  const handleTranslate = async (targetLang: string) => {
-    if (!englishContent.trim()) {
-      setError("No content to translate");
-      return;
-    }
-
-    // Input validation: Only warn for extremely long texts, don't block
-    // Let the system handle it - it's designed to work with any length
-    if (englishContent.length > 100000) {
-      // Just warn, don't block - system can handle it
-      console.warn("Very long content detected. Translation may take longer.");
-    }
-
-    // Check if already translated
-    if (translatedContent[targetLang] && !translatingLanguages.has(targetLang)) {
-      setActiveTab(targetLang);
-      return;
-    }
-
-    // UX IMPROVEMENT: Create tab immediately with skeleton UI
-    setTranslatingLanguages(prev => new Set(prev).add(targetLang));
-    setActiveTab(targetLang); // Switch to the new tab immediately
-    setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
-    setError(null);
-
-    try {
-      // Use simple non-streaming translation (reliable and correct)
-      const resp = await stitchAPI.translateContent({
-        text: englishContent,
-        sourceLanguage: "en",
-        targetLanguage: targetLang,
-      });
-
-      if (resp.success && resp.translated) {
-        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
-        setActiveTab(targetLang);
-        setError(null);
-        showToast(`Translation to ${getLanguageName(targetLang)} completed!`, "success");
-      } else {
-        const errorMsg = resp.error || "Translation failed. Please try again.";
-        setError(errorMsg);
-        showToast(`Translation failed: ${errorMsg}`, "error");
-      }
-
-      // Translation complete
-      setTranslatingLanguages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(targetLang);
-        return newSet;
-      });
-    } catch (err) {
-      const msg =
-        err instanceof StitchApiError
-          ? err.message
-          : err instanceof Error
-          ? err.message
-          : "Translation failed. Please try again.";
-      setError(msg);
-      showToast(`Translation failed: ${msg}`, "error");
-      
-      // Remove from translating set on error
-      setTranslatingLanguages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(targetLang);
-        return newSet;
-      });
-      
-      // Remove empty translation on error
-      setTranslatedContent(prev => {
-        const newPrev = { ...prev };
-        delete newPrev[targetLang];
-        return newPrev;
-      });
-    } finally {
-      setIsTranslating(prev => ({ ...prev, [targetLang]: false }));
-    }
-  };
-
-  // OPTIMIZATION: Memoize language name lookup
-  const getLanguageName = useCallback((code: string) => {
-    const lang = ALL_LANGUAGES.find(l => l.code === code);
-    return lang ? `${lang.name} (${lang.native})` : code;
-  }, []);
 
   // OPTIMIZATION: Memoize available tabs list
   const availableTabs = useMemo(() => {
@@ -1236,4 +1308,13 @@ const StitchPage: React.FC = () => {
   );
 };
 
-export default StitchPage;
+// Wrap StitchPage with Error Boundary
+const StitchPageWithErrorBoundary: React.FC = () => {
+  return (
+    <StitchErrorBoundary>
+      <StitchPage />
+    </StitchErrorBoundary>
+  );
+};
+
+export default StitchPageWithErrorBoundary;
