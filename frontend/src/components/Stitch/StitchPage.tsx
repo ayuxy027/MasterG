@@ -28,6 +28,7 @@ const ALL_LANGUAGES = [
   { code: "sat", name: "Santali", native: "ᱥᱟᱱᱛᱟᱲᱤ" },
   { code: "brx", name: "Bodo", native: "बर'" },
   { code: "doi", name: "Dogri", native: "डोगरी" },
+  { code: "bho", name: "Bhojpuri", native: "भोजपुरी" },
 ];
 
 const GRADE_LEVELS = [
@@ -191,6 +192,37 @@ const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
   }
 };
 
+// Toast Notification Component
+interface Toast {
+  id: string;
+  message: string;
+  type: "success" | "error" | "info";
+}
+
+const ToastNotification: React.FC<{ toast: Toast; onClose: () => void }> = ({ toast, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = toast.type === "success" ? "bg-green-500" : toast.type === "error" ? "bg-red-500" : "bg-blue-500";
+  const icon = toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : "ℹ";
+
+  return (
+    <div className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slideIn`}>
+      <span className="text-xl font-bold">{icon}</span>
+      <span className="flex-1 text-sm font-medium">{toast.message}</span>
+      <button onClick={onClose} className="text-white hover:text-gray-200">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+};
+
 // ContentPreview component - NOT memoized to ensure re-renders when isMarkdown changes
 const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> = ({ content, isMarkdown = false }) => {
   if (!content) {
@@ -218,11 +250,11 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
 
   // Fallback component for when markdown fails
   const fallbackContent = (
-    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-      <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
-        {content}
-      </pre>
-    </div>
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+            {content}
+          </pre>
+        </div>
   );
 
   return (
@@ -231,7 +263,7 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
         <MarkdownErrorBoundary fallback={fallbackContent}>
           <div className="p-6">
             <SafeMarkdownRenderer content={content} />
-          </div>
+      </div>
         </MarkdownErrorBoundary>
       ) : (
         <div className="p-6">
@@ -264,6 +296,131 @@ const StitchPage: React.FC = () => {
       setMarkdownEnabled(false);
     }
   }, [activeTab]);
+
+  // Auto-scroll to content when generation completes
+  useEffect(() => {
+    if (!isGenerating && englishContent && contentPreviewRef.current) {
+      setTimeout(() => {
+        contentPreviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 300);
+    }
+  }, [isGenerating, englishContent]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + C to copy active tab content
+      if ((e.metaKey || e.ctrlKey) && e.key === "c" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
+        if (activeContent) {
+          e.preventDefault();
+          handleCopy(activeContent);
+        }
+      }
+      // Cmd/Ctrl + S to download active tab content
+      if ((e.metaKey || e.ctrlKey) && e.key === "s" && !e.shiftKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        const activeContent = activeTab === "english" ? englishContent : translatedContent[activeTab];
+        if (activeContent) {
+          e.preventDefault();
+          handleDownload(activeContent, activeTab === "english" ? "english" : getLanguageName(activeTab));
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, englishContent, translatedContent]);
+
+  // Toast notification helpers
+  const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    setToasts((prev) => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
+
+  // Copy to clipboard
+  const handleCopy = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      showToast("Copied to clipboard!", "success");
+    } catch (err) {
+      showToast("Failed to copy to clipboard", "error");
+    }
+  };
+
+  // Download as file
+  const handleDownload = (content: string, filename: string) => {
+    try {
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}-content-${new Date().toISOString().split("T")[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("File downloaded successfully!", "success");
+    } catch (err) {
+      showToast("Failed to download file", "error");
+    }
+  };
+
+  // Clear all content
+  const handleClear = () => {
+    setGeneratedContent("");
+    setEnglishContent("");
+    setTranslatedContent({});
+    setThinkingText("");
+    setActiveTab("english");
+    setMarkdownEnabled(false);
+    setError(null);
+    showToast("Content cleared", "info");
+  };
+
+  // Word and character count
+  const getWordCount = (text: string): number => {
+    if (!text.trim()) return 0;
+    return text.trim().split(/\s+/).filter((word) => word.length > 0).length;
+  };
+
+  const getCharacterCount = (text: string): number => {
+    return text.length;
+  };
+
+  // Get active content for stats
+  const getActiveContent = (): string => {
+    return activeTab === "english" ? englishContent : translatedContent[activeTab] || "";
+  };
+
+  // Bulk translate to all languages
+  const handleBulkTranslate = async () => {
+    if (!englishContent.trim()) {
+      showToast("No content to translate", "error");
+      return;
+    }
+
+    const languagesToTranslate = ALL_LANGUAGES.filter((lang) => lang.code !== "en" && !translatedContent[lang.code] && !translatingLanguages.has(lang.code));
+    
+    if (languagesToTranslate.length === 0) {
+      showToast("All languages already translated!", "info");
+      return;
+    }
+
+    showToast(`Starting translation to ${languagesToTranslate.length} languages...`, "info");
+
+    for (const lang of languagesToTranslate) {
+      await handleTranslate(lang.code);
+      // Small delay between translations to avoid overwhelming the system
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    showToast("Bulk translation completed!", "success");
+  };
+
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
@@ -471,9 +628,11 @@ const StitchPage: React.FC = () => {
         setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
         setActiveTab(targetLang);
         setError(null);
+        showToast(`Translation to ${getLanguageName(targetLang)} completed!`, "success");
       } else {
         const errorMsg = resp.error || "Translation failed. Please try again.";
         setError(errorMsg);
+        showToast(`Translation failed: ${errorMsg}`, "error");
       }
 
       // Translation complete
@@ -490,6 +649,7 @@ const StitchPage: React.FC = () => {
           ? err.message
           : "Translation failed. Please try again.";
       setError(msg);
+      showToast(`Translation failed: ${msg}`, "error");
       
       // Remove from translating set on error
       setTranslatingLanguages(prev => {
@@ -522,6 +682,17 @@ const StitchPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <ToastNotification
+            key={toast.id}
+            toast={toast}
+            onClose={() => removeToast(toast.id)}
+          />
+        ))}
+      </div>
+
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-6 sm:mb-8 text-center">
@@ -818,7 +989,7 @@ const StitchPage: React.FC = () => {
             </div>
 
             {/* Content Preview with Tabs */}
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
+            <div ref={contentPreviewRef} className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
               <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-orange-200/60">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <svg
@@ -835,8 +1006,60 @@ const StitchPage: React.FC = () => {
                     />
                   </svg>
                   <h3 className="text-sm sm:text-base font-semibold text-gray-800">Content Preview</h3>
+                  {/* Word/Character Count */}
+                  {getActiveContent() && (
+                    <div className="text-xs text-gray-500 ml-2">
+                      {getWordCount(getActiveContent())} words • {getCharacterCount(getActiveContent())} chars
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Quick Actions Bar */}
+                  {getActiveContent() && (
+                    <div className="flex items-center gap-1 mr-2 border-r border-orange-200 pr-2">
+                      <button
+                        onClick={() => handleCopy(getActiveContent())}
+                        className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                        title="Copy to clipboard (Cmd/Ctrl+C)"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDownload(getActiveContent(), activeTab === "english" ? "english" : getLanguageName(activeTab))}
+                        className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                        title="Download as file (Cmd/Ctrl+S)"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={handleClear}
+                        className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Clear all content"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {/* Bulk Translate Button */}
+                  {englishContent && Object.keys(translatedContent).length < ALL_LANGUAGES.length - 1 && (
+                    <button
+                      onClick={handleBulkTranslate}
+                      disabled={isGenerating || Object.values(isTranslating).some(v => v)}
+                      className="text-xs px-2 py-1.5 rounded-lg bg-blue-100 text-blue-700 font-medium hover:bg-blue-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      title="Translate to all languages"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                      </svg>
+                      Bulk
+                    </button>
+                  )}
                   <select
                     value={targetLanguageForTranslation}
                     onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
@@ -990,7 +1213,9 @@ const StitchPage: React.FC = () => {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           />
                         </svg>
-                        <span className="text-sm font-medium">Translating...</span>
+                        <span className="text-sm font-medium">
+                          Translating to {getLanguageName(activeTab)}...
+                        </span>
                       </div>
                     </div>
                   </div>

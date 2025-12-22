@@ -28,6 +28,7 @@ export const SUPPORTED_LANGUAGES = {
   sat: 'Santali',
   brx: 'Bodo',
   doi: 'Dogri',
+  bho: 'Bhojpuri',
   en: 'English',
 } as const;
 
@@ -218,6 +219,7 @@ class LanguageService {
       sat: "sat_Olck",
       brx: "brx_Deva",
       doi: "doi_Deva",
+      bho: "bho_Deva",
       en: "eng_Latn",
     };
 
