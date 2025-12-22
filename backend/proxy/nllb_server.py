@@ -26,7 +26,8 @@ os.environ["TORCH_COMPILE_DISABLE"] = "1"
 os.environ["PYTORCH_DISABLE_COMPILE"] = "1"
 
 # CPU Optimization: Enable MKL/OpenBLAS threading
-# These optimize CPU matrix operations
+# NOTE: These only affect CPU operations - GPU (CUDA/MPS) operations bypass these settings
+# These optimize CPU matrix operations when GPU is not available
 os.environ["OMP_NUM_THREADS"] = str(multiprocessing.cpu_count())
 os.environ["MKL_NUM_THREADS"] = str(multiprocessing.cpu_count())
 os.environ["NUMEXPR_NUM_THREADS"] = str(multiprocessing.cpu_count())
@@ -36,7 +37,8 @@ torch._dynamo.config.suppress_errors = True
 torch._dynamo.config.disable = True
 
 # CPU Optimization: Set optimal number of threads for PyTorch
-# Use all available CPU cores for maximum performance
+# NOTE: These settings only affect CPU operations - GPU operations use their own threading
+# Use all available CPU cores for maximum performance (only when GPU is not available)
 cpu_count = multiprocessing.cpu_count()
 torch.set_num_threads(cpu_count)
 torch.set_num_interop_threads(min(4, cpu_count // 2))  # Inter-op threads for parallel ops
@@ -102,16 +104,18 @@ def load_model():
     )
     
     # Auto-detect best device with acceleration support
+    # PRIORITY: GPU (CUDA) > GPU (MPS/Apple Silicon) > CPU (fallback)
+    # This ensures GPU is always preferred when available for team members with GPU laptops
     if torch.cuda.is_available():
       device = "cuda"
-      sys.stderr.write("Using CUDA GPU acceleration\n")
+      sys.stderr.write("✅ Using CUDA GPU acceleration (GPU preferred)\n")
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
       device = "mps"  # Apple Silicon GPU
-      sys.stderr.write("Using Apple Silicon (MPS) GPU acceleration\n")
+      sys.stderr.write("✅ Using Apple Silicon (MPS) GPU acceleration (GPU preferred)\n")
     else:
       device = "cpu"
       cpu_info = f"CPU with {cpu_count} cores, {torch.get_num_threads()} threads"
-      sys.stderr.write(f"Using CPU acceleration: {cpu_info}\n")
+      sys.stderr.write(f"⚡ Using CPU acceleration (GPU not available): {cpu_info}\n")
     
     model = model.to(device)
     model.eval()
@@ -187,13 +191,15 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
   """
   tokenizer, model, device = load_model()
   
-  # CPU Optimization: Use smaller batches for CPU (better cache utilization)
+  # Auto-detect optimal batch size based on device
+  # GPU is always preferred - CPU optimizations only apply when GPU unavailable
   if batch_size is None:
     if device == "cpu":
       # CPU: Smaller batches (4-6) work better due to cache locality
       batch_size = min(6, max(4, cpu_count // 2))
     else:
       # GPU: Larger batches (8-16) for better parallelism
+      # This applies to both CUDA and MPS (Apple Silicon) GPUs
       batch_size = 8
   
   # Strip markdown before translation
@@ -229,7 +235,8 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
     tgt_lang_id = 256068  # Fallback to a common language code ID
   
   # CPU Optimization: Process batches in parallel for CPU
-  # GPU: Sequential batches (GPU handles parallelism internally)
+  # GPU: Sequential batches (GPU handles parallelism internally - no need for parallel batches)
+  # NOTE: GPU is always preferred - parallel batches only used when device == "cpu"
   total_batches = (len(units) + batch_size - 1) // batch_size
   use_parallel_batches = (device == "cpu" and total_batches > 1 and cpu_count >= 4)
   
@@ -377,11 +384,13 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
   """
   tokenizer, model, device = load_model()
   
-  # CPU Optimization: Use smaller batches for CPU
+  # Auto-detect optimal batch size based on device
+  # GPU is always preferred - CPU optimizations only apply when GPU unavailable
   if batch_size is None:
     if device == "cpu":
       batch_size = min(6, max(4, cpu_count // 2))
     else:
+      # GPU: Larger batches for better parallelism (CUDA or MPS)
       batch_size = 8
 
   clean_text = strip_markdown(text)
