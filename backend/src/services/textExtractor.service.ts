@@ -20,7 +20,7 @@ class TextExtractorService {
      * Extract text from any supported file type
      */
     async extract(filePath: string, mimeType: string): Promise<ExtractionResult> {
-        console.log(`📝 Extracting text from: ${path.basename(filePath)} (${mimeType})`);
+        // console.log(`📝 Extracting text from: ${path.basename(filePath)} (${mimeType})`);
 
         switch (mimeType) {
             case SUPPORTED_FILE_TYPES.PDF:

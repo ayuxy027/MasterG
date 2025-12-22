@@ -32,37 +32,44 @@ export class ChunkingService {
       // Detect language of the page text
       const languageDetection = languageService.detectLanguage(text);
 
-      console.log(
-        `📝 Page ${pageNumber} detected as ${languageDetection.language} (${
-          languageDetection.languageCode
-        }) with ${(languageDetection.confidence * 100).toFixed(0)}% confidence`
-      );
+      // console.log(
+      //   `📝 Page ${pageNumber} detected as ${languageDetection.language} (${
+      //     languageDetection.languageCode
+      //   }) with ${(languageDetection.confidence * 100).toFixed(0)}% confidence`
+      // );
 
-      // Create a SINGLE chunk for the entire page (no splitting)
-      const metadata: ChunkMetadata = {
-        fileName, // PDF name for citations
-        fileId,
-        page: pageNumber, // Page number for citations
-        chunkIndex: 0, // Always 0 since one chunk per page
-        timestamp: new Date().toISOString(),
-        userId,
-        language: languageDetection.languageCode, // NEW: Store detected language
-        languageConfidence: languageDetection.confidence, // NEW: Store confidence
-        // fullDocumentContent removed - now stored separately in MongoDB to avoid payload issues
-      };
+      // Split text into chunks using the configured splitter
+      const splitDocs = await this.splitter.createDocuments([text]);
 
-      const chunk: Chunk = {
-        id: uuidv4(),
-        content: text.trim(), // Use entire page text as one chunk
-        metadata,
-      };
+      const chunks: Chunk[] = splitDocs.map((doc, index) => {
+        const metadata: ChunkMetadata = {
+          fileName, // PDF name for citations
+          fileId,
+          page: pageNumber, // Page number for citations
+          chunkIndex: index,
+          timestamp: new Date().toISOString(),
+          userId,
+          language: languageDetection.languageCode, // Store detected language
+          languageConfidence: languageDetection.confidence, // Store confidence
+        };
 
-      console.log(
-        `✅ Created 1 chunk for ${fileName} (Page ${pageNumber}, Lang: ${
-          languageDetection.language
-        }, ChunkID: ${chunk.id.substring(0, 8)}...)`
-      );
-      return [chunk]; // Return array with single chunk
+        return {
+          id: uuidv4(),
+          content: doc.pageContent.trim(),
+          metadata,
+        };
+      });
+
+      // Filter out empty chunks
+      const validChunks = chunks.filter(this.validateChunk);
+
+      // console.log(
+      //   `✅ Created ${validChunks.length} chunks for ${fileName} (Page ${pageNumber}, Lang: ${
+      //     languageDetection.language
+      //   })`
+      // );
+
+      return validChunks;
     } catch (error) {
       console.error("Chunking error:", error);
       throw new Error("Failed to create chunks from text");

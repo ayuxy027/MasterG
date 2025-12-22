@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { DocumentTree as DocumentTreeType, TreeNode } from '../../../types/documentTree';
 import { extractDocumentTree, getDocumentTree } from '../../../services/documentTreeApi';
+import { optimizePrompt } from '../../../services/planApi';
 import type { DocumentInfo } from '../../../types/topic';
 import TreeNodeComponent from './TreeNode';
 
@@ -9,6 +10,7 @@ interface DocumentTreeProps {
     userId: string;
     sessionId: string;
     onSwitchToStudy: (prompt: string) => void;
+    grade?: string;
 }
 
 const DocumentTree: React.FC<DocumentTreeProps> = ({
@@ -16,12 +18,14 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
     userId,
     sessionId,
     onSwitchToStudy,
+    grade,
 }) => {
     const [tree, setTree] = useState<DocumentTreeType | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingTree, setIsLoadingTree] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [optimizingNodeId, setOptimizingNodeId] = useState<string | null>(null);
 
     // Load saved tree from MongoDB on mount
     useEffect(() => {
@@ -60,9 +64,41 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
         }
     };
 
-    const handleStudyNode = (node: TreeNode, nodePath: string[]) => {
-        const prompt = `Explain "${node.title}" from ${document.fileName}`;
-        onSwitchToStudy(prompt);
+    const handleStudyNode = async (node: TreeNode) => {
+        console.log(`[DocumentTree] Starting study for node: ${node.title} (ID: ${node.id})`);
+        try {
+            setOptimizingNodeId(node.id);
+
+            // 1. Minimum UX delay to ensure "Optimizing..." state is visible
+            // This prevents the UI from flickering if the backend is too fast or fails immediately.
+            const minDelayPromise = new Promise(resolve => setTimeout(resolve, 800));
+
+            // 2. Prepare Context (safely)
+            const nodeDesc = node.description || '';
+            const nodeKeywords = node.keywords?.join(', ') || '';
+            const context = `${nodeDesc}. Keywords: ${nodeKeywords}`;
+            // console.log(`[DocumentTree] Calling optimizePrompt with grade: ${grade}`);
+
+            // 3. Call Backend (Parallel with min delay)
+            const [optimizedPrompt] = await Promise.all([
+                optimizePrompt(node.title, context, document.id, grade),
+                minDelayPromise
+            ]);
+
+            // console.log(`[DocumentTree] Received optimized prompt:`, optimizedPrompt.substring(0, 50) + "...");
+
+            // 4. Switch to Chat with result
+            onSwitchToStudy(optimizedPrompt);
+        } catch (error: any) {
+            console.error("[DocumentTree] Study optimization failed:", error);
+            // Fallback with error visibility for debugging
+            // User sees: "Error: [Message] -> Explain..."
+            // This helps Identify if it's a network error, 500, or logical error.
+            const errorMsg = error.message || "Unknown error";
+            onSwitchToStudy(`[Optimization Failed: ${errorMsg}] Explain "${node.title}" from ${document.fileName}`);
+        } finally {
+            setOptimizingNodeId(null);
+        }
     };
 
     // Show loading state while checking for saved tree
@@ -187,6 +223,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
                                 nodePath={[]}
                                 documentName={document.fileName}
                                 onStudy={handleStudyNode}
+                                optimizingNodeId={optimizingNodeId}
                             />
                         ))}
                     </div>

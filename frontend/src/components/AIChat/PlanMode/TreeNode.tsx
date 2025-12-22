@@ -6,7 +6,8 @@ interface TreeNodeProps {
     depth: number;
     nodePath: string[];
     documentName: string;
-    onStudy: (node: TreeNodeType, path: string[]) => void;
+    onStudy: (node: TreeNodeType) => void;
+    optimizingNodeId?: string | null;
 }
 
 const TreeNodeComponent: React.FC<TreeNodeProps> = ({
@@ -15,10 +16,12 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = ({
     nodePath,
     documentName,
     onStudy,
+    optimizingNodeId = null,
 }) => {
     const [isExpanded, setIsExpanded] = useState(depth < 1);
     const hasChildren = node.children && node.children.length > 0;
     const currentPath = [...nodePath, node.title];
+    const isOptimizing = optimizingNodeId === node.id;
 
     // Difficulty colors
     const difficultyColors = {
@@ -124,10 +127,17 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = ({
 
                 {/* Study Button */}
                 <button
-                    onClick={() => onStudy(node, currentPath)}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-orange-500 text-white hover:bg-orange-600 shadow-sm hover:shadow"
+                    onClick={() => onStudy(node)}
+                    disabled={isOptimizing}
+                    className={`
+                        flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow
+                        ${isOptimizing
+                            ? 'bg-orange-100 text-orange-400 cursor-not-allowed'
+                            : 'bg-orange-500 text-white hover:bg-orange-600'
+                        }
+                    `}
                 >
-                    Study
+                    {isOptimizing ? 'Optimizing...' : 'Study'}
                 </button>
             </div>
 
@@ -142,6 +152,7 @@ const TreeNodeComponent: React.FC<TreeNodeProps> = ({
                             nodePath={currentPath}
                             documentName={documentName}
                             onStudy={onStudy}
+                            optimizingNodeId={optimizingNodeId}
                         />
                     ))}
                 </div>

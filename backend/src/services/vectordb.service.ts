@@ -41,7 +41,7 @@ export class VectorDBService {
 
       // Cache it
       this.collections.set(name, collection);
-      console.log(`📚 Collection "${name}" initialized`);
+      // Collection initialized
 
       return collection;
     } catch (error) {
@@ -95,15 +95,15 @@ export class VectorDBService {
           documents: data.chunks.map((chunk) => chunk.content),
         });
 
-        console.log(
-          `✅ Stored ${data.chunks.length} chunks for PDF "${data.fileName}" (${fileId}) in collection "${collection.name}"`
-        );
+        // console.log(
+        //   `✅ Stored ${data.chunks.length} chunks for PDF "${data.fileName}" (${fileId}) in collection "${collection.name}"`
+        // );
       }
 
-      console.log(
-        `📦 Total: ${chunks.length} chunks from ${Object.keys(chunksByPdf).length
-        } PDF(s)`
-      );
+      // console.log(
+      //   `📦 Total: ${chunks.length} chunks from ${Object.keys(chunksByPdf).length
+      //   } PDF(s)`
+      // );
     } catch (error) {
       console.error("Vector store error:", error);
       throw new Error("Failed to store chunks in vector database");
@@ -111,12 +111,13 @@ export class VectorDBService {
   }
 
   /**
-   * Query similar chunks from specific collection
+   * Query similar chunks from specific collection with optional metadata filters
    */
   async queryChunks(
     queryEmbedding: number[],
     topK: number = 3,
-    collectionName?: string
+    collectionName?: string,
+    metadataFilters?: { where: any }
   ): Promise<{
     documents: string[];
     metadatas: ChunkMetadata[];
@@ -125,10 +126,17 @@ export class VectorDBService {
     try {
       const collection = await this.initCollection(collectionName);
 
-      const results = await collection.query({
+      const queryParams: any = {
         queryEmbeddings: [queryEmbedding],
         nResults: topK,
-      });
+      };
+
+      // Add metadata filters if provided
+      if (metadataFilters?.where) {
+        queryParams.where = metadataFilters.where;
+      }
+
+      const results = await collection.query(queryParams);
 
       if (!results.documents || !results.metadatas || !results.distances) {
         throw new Error("Invalid query results");
@@ -170,7 +178,7 @@ export class VectorDBService {
         } else {
           whereFilter = { fileId: { $in: fileIds } };
         }
-        console.log(`🎯 Filtering query to files: ${fileIds.join(', ')}`);
+        // Filtering query to files
       }
 
       const results = await collection.query({

@@ -9,11 +9,6 @@ import { QueryRequest, QueryResponse } from '../types';
 /**
  * Query Controller with AI-Powered Classification
  * Uses Ollama (DeepSeek R1) for intelligent query routing
- * 
- * LAYER 1: AI Classification - LLM decides query type
- * LAYER 2: Execute based on classification
- *   - GREETING/SIMPLE → Direct AI response (NO sources)
- *   - RAG → Document search + AI response (WITH sources)
  */
 export class QueryController {
 
@@ -113,7 +108,7 @@ export class QueryController {
       }
 
       const startTime = Date.now();
-      console.log(`💬 Query: "${query}"`);
+      // Query received
 
       // Get chat context
       const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
@@ -127,12 +122,9 @@ export class QueryController {
       // Save user message first
       await chatService.addMessage(userId, sessionId, { role: 'user', content: query });
 
-      // ========== LAYER 1: AI CLASSIFICATION ==========
-
       const classification = await ollamaChatService.classifyQuery(query, hasDocuments, chatHistory);
-      console.log(`🎯 Classification: ${classification.type} - ${classification.reason}`);
+      // Classification completed
 
-      // ========== LAYER 2: EXECUTE BASED ON TYPE ==========
       let answer: string;
       let sources: any[] = [];
 
@@ -157,7 +149,7 @@ export class QueryController {
       });
 
       const responseTime = Date.now() - startTime;
-      console.log(`✅ Response in ${responseTime}ms | Type: ${classification.type}`);
+      // Response generated
 
       res.json({
         success: true,
@@ -199,7 +191,7 @@ export class QueryController {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
 
-      console.log(`🚀 Stream Query: "${query}"`);
+      // Stream query initiated
 
       // Get chat context
       const chromaCollectionName = await chatService.getChromaCollectionName(userId, sessionId);
@@ -216,10 +208,8 @@ export class QueryController {
       // Send "analyzing" status
       res.write(`data: ${JSON.stringify({ type: 'layer', layer: 'classifying' })}\n\n`);
 
-      // ========== LAYER 1: AI CLASSIFICATION ==========
-
       const classification = await ollamaChatService.classifyQuery(query, hasDocuments, chatHistory);
-      console.log(`🎯 Classification: ${classification.type} - ${classification.reason}`);
+      // Classification completed
 
       // Send classification result
       res.write(`data: ${JSON.stringify({ type: 'layer', layer: classification.type })}\n\n`);
@@ -227,9 +217,7 @@ export class QueryController {
       let fullAnswer = '';
       let sources: any[] = [];
 
-      // ========== LAYER 2: EXECUTE ==========
       if (classification.type === "GREETING" || classification.type === "SIMPLE") {
-        // Fast path - no document search
         try {
           const answer = classification.type === "GREETING"
             ? await this.handleGreeting(query, chatHistory)
@@ -321,7 +309,7 @@ export class QueryController {
         });
       }
 
-      console.log(`✅ Stream complete | Type: ${classification.type} | Length: ${fullAnswer.length}`);
+      // Stream complete
       res.end();
 
     } catch (error: any) {

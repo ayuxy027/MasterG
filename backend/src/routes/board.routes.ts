@@ -53,7 +53,7 @@ router.post("/generate", async (req: Request, res: Response) => {
       });
     }
 
-    console.log(`📝 Board: Generating ${cardCount} cards for query: "${prompt}"...`);
+    // Board: Generating cards for query
 
     // Updated prompt to generate results based on query, not prompts
     const systemPrompt = `You are an educational content creator. The user has asked a question or provided a topic. Generate exactly ${cardCount} educational cards that answer their query or explain the topic.

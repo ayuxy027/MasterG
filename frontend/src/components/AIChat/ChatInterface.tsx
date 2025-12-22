@@ -424,55 +424,57 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Upload Progress Indicators */}
-      {uploadProgress.length > 0 && (
-        <div className="px-4 py-2 bg-orange-50 border-t border-orange-200 space-y-2">
-          {uploadProgress.map((upload) => (
-            <div key={upload.fileId} className="flex items-center gap-3">
-              <svg
-                className="w-4 h-4 text-orange-600 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-gray-700 truncate">
-                    {upload.fileName}
-                  </span>
-                  <span className="text-gray-500 ml-2">
-                    {upload.status === "completed"
-                      ? "✓"
-                      : upload.status === "error"
-                        ? "✗"
-                        : `${Math.round(upload.progress)}%`}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full transition-all ${upload.status === "completed"
-                      ? "bg-green-500"
-                      : upload.status === "error"
-                        ? "bg-red-500"
-                        : "bg-orange-500"
-                      }`}
-                    style={{ width: `${upload.progress}%` }}
+      {
+        uploadProgress.length > 0 && (
+          <div className="px-4 py-2 bg-orange-50 border-t border-orange-200 space-y-2">
+            {uploadProgress.map((upload) => (
+              <div key={upload.fileId} className="flex items-center gap-3">
+                <svg
+                  className="w-4 h-4 text-orange-600 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                   />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-gray-700 truncate">
+                      {upload.fileName}
+                    </span>
+                    <span className="text-gray-500 ml-2">
+                      {upload.status === "completed"
+                        ? "✓"
+                        : upload.status === "error"
+                          ? "✗"
+                          : `${Math.round(upload.progress)}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${upload.status === "completed"
+                        ? "bg-green-500"
+                        : upload.status === "error"
+                          ? "bg-red-500"
+                          : "bg-orange-500"
+                        }`}
+                      style={{ width: `${upload.progress}%` }}
+                    />
+                  </div>
+                  {upload.error && (
+                    <p className="text-xs text-red-600 mt-1">{upload.error}</p>
+                  )}
                 </div>
-                {upload.error && (
-                  <p className="text-xs text-red-600 mt-1">{upload.error}</p>
-                )}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )
+      }
 
       {/* Compact Input Area - All controls on one line */}
       <div className="flex-shrink-0 border-t-2 border-orange-200 p-3 bg-white">
@@ -508,6 +510,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               />
             </svg>
           </button>
+
+
 
           {/* Text Input - Takes remaining space */}
           <MentionInput
@@ -571,7 +575,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           ))}
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

@@ -18,10 +18,13 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [grade, setGrade] = useState<string>('12'); // Default to Grade 12
 
     useEffect(() => {
         loadDocuments();
     }, [userId, sessionId]);
+
+    const grades = Array.from({ length: 10 }, (_, i) => (i + 3).toString()); // 3 to 12
 
     const loadDocuments = async () => {
         setIsLoading(true);
@@ -49,15 +52,31 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
     return (
         <div className="h-full overflow-y-auto p-6 bg-gradient-to-b from-white to-orange-50/30">
             {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">
-                            Knowledge Tree
-                        </h2>
-                        <p className="text-gray-600 mt-1">
-                            Build hierarchical learning paths from your documents
-                        </p>
+            <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        Knowledge Tree
+                    </h2>
+                    <p className="text-gray-600 mt-1">
+                        Build hierarchical learning paths from your documents
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {/* Grade Selector */}
+                    <div className="flex items-center gap-2 bg-white rounded-lg p-1.5 border border-orange-200 shadow-sm">
+                        <span className="text-sm font-medium text-gray-600 pl-2">Grade:</span>
+                        <select
+                            value={grade}
+                            onChange={(e) => setGrade(e.target.value)}
+                            className="bg-transparent text-sm font-bold text-orange-600 focus:outline-none cursor-pointer py-1 pr-2"
+                        >
+                            {grades.map(g => (
+                                <option key={g} value={g}>{g}th</option>
+                            ))}
+                            <option value="Undergrad">Undergrad</option>
+                            <option value="Grad">Graduate</option>
+                        </select>
                     </div>
 
                     {documents.length > 0 && (
@@ -118,6 +137,7 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
                             userId={userId}
                             sessionId={sessionId}
                             onSwitchToStudy={onSwitchToStudy}
+                            grade={grade}
                         />
                     ))}
                 </div>

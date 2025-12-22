@@ -43,7 +43,7 @@ export class OllamaChatService {
     }
 
     /**
-     * 🧠 LAYER 1: AI-Powered Query Classification
+     * AI-Powered Query Classification
      * Uses LLM to intelligently classify the query type
      * Returns: GREETING | SIMPLE | RAG
      */
@@ -109,7 +109,7 @@ Respond with ONLY this JSON format (no other text):
                         ? parsed.type.toUpperCase()
                         : "RAG";
 
-                    console.log(`🧠 AI Classification: ${type} - ${parsed.reason || "no reason"}`);
+                    // AI Classification completed
 
                     return {
                         type: type as "GREETING" | "SIMPLE" | "RAG",
@@ -161,8 +161,8 @@ Respond with ONLY this JSON format (no other text):
     }
 
     /**
-     * Build educational prompt for student learning
-     * Adapted from Groq service for DeepSeek R1
+     * Build optimized educational prompt for better last-layer attention
+     * Ensures descriptive answers strictly based on document chunks
      */
     private buildEducationalPrompt(
         documentContext: string,
@@ -174,84 +174,92 @@ Respond with ONLY this JSON format (no other text):
         const languageName = SUPPORTED_LANGUAGES[language];
         const hasDocuments = documentContext && documentContext.trim().length > 0;
 
-        // Format chat history (last 10 messages for context)
+        // OPTIMIZATION: Only use last 3-5 messages for recency and relevance
+        const recentHistory = chatHistory.slice(-5);
         const chatContextString =
-            chatHistory.length > 0
-                ? chatHistory
-                    .slice(-10)
+            recentHistory.length > 0
+                ? recentHistory
                     .map((msg) => {
-                        const role = msg.role === "user" ? "Student" : "You";
-                        let msgContent = `${role}: ${msg.content}`;
-                        if (msg.sources && msg.sources.length > 0) {
-                            const sourceInfo = msg.sources
-                                .map((s) => `${s.pdfName} (Page ${s.pageNo})`)
-                                .join(", ");
-                            msgContent += `\n  [Referenced: ${sourceInfo}]`;
-                        }
-                        return msgContent;
+                        const role = msg.role === "user" ? "Student" : "MasterJi";
+                        return `${role}: ${msg.content}`;
                     })
                     .join("\n")
-                : "";
+                : "No previous conversation";
 
-        // Format source citations
+        // Format source citations clearly
         const sourcesString =
             sources.length > 0
                 ? sources
                     .map(
                         (s, idx) =>
-                            `[Source ${idx + 1}] "${s.pdfName}" - Page ${s.pageNo}`
+                            `[Source ${idx + 1}]: "${s.pdfName}", Page ${s.pageNo}`
                     )
                     .join("\n")
                 : "";
 
         if (hasDocuments) {
-            return `You are an expert educational tutor. Answer the question directly based on the document content.
+            // OPTIMIZED PROMPT STRUCTURE for better last-layer attention
+            return `You are MasterJi, an expert educational AI assistant helping students learn.
 
-DOCUMENT CONTENT:
+# TASK
+Provide a comprehensive, detailed, and educational answer to the student's question using ONLY the information from the provided document context below.
+Your answer must be descriptive, thorough, and based strictly on the given context.
+Respond in ${languageName}.
+
+# CONTEXT FROM DOCUMENTS
 ${documentContext}
 
-SOURCES:
+# AVAILABLE SOURCES
 ${sourcesString}
 
-${chatContextString
-                    ? `CONVERSATION HISTORY (use this to understand context and references):
+# RECENT CONVERSATION (Last 5 messages for context)
 ${chatContextString}
 
-`
-                    : ""
-                }Current Question: ${question}
+# STUDENT'S QUESTION
+${question}
 
-CRITICAL INSTRUCTIONS:
-- Use the conversation history to understand context (e.g., "that chapter", "upas chapter", "solve exercise")
-- If the student refers to something from previous messages, use that context
-- DO NOT say: "Let me search", "Let me analyze", "I'm looking", "Searching the document"
-- DO: Start IMMEDIATELY with the answer in ${languageName}
-- Cite sources like: "According to ${sources[0]?.pdfName || "the document"
-                }, Page X..."
+# CRITICAL INSTRUCTIONS - READ CAREFULLY
+1. **Answer ONLY from the provided context above** - Do not use external knowledge or make assumptions
+2. **Be descriptive and thorough** - Provide detailed explanations, not brief summaries
+3. **Use simple, educational language** - Break down complex concepts into understandable parts
+4. **Cite your sources** - Use [Source X] notation when referencing specific information
+5. **Structure your answer clearly** - Use paragraphs, bullet points, or numbered lists when appropriate
+6. **Provide examples** - If the context contains examples, include them in your explanation
+7. **If information is incomplete** - Clearly state: "Based on the provided documents, I can tell you [what you know]. However, the documents don't contain information about [what's missing]."
+8. **Never say**: "Let me search", "I'm analyzing", "Looking through documents" - Just answer directly
+9. **Never hallucinate** - If the context doesn't contain the answer, say so explicitly
 
-Start your answer NOW in ${languageName}:`;
+# ANSWER FORMAT
+- Start immediately with the answer (no preamble like "Based on the document...")
+- Be comprehensive and educational
+- Include relevant details, definitions, and explanations
+- Use examples from the context when available
+- Cite sources using [Source X] notation
+- End with a summary if the answer is long
+
+# YOUR DETAILED ANSWER (in ${languageName})
+`;
         } else {
-            return `You are an educational assistant. The student has asked a question but no relevant documents were found.
+            // No documents available
+            return `You are MasterJi, an educational AI assistant.
 
-${chatContextString
-                    ? `CONVERSATION HISTORY:
+# SITUATION
+The student has asked a question, but no relevant documents were found in their uploaded files.
+
+# RECENT CONVERSATION
 ${chatContextString}
 
-`
-                    : ""
-                }Current Question: ${question}
+# STUDENT'S QUESTION
+${question}
 
-CRITICAL INSTRUCTIONS:
-- Check the conversation history - the student might be referring to something discussed earlier
-- If they're asking about a specific chapter/exercise mentioned before, acknowledge it
-- DO NOT say: "Let me", "Searching", "Looking", "Analyzing"
-- DO: Answer immediately in ${languageName}
+# INSTRUCTIONS
+1. Check if the student is referring to something from the conversation history
+2. If it's a general educational question, provide a brief answer and note: "This is general knowledge as it's not in your uploaded documents. For detailed information specific to your materials, please upload the relevant documents."
+3. If it's about specific content they mentioned before, politely ask them to upload the relevant document
+4. If it's not educational, politely decline and remind them you're here to help with their studies
 
-If educational: Provide answer + note "This is general knowledge as it's not in your documents."
-If referring to previous content: Explain you need them to upload the relevant document
-If NOT educational: Politely decline
-
-Answer NOW in ${languageName}:`;
+# YOUR RESPONSE (in ${languageName})
+`;
         }
     }
 
@@ -332,6 +340,8 @@ Answer NOW in ${languageName}:`;
         responseFormat?: "json_object" | "text"
     ): Promise<string> {
         try {
+            // console.log(`🤖 [OllamaService] Sending request to ${this.model} at ${this.baseUrl}`);
+
             // Convert messages array to a single prompt for Ollama
             const prompt = messages
                 .map((m) => {
@@ -352,8 +362,8 @@ Answer NOW in ${languageName}:`;
                     prompt: fullPrompt,
                     stream: false,
                     options: {
-                        temperature: 0.3,
-                        num_predict: 1000,
+                        temperature: 0.1, // More deterministic
+                        num_predict: 2500, // Increased to prevent truncation
                     },
                 },
                 {
@@ -365,10 +375,12 @@ Answer NOW in ${languageName}:`;
             );
 
             if (!response.data.response) {
+                // console.error("❌ [OllamaService] No response data received from Ollama API");
                 throw new Error("No response from Ollama");
             }
 
             const result = response.data.response.trim();
+            // console.log(`✅ [OllamaService] Response received. Length: ${result.length}`);
 
             // For JSON responses, try to extract just the JSON part
             if (responseFormat === "json_object") {
@@ -380,9 +392,15 @@ Answer NOW in ${languageName}:`;
             return answer;
         } catch (error: any) {
             if (error.code === "ECONNREFUSED") {
+                console.error(`❌ [OllamaService] Connection refused to ${this.baseUrl}. Is Ollama running?`);
                 throw new Error("Ollama is not running. Please start Ollama service.");
             }
-            console.error("Ollama chat completion error:", error.message);
+            console.error("❌ [OllamaService] Chat completion error:", {
+                message: error.message,
+                code: error.code,
+                model: this.model,
+                url: this.baseUrl
+            });
             throw new Error(`Ollama chat completion failed: ${error.message}`);
         }
     }
@@ -604,7 +622,7 @@ Start your answer NOW in ${languageName}:`;
     }
 
     /**
-     * Extract keywords from query (for RAG optimization)
+     * Extract keywords from query
      */
     async extractKeywords(query: string): Promise<string[]> {
         try {

@@ -22,7 +22,7 @@ export class PDFService {
     try {
       const dataBuffer = await fs.readFile(filePath);
       const data = await pdfParse(dataBuffer);
-      
+
       if (!data.text || data.text.trim().length === 0) {
         throw new Error('No text content found in PDF');
       }
@@ -39,15 +39,15 @@ export class PDFService {
    * Note: Only handles text-based PDFs. Scanned/image PDFs will return empty text.
    */
   async extractTextByPages(filePath: string): Promise<PDFPage[]> {
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`🔍 PDF TEXT EXTRACTION`);
-    console.log(`${'='.repeat(60)}`);
-    console.log(`📄 File: ${path.basename(filePath)}`);
-    
+    // console.log(`\n${'='.repeat(60)}`);
+    // console.log(`🔍 PDF TEXT EXTRACTION`);
+    // console.log(`${'='.repeat(60)}`);
+    // console.log(`📄 File: ${path.basename(filePath)}`);
+
     try {
       const dataBuffer = await fs.readFile(filePath);
       const uint8Array = new Uint8Array(dataBuffer);
-      
+
       // Load PDF document
       const loadingTask = getDocument({
         data: uint8Array,
@@ -57,14 +57,14 @@ export class PDFService {
       });
       const pdfDoc = await loadingTask.promise;
       const totalPages = pdfDoc.numPages;
-      
-      console.log(`📑 Total pages: ${totalPages}`);
-      console.log(`${'='.repeat(60)}\n`);
+
+      // console.log(`📑 Total pages: ${totalPages}`);
+      // console.log(`${'='.repeat(60)}\n`);
 
       const pageContents: PDFPage[] = [];
 
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-        console.log(`📖 Processing page ${pageNum}/${totalPages}...`);
+        // console.log(`📖 Processing page ${pageNum}/${totalPages}...`);
 
         const page = await pdfDoc.getPage(pageNum);
         const textContent = await page.getTextContent();
@@ -77,9 +77,9 @@ export class PDFService {
             text: pageText.trim(),
             extractionMethod: 'text',
           });
-          console.log(`   ✅ Extracted ${pageText.length} characters`);
+          // console.log(`   ✅ Extracted ${pageText.length} characters`);
         } else {
-          console.log(`   ⚠️  No text found on page ${pageNum}`);
+          // console.log(`   ⚠️  No text found on page ${pageNum}`);
         }
       }
 
@@ -87,13 +87,13 @@ export class PDFService {
       await pdfDoc.destroy();
 
       // Summary
-      console.log(`\n${'='.repeat(60)}`);
-      console.log(`📊 EXTRACTION SUMMARY`);
-      console.log(`${'='.repeat(60)}`);
-      console.log(`📑 Total pages: ${totalPages}`);
-      console.log(`✅ Pages with content: ${pageContents.length}`);
-      console.log(`❌ Pages without content: ${totalPages - pageContents.length}`);
-      console.log(`${'='.repeat(60)}\n`);
+      // console.log(`\n${'='.repeat(60)}`);
+      // console.log(`📊 EXTRACTION SUMMARY`);
+      // console.log(`${'='.repeat(60)}`);
+      // console.log(`📑 Total pages: ${totalPages}`);
+      // console.log(`✅ Pages with content: ${pageContents.length}`);
+      // console.log(`❌ Pages without content: ${totalPages - pageContents.length}`);
+      // console.log(`${'='.repeat(60)}\n`);
 
       if (pageContents.length === 0) {
         throw new Error('No text content found in PDF. The PDF may be image-based (scanned) or corrupted. Please try a text-based PDF.');
@@ -114,7 +114,7 @@ export class PDFService {
     try {
       const dataBuffer = await fs.readFile(filePath);
       const data = await pdfParse(dataBuffer);
-      
+
       return {
         pages: data.numpages,
         info: data.info,

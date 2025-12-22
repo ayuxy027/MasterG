@@ -218,7 +218,7 @@ export class ChatService {
         { upsert: true, new: true }
       );
 
-      console.log(`💬 Message added to chat history (${userId}/${sessionId})`);
+      // Message added to chat history
     } catch (error) {
       console.error("Error adding message to chat history:", error);
       // Don't throw - allow RAG to work without chat history

@@ -151,7 +151,7 @@ export class ChatController {
   }
 
   /**
-   * Query chat with simplified RAG pipeline (Ollama only)
+   * Process chat query with RAG
    */
   async queryChat(req: Request, res: Response): Promise<void> {
     const startTime = Date.now();
@@ -180,7 +180,6 @@ export class ChatController {
 
 
 
-      // Process query through simplified RAG pipeline
       const result = await asyncRAGOrchestratorService.processQuery(
         query,
         chatHistory,
