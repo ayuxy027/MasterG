@@ -50,12 +50,14 @@ export class PosterController {
           sampleCount: 1,
         });
 
+        const promptString = `Positive: ${enhancedPrompt.positive}\nNegative: ${enhancedPrompt.negative}`;
+
         res.status(200).json({
           success: true,
           posters: [
             {
               imageBase64,
-              enhancedPrompt,
+              enhancedPrompt: promptString,
               mimeType: "image/png",
             },
           ],

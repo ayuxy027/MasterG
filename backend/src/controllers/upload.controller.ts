@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { chunkingService } from "../services/chunking.service";
-import { embeddingService } from "../services/embedding.service";
 import { ollamaEmbeddingService } from "../services/ollamaEmbedding.service";
 import { vectorDBService } from "../services/vectordb.service";
 import { chatService } from "../services/chat.service";
@@ -140,7 +139,7 @@ export class UploadController {
       const useOllama = !!env.OLLAMA_URL;
       console.log(`🔧 Mode: ${useOllama ? 'OFFLINE (Ollama)' : 'ONLINE (Google)'}`);
       console.log(
-        `🔄 Generating embeddings page-wise for ${allChunks.length} pages...`
+        `🔄 Generating embeddings for ${allChunks.length} chunks...`
       );
 
       let embeddingResults;
@@ -151,13 +150,13 @@ export class UploadController {
         );
       } else {
         // Use Google API for embeddings (online)
-        embeddingResults = await embeddingService.generateEmbeddings(
+        embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
           allChunks.map((chunk) => chunk.content)
         );
       }
 
       console.log(
-        `✅ Generated ${embeddingResults.length} embeddings (1 per page) for easier page-wise matching`
+        `✅ Generated ${embeddingResults.length} embeddings`
       );
 
       // Step 4: Store in chat-specific ChromaDB collection

@@ -19,6 +19,8 @@ interface ChatInterfaceProps {
   messages: MessageUI[];
   setMessages: React.Dispatch<React.SetStateAction<MessageUI[]>>;
   onSessionUpdate: (firstUserMessage?: string) => void;
+  initialPrompt?: string | null;
+  onInitialPromptConsumed?: () => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -27,6 +29,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages,
   setMessages,
   onSessionUpdate,
+  initialPrompt,
+  onInitialPromptConsumed,
 }) => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +52,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     // Check if this is a new session (no messages)
     setIsFirstMessage(messages.length === 0);
   }, [sessionId, messages.length]);
+
+  // Handle initial prompt from Plan mode
+  useEffect(() => {
+    if (initialPrompt) {
+      setInputValue(initialPrompt);
+      onInitialPromptConsumed?.();
+    }
+  }, [initialPrompt, onInitialPromptConsumed]);
 
   const loadUploadedFiles = async () => {
     try {

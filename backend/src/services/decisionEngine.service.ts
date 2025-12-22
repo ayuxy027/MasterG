@@ -2,33 +2,43 @@ import { ollamaChatService } from "./ollamaChat.service";
 import { ollamaEmbeddingService } from "./ollamaEmbedding.service";
 import { vectorDBService } from "./vectordb.service";
 import { ChatMessage } from "../types";
-import logger from "./logger.service";
 
 /**
- * Simplified Decision Engine
+ * Optimized Decision Engine
  * Uses only Ollama (DeepSeek R1) - Completely Offline
  */
 export class DecisionEngineService {
-  private readonly TOP_K = 8;
-  private readonly SIMILARITY_THRESHOLD = 0.4;
+  private readonly TOP_K = 5; // OPTIMIZED: Reduced from 8
+  private readonly SIMILARITY_THRESHOLD = 0.5; // OPTIMIZED: Increased from 0.4
 
   /**
    * Handle RAG query - retrieve context and generate answer
+   * 
+   * @param retrievalQuery - Optimized query for retrieval (from smart classifier)
+   * @param chatHistory - Chat conversation history
+   * @param chromaCollectionName - Collection to search in
+   * @param originalQuery - Original user query (for answer generation)
    */
   async handleRAGQuery(
-    query: string,
+    retrievalQuery: string,
     chatHistory: ChatMessage[],
-    chromaCollectionName: string
+    chromaCollectionName: string,
+    originalQuery?: string
   ): Promise<{ answer: string; sources: any[]; metadata: any }> {
     const startTime = Date.now();
 
     try {
+      // Use original query for display, retrieval query for search
+      const queryForAnswer = originalQuery || retrievalQuery;
+
       // Step 1: Generate query embedding using Ollama
-      logger.info("🔍 Generating query embedding with Ollama");
-      const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(query);
+      console.log("🔍 Generating query embedding with Ollama");
+      const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(
+        retrievalQuery
+      );
 
       // Step 2: Retrieve relevant chunks from ChromaDB
-      logger.info(`🔍 Searching in collection: ${chromaCollectionName}`);
+      console.log(`🔍 Searching in collection: ${chromaCollectionName}`);
       const searchResults = await vectorDBService.queryChunks(
         queryEmbedding,
         this.TOP_K,
@@ -40,7 +50,8 @@ export class DecisionEngineService {
 
       if (relevantChunks.length === 0) {
         return {
-          answer: "I couldn't find relevant information in your documents for this question. Try rephrasing or ask about something else in the documents.",
+          answer:
+            "I couldn't find relevant information in your documents for this question. Try rephrasing or ask about something else in the documents.",
           sources: [],
           metadata: {
             chunksFound: 0,
@@ -49,7 +60,7 @@ export class DecisionEngineService {
         };
       }
 
-      // Step 4: Build context string
+      // Step 4: Build context string (OPTIMIZED: Use only 3 chunks)
       const context = this.buildContext(relevantChunks);
 
       // Step 5: Build sources for citation
@@ -59,12 +70,12 @@ export class DecisionEngineService {
         snippet: chunk.content.substring(0, 150) + "...",
       }));
 
-      // Step 6: Generate answer using Ollama
-      logger.info("🤖 Generating answer with Ollama (DeepSeek R1)");
+      // Step 6: Generate answer using Ollama (use original query)
+      console.log("🤖 Generating answer with Ollama (DeepSeek R1)");
       const response = await ollamaChatService.generateEducationalAnswer(
         context,
         chatHistory,
-        query,
+        queryForAnswer,
         "en",
         sources
       );
@@ -79,7 +90,7 @@ export class DecisionEngineService {
         },
       };
     } catch (error: any) {
-      logger.error("RAG query error:", error);
+      console.error("❌ RAG query error:", error.message);
       throw error;
     }
   }
