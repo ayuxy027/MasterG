@@ -290,11 +290,20 @@ export class NLLBService {
     options: NLLBTranslateOptions,
     resolve: (value: { success: boolean; translated?: string; error?: string }) => void
   ) {
+    // ROBUST: Ensure server is running, start if needed
     if (!this.pythonProcess) {
-      resolve({
-        success: false,
-        error: "NLLB server is not running",
-      });
+      this.startServer();
+      // Wait a bit longer for server to be ready
+      setTimeout(() => {
+        if (!this.pythonProcess) {
+          resolve({
+            success: false,
+            error: "NLLB server failed to start. Please check Python environment.",
+          });
+          return;
+        }
+        this.sendRequest(text, options, resolve);
+      }, 3000); // Increased wait time
       return;
     }
 
@@ -316,6 +325,7 @@ export class NLLBService {
         stdoutBuffer = lines.slice(1).join("\n");
 
         this.pythonProcess!.stdout.removeListener("data", dataHandler);
+        this.pythonProcess!.stderr.removeListener("data", errorHandler);
 
         try {
           const parsed = JSON.parse(responseLine);
