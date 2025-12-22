@@ -357,7 +357,7 @@ const StitchPage: React.FC = () => {
   });
   const [sessions, setSessions] = useState<StitchSessionListItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   const [selectedGrade, setSelectedGrade] = useState("8");
   const [customGrade, setCustomGrade] = useState("");
@@ -699,13 +699,23 @@ const StitchPage: React.FC = () => {
 
   // Track previous sessionId to avoid reloading same session
   const previousSessionIdRef = useRef<string | null>(null);
+  // Track if a session is newly created (don't try to load it from backend)
+  const isNewSessionRef = useRef<boolean>(false);
 
   // Load session data when sessionId changes (but not on initial mount if no sessionId)
+  // Skip loading if it's a newly created session
   useEffect(() => {
     if (currentSessionId && currentSessionId !== previousSessionIdRef.current) {
       localStorage.setItem("masterji_stitch_sessionId", currentSessionId);
       previousSessionIdRef.current = currentSessionId;
-      loadSessionData(currentSessionId);
+      
+      // Only load if it's not a newly created session
+      if (!isNewSessionRef.current) {
+        loadSessionData(currentSessionId);
+      } else {
+        // Reset the flag after skipping the load
+        isNewSessionRef.current = false;
+      }
     }
   }, [currentSessionId, loadSessionData]);
 
@@ -743,6 +753,9 @@ const StitchPage: React.FC = () => {
   // Create new session
   const handleNewSession = useCallback(() => {
     const newSessionId = generateSessionId();
+    
+    // Mark as new session so we don't try to load it from backend
+    isNewSessionRef.current = true;
     setCurrentSessionId(newSessionId);
 
     // Clear current content
@@ -943,19 +956,7 @@ const StitchPage: React.FC = () => {
   }, [translatedContent, translatingLanguages]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30 relative">
-      {/* Session Sidebar */}
-      <StitchSessionSidebar
-        sessions={sessions}
-        currentSessionId={currentSessionId}
-        onSessionSelect={handleSessionSelect}
-        onNewSession={handleNewSession}
-        onDeleteSession={handleDeleteSession}
-        isLoading={sessionsLoading}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((toast) => (
@@ -967,190 +968,62 @@ const StitchPage: React.FC = () => {
         ))}
       </div>
 
-      <div className={`max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-0' : 'lg:ml-64'}`}>
-        {/* Header */}
-        <div className="mb-6 sm:mb-8 text-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-800 mb-2 sm:mb-3">
-            <span className="text-orange-400">Stitch</span> Offline Content
-          </h1>
-          <p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
-            Generate comprehensive, curriculum-aligned educational content offline using DeepSeek R1
-          </p>
-        </div>
+      {/* Main Content Area */}
+      <div className="flex-1 min-h-0 flex overflow-hidden max-w-[1920px] w-full mx-auto">
+        {/* Session Sidebar */}
+        {!sidebarCollapsed && (
+          <StitchSessionSidebar
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            onSessionSelect={handleSessionSelect}
+            onNewSession={handleNewSession}
+            onDeleteSession={handleDeleteSession}
+            isLoading={sessionsLoading}
+          />
+        )}
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel - Configuration */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-5 sm:p-6">
-              <div className="flex items-center gap-2 mb-4 sm:mb-6">
-                <svg
-                  className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                <h2 className="text-sm sm:text-base font-semibold text-gray-800">Configuration</h2>
-              </div>
+        {/* Sidebar Toggle Button */}
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="w-6 bg-white/80 hover:bg-orange-50 border-r-2 border-orange-100 flex items-center justify-center transition-colors"
+          title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+        >
+          <svg
+            className={`w-4 h-4 text-gray-600 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
 
-              <div className="space-y-6">
-                {/* Grade Level */}
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                    Grade Level
-                  </label>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2">
-                      {GRADE_LEVELS.filter(grade => grade.value !== "custom").map((grade) => (
-                        <button
-                          key={grade.value}
-                          onClick={() => {
-                            setSelectedGrade(grade.value);
-                            setCustomGrade("");
-                          }}
-                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === grade.value && selectedGrade !== "custom"
-                            ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
-                            : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
-                            }`}
-                        >
-                          {grade.label}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedGrade("custom");
-                        setCustomGrade("");
-                      }}
-                      className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === "custom"
-                        ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
-                        : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white"
-                        }`}
-                    >
-                      Custom
-                    </button>
-                    {selectedGrade === "custom" && (
-                      <input
-                        type="text"
-                        value={customGrade}
-                        onChange={(e) => setCustomGrade(e.target.value)}
-                        placeholder="Enter grade level..."
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
-                      />
-                    )}
-                  </div>
-                </div>
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8">
+            {/* Header */}
+            <div className="mb-6 sm:mb-8 text-center">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-800 mb-2 sm:mb-3">
+                <span className="text-orange-400">Stitch</span> Offline Content
+              </h1>
+              <p className="text-sm sm:text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
+                Generate comprehensive, curriculum-aligned educational content offline using DeepSeek R1
+              </p>
+            </div>
 
-                {/* Subject */}
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                    Subject
-                  </label>
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => {
-                      setSelectedSubject(e.target.value);
-                      if (e.target.value !== "custom") {
-                        setCustomSubject("");
-                      }
-                    }}
-                    className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${selectedSubject && selectedSubject !== ""
-                      ? "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
-                      : "border-gray-200 focus:border-orange-300"
-                      } focus:ring-2 focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300`}
-                  >
-                    {CORE_SUBJECTS.map((subject) => (
-                      <option key={subject.value} value={subject.value}>
-                        {subject.label}
-                      </option>
-                    ))}
-                    <option value="custom">Custom</option>
-                  </select>
-                  {selectedSubject === "custom" && (
-                    <input
-                      type="text"
-                      value={customSubject}
-                      onChange={(e) => setCustomSubject(e.target.value)}
-                      placeholder="Enter subject name..."
-                      className="w-full mt-2 px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
-                    />
-                  )}
-                </div>
-
-                {/* Topic */}
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                    Topic / Lesson Title
-                  </label>
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="e.g., Photosynthesis, Quadratic Equations"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
-                  />
-                </div>
-
-                {/* Generate Button */}
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !topic.trim() || (selectedGrade === "custom" && !customGrade.trim()) || (selectedSubject === "custom" && !customSubject.trim())}
-                  className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 active:bg-orange-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300"
-                >
-                  {isGenerating ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg
-                        className="animate-spin h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      Generating...
-                    </span>
-                  ) : (
-                    "Generate Content"
-                  )}
-                </button>
-                {isGenerating && (
-                  <button
-                    onClick={handleStopGeneration}
-                    className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 border border-gray-300 shadow-sm hover:shadow"
-                  >
-                    Stop Generating
-                  </button>
-                )}
-
-                {/* Error Display */}
-                {error && (
-                  <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-start gap-3">
+            {/* Main Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Panel - Configuration */}
+              <div className="lg:col-span-1 space-y-4">
+                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-5 sm:p-6">
+                  <div className="flex items-center gap-2 mb-4 sm:mb-6">
                     <svg
-                      className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1158,20 +1031,278 @@ const StitchPage: React.FC = () => {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        strokeWidth={2}
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                       />
                     </svg>
+                    <h2 className="text-sm sm:text-base font-semibold text-gray-800">Configuration</h2>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Grade Level */}
                     <div>
-                      <p className="font-semibold text-red-800 text-xs sm:text-sm">Error</p>
-                      <p className="text-xs sm:text-sm text-red-700">{error}</p>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                        Grade Level
+                      </label>
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          {GRADE_LEVELS.filter(grade => grade.value !== "custom").map((grade) => (
+                            <button
+                              key={grade.value}
+                              onClick={() => {
+                                setSelectedGrade(grade.value);
+                                setCustomGrade("");
+                              }}
+                              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === grade.value && selectedGrade !== "custom"
+                                ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                                : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
+                                }`}
+                            >
+                              {grade.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedGrade("custom");
+                            setCustomGrade("");
+                          }}
+                          className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === "custom"
+                            ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                            : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white"
+                            }`}
+                        >
+                          Custom
+                        </button>
+                        {selectedGrade === "custom" && (
+                          <input
+                            type="text"
+                            value={customGrade}
+                            onChange={(e) => setCustomGrade(e.target.value)}
+                            placeholder="Enter grade level..."
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                          />
+                        )}
+                      </div>
                     </div>
+
+                    {/* Subject */}
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                        Subject
+                      </label>
+                      <select
+                        value={selectedSubject}
+                        onChange={(e) => {
+                          setSelectedSubject(e.target.value);
+                          if (e.target.value !== "custom") {
+                            setCustomSubject("");
+                          }
+                        }}
+                        className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${selectedSubject && selectedSubject !== ""
+                          ? "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
+                          : "border-gray-200 focus:border-orange-300"
+                          } focus:ring-2 focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300`}
+                      >
+                        {CORE_SUBJECTS.map((subject) => (
+                          <option key={subject.value} value={subject.value}>
+                            {subject.label}
+                          </option>
+                        ))}
+                        <option value="custom">Custom</option>
+                      </select>
+                      {selectedSubject === "custom" && (
+                        <input
+                          type="text"
+                          value={customSubject}
+                          onChange={(e) => setCustomSubject(e.target.value)}
+                          placeholder="Enter subject name..."
+                          className="w-full mt-2 px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                        />
+                      )}
+                    </div>
+
+                    {/* Topic */}
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                        Topic / Lesson Title
+                      </label>
+                      <input
+                        type="text"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        placeholder="e.g., Photosynthesis, Quadratic Equations"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                      />
+                    </div>
+
+                    {/* Generate Button */}
                     <button
-                      onClick={() => setError(null)}
-                      className="ml-auto text-red-500 hover:text-red-700"
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !topic.trim() || (selectedGrade === "custom" && !customGrade.trim()) || (selectedSubject === "custom" && !customSubject.trim())}
+                      className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 active:bg-orange-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300"
                     >
+                      {isGenerating ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg
+                            className="animate-spin h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
+                          Generating...
+                        </span>
+                      ) : (
+                        "Generate Content"
+                      )}
+                    </button>
+                    {isGenerating && (
+                      <button
+                        onClick={handleStopGeneration}
+                        className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 border border-gray-300 shadow-sm hover:shadow"
+                      >
+                        Stop Generating
+                      </button>
+                    )}
+
+                    {/* Error Display */}
+                    {error && (
+                      <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-start gap-3">
+                        <svg
+                          className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        <div>
+                          <p className="font-semibold text-red-800 text-xs sm:text-sm">Error</p>
+                          <p className="text-xs sm:text-sm text-red-700">{error}</p>
+                        </div>
+                        <button
+                          onClick={() => setError(null)}
+                          className="ml-auto text-red-500 hover:text-red-700"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ollama Status */}
+                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-4 sm:p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs sm:text-sm font-semibold text-gray-800">Ollama Status</span>
+                    {ollamaStatus.checking ? (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                        Checking...
+                      </span>
+                    ) : ollamaStatus.connected ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
+                        Not Connected
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {ollamaStatus.connected
+                      ? "Offline LLM is ready"
+                      : "Connect to Ollama for offline LLM"}
+                  </p>
+                  <button
+                    onClick={checkOllamaStatus}
+                    className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                  >
+                    Refresh Status
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Panel - Thinking & Preview */}
+              <div className="lg:col-span-2 space-y-4">
+                {/* Thinking Text */}
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-64 flex flex-col">
+                  <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
+                    <svg
+                      className="w-5 h-5 text-orange-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
+                    </svg>
+                    <h3 className="text-sm sm:text-base font-semibold text-gray-800">Thinking Process</h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4">
+                    {!thinkingText && !isGenerating ? (
+                      <div className="flex items-center justify-center h-full text-gray-400">
+                        <p className="text-sm">AI thinking process will appear here during generation</p>
+                      </div>
+                    ) : (
+                      <div className="prose prose-sm max-w-none">
+                        <div className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed font-mono bg-gray-50 p-4 rounded-lg border border-gray-200">
+                          {thinkingText || (isGenerating ? "Thinking..." : "")}
+                          {isGenerating && (
+                            <span className="inline-block w-2 h-4 bg-orange-500 ml-1 animate-pulse" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Content Preview with Tabs */}
+                <div ref={contentPreviewRef} className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
+                  <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-orange-200/60">
+                    <div className="flex items-center gap-2 sm:gap-3">
                       <svg
-                        className="w-5 h-5"
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1179,321 +1310,230 @@ const StitchPage: React.FC = () => {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M6 18L18 6M6 6l12 12"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                         />
                       </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Ollama Status */}
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-4 sm:p-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs sm:text-sm font-semibold text-gray-800">Ollama Status</span>
-                {ollamaStatus.checking ? (
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                    Checking...
-                  </span>
-                ) : ollamaStatus.connected ? (
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
-                    Connected
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
-                    Not Connected
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500 mb-2">
-                {ollamaStatus.connected
-                  ? "Offline LLM is ready"
-                  : "Connect to Ollama for offline LLM"}
-              </p>
-              <button
-                onClick={checkOllamaStatus}
-                className="text-xs text-orange-600 hover:text-orange-700 font-medium"
-              >
-                Refresh Status
-              </button>
-            </div>
-          </div>
-
-          {/* Right Panel - Thinking & Preview */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Thinking Text */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-64 flex flex-col">
-              <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
-                <svg
-                  className="w-5 h-5 text-orange-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                  />
-                </svg>
-                <h3 className="text-sm sm:text-base font-semibold text-gray-800">Thinking Process</h3>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                {!thinkingText && !isGenerating ? (
-                  <div className="flex items-center justify-center h-full text-gray-400">
-                    <p className="text-sm">AI thinking process will appear here during generation</p>
-                  </div>
-                ) : (
-                  <div className="prose prose-sm max-w-none">
-                    <div className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed font-mono bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      {thinkingText || (isGenerating ? "Thinking..." : "")}
-                      {isGenerating && (
-                        <span className="inline-block w-2 h-4 bg-orange-500 ml-1 animate-pulse" />
+                      <h3 className="text-sm sm:text-base font-semibold text-gray-800">Content Preview</h3>
+                      {/* Word/Character Count */}
+                      {getActiveContent() && (
+                        <div className="text-xs text-gray-500 ml-2">
+                          {getWordCount(getActiveContent())} words • {getCharacterCount(getActiveContent())} chars
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Content Preview with Tabs */}
-            <div ref={contentPreviewRef} className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 h-96 flex flex-col">
-              <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-orange-200/60">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <svg
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <h3 className="text-sm sm:text-base font-semibold text-gray-800">Content Preview</h3>
-                  {/* Word/Character Count */}
-                  {getActiveContent() && (
-                    <div className="text-xs text-gray-500 ml-2">
-                      {getWordCount(getActiveContent())} words • {getCharacterCount(getActiveContent())} chars
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Quick Actions Bar */}
-                  {getActiveContent() && (
-                    <div className="flex items-center gap-1 mr-2 border-r border-orange-200 pr-2">
-                      <button
-                        onClick={() => handleCopy(getActiveContent())}
-                        className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
-                        title="Copy to clipboard (Cmd/Ctrl+C)"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDownload(getActiveContent(), activeTab === "english" ? "english" : getLanguageName(activeTab))}
-                        className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
-                        title="Download as file (Cmd/Ctrl+S)"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={handleClear}
-                        className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Clear all content"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                  {/* Bulk Translate Button */}
-                  {englishContent && Object.keys(translatedContent).length < ALL_LANGUAGES.length - 1 && (
-                    <button
-                      onClick={handleBulkTranslate}
-                      disabled={isGenerating || Object.values(isTranslating).some(v => v)}
-                      className="text-xs px-2 py-1.5 rounded-lg bg-blue-100 text-blue-700 font-medium hover:bg-blue-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-1.5"
-                      title="Translate to all languages"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                      </svg>
-                      Bulk
-                    </button>
-                  )}
-                  <select
-                    value={targetLanguageForTranslation}
-                    onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
-                    className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
-                  >
-                    {ALL_LANGUAGES.map((lang) => (
-                      <option key={lang.code} value={lang.code}>
-                        {lang.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    disabled={!englishContent.trim() || isTranslating[targetLanguageForTranslation]}
-                    onClick={() => handleTranslate(targetLanguageForTranslation)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isTranslating[targetLanguageForTranslation] ? (
-                      <>
-                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Translating...
-                      </>
-                    ) : (
-                      "Translate"
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Tabs */}
-              {englishContent && (
-                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6 overflow-x-auto items-center">
-                  <button
-                    onClick={() => setActiveTab("english")}
-                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === "english"
-                      ? "border-orange-400 text-orange-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
-                      }`}
-                  >
-                    English
-                  </button>
-                  {/* Markdown Toggle - Only show when English tab is active AND generation is complete */}
-                  {activeTab === "english" && !isGenerating && englishContent && (
-                    <div className="ml-4 flex items-center gap-2 border-l border-orange-200 pl-4">
-                      <span className="text-xs text-gray-600 font-medium">Markdown:</span>
-                      <button
-                        onClick={() => setMarkdownEnabled(!markdownEnabled)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${markdownEnabled ? "bg-orange-500" : "bg-gray-300"
-                          }`}
-                        role="switch"
-                        aria-checked={markdownEnabled}
-                        aria-label="Toggle markdown rendering (only available after generation completes)"
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${markdownEnabled ? "translate-x-6" : "translate-x-1"
-                            }`}
-                        />
-                      </button>
-                      <span className="text-xs text-gray-500 font-medium">
-                        {markdownEnabled ? "On" : "Off"}
-                      </span>
-                    </div>
-                  )}
-                  {/* Show all languages that are either translated or currently translating */}
-                  {availableTabs.map((langCode) => (
-                    <button
-                      key={langCode}
-                      onClick={() => setActiveTab(langCode)}
-                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === langCode
-                        ? "border-orange-400 text-orange-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
-                        }`}
-                    >
-                      {getLanguageName(langCode)}
-                      {translatingLanguages.has(langCode) && (
-                        <svg
-                          className="animate-spin h-3 w-3 text-orange-500"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
+                    <div className="flex items-center gap-2">
+                      {/* Quick Actions Bar */}
+                      {getActiveContent() && (
+                        <div className="flex items-center gap-1 mr-2 border-r border-orange-200 pr-2">
+                          <button
+                            onClick={() => handleCopy(getActiveContent())}
+                            className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                            title="Copy to clipboard (Cmd/Ctrl+C)"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDownload(getActiveContent(), activeTab === "english" ? "english" : getLanguageName(activeTab))}
+                            className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                            title="Download as file (Cmd/Ctrl+S)"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={handleClear}
+                            className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Clear all content"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                      {/* Bulk Translate Button */}
+                      {englishContent && Object.keys(translatedContent).length < ALL_LANGUAGES.length - 1 && (
+                        <button
+                          onClick={handleBulkTranslate}
+                          disabled={isGenerating || Object.values(isTranslating).some(v => v)}
+                          className="text-xs px-2 py-1.5 rounded-lg bg-blue-100 text-blue-700 font-medium hover:bg-blue-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-1.5"
+                          title="Translate to all languages"
                         >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                          </svg>
+                          Bulk
+                        </button>
                       )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Tab Content */}
-              <div className="flex-1 overflow-hidden">
-                {activeTab === "english" ? (
-                  // Only allow markdown rendering after generation completes (not during streaming)
-                  // During generation (isGenerating), always show plain text
-                  <ContentPreview
-                    content={englishContent}
-                    isMarkdown={markdownEnabled && !isGenerating && activeTab === "english"}
-                  />
-                ) : translatingLanguages.has(activeTab) ? (
-                  // UX IMPROVEMENT: Show skeleton/loading UI while translating
-                  <div className="h-full overflow-auto p-6 bg-white">
-                    <div className="space-y-4">
-                      {/* Skeleton loading animation */}
-                      <div className="space-y-3">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <div key={i} className="animate-pulse">
-                            <div className="h-4 bg-gray-200 rounded w-full"></div>
-                            <div className="h-4 bg-gray-200 rounded w-5/6 mt-2"></div>
-                            <div className="h-4 bg-gray-200 rounded w-4/6 mt-2"></div>
-                          </div>
+                      <select
+                        value={targetLanguageForTranslation}
+                        onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
+                        className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
+                      >
+                        {ALL_LANGUAGES.map((lang) => (
+                          <option key={lang.code} value={lang.code}>
+                            {lang.name}
+                          </option>
                         ))}
-                      </div>
-                      {/* Loading indicator */}
-                      <div className="flex items-center justify-center gap-2 text-orange-500 mt-4">
-                        <svg
-                          className="animate-spin h-5 w-5"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        <span className="text-sm font-medium">
-                          Translating to {getLanguageName(activeTab)}...
-                        </span>
-                      </div>
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!englishContent.trim() || isTranslating[targetLanguageForTranslation]}
+                        onClick={() => handleTranslate(targetLanguageForTranslation)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {isTranslating[targetLanguageForTranslation] ? (
+                          <>
+                            <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Translating...
+                          </>
+                        ) : (
+                          "Translate"
+                        )}
+                      </button>
                     </div>
                   </div>
-                ) : translatedContent[activeTab] ? (
-                  // Translated content always shows as plain text (no markdown rendering - markdown toggle is English-only)
-                  <ContentPreview content={translatedContent[activeTab]} isMarkdown={false} />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400">
-                    <p className="text-sm">No translation available for this language yet</p>
+
+                  {/* Tabs */}
+                  {englishContent && (
+                    <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6 overflow-x-auto items-center">
+                      <button
+                        onClick={() => setActiveTab("english")}
+                        className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === "english"
+                          ? "border-orange-400 text-orange-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
+                          }`}
+                      >
+                        English
+                      </button>
+                      {/* Markdown Toggle - Only show when English tab is active AND generation is complete */}
+                      {activeTab === "english" && !isGenerating && englishContent && (
+                        <div className="ml-4 flex items-center gap-2 border-l border-orange-200 pl-4">
+                          <span className="text-xs text-gray-600 font-medium">Markdown:</span>
+                          <button
+                            onClick={() => setMarkdownEnabled(!markdownEnabled)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${markdownEnabled ? "bg-orange-500" : "bg-gray-300"
+                              }`}
+                            role="switch"
+                            aria-checked={markdownEnabled}
+                            aria-label="Toggle markdown rendering (only available after generation completes)"
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${markdownEnabled ? "translate-x-6" : "translate-x-1"
+                                }`}
+                            />
+                          </button>
+                          <span className="text-xs text-gray-500 font-medium">
+                            {markdownEnabled ? "On" : "Off"}
+                          </span>
+                        </div>
+                      )}
+                      {/* Show all languages that are either translated or currently translating */}
+                      {availableTabs.map((langCode) => (
+                        <button
+                          key={langCode}
+                          onClick={() => setActiveTab(langCode)}
+                          className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === langCode
+                            ? "border-orange-400 text-orange-600"
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
+                            }`}
+                        >
+                          {getLanguageName(langCode)}
+                          {translatingLanguages.has(langCode) && (
+                            <svg
+                              className="animate-spin h-3 w-3 text-orange-500"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Tab Content */}
+                  <div className="flex-1 overflow-hidden">
+                    {activeTab === "english" ? (
+                      // Only allow markdown rendering after generation completes (not during streaming)
+                      // During generation (isGenerating), always show plain text
+                      <ContentPreview
+                        content={englishContent}
+                        isMarkdown={markdownEnabled && !isGenerating && activeTab === "english"}
+                      />
+                    ) : translatingLanguages.has(activeTab) ? (
+                      // UX IMPROVEMENT: Show skeleton/loading UI while translating
+                      <div className="h-full overflow-auto p-6 bg-white">
+                        <div className="space-y-4">
+                          {/* Skeleton loading animation */}
+                          <div className="space-y-3">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <div key={i} className="animate-pulse">
+                                <div className="h-4 bg-gray-200 rounded w-full"></div>
+                                <div className="h-4 bg-gray-200 rounded w-5/6 mt-2"></div>
+                                <div className="h-4 bg-gray-200 rounded w-4/6 mt-2"></div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Loading indicator */}
+                          <div className="flex items-center justify-center gap-2 text-orange-500 mt-4">
+                            <svg
+                              className="animate-spin h-5 w-5"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            <span className="text-sm font-medium">
+                              Translating to {getLanguageName(activeTab)}...
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : translatedContent[activeTab] ? (
+                      // Translated content always shows as plain text (no markdown rendering - markdown toggle is English-only)
+                      <ContentPreview content={translatedContent[activeTab]} isMarkdown={false} />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400">
+                        <p className="text-sm">No translation available for this language yet</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
