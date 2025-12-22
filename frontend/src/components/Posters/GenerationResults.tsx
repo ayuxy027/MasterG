@@ -139,26 +139,19 @@ const GenerationResults: React.FC<GenerationResultsProps> = ({
           {posters.map((poster, index) => (
             <div
               key={`${poster.imageBase64.substring(0, 20)}-${index}`}
-              className="group relative overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white flex items-center justify-center"
+              className="relative overflow-hidden rounded-xl shadow-lg bg-white flex items-center justify-center"
               style={{ minHeight: "300px" }}
             >
               <img
                 src={`data:${poster.mimeType};base64,${poster.imageBase64}`}
                 alt={`Educational poster ${index + 1}`}
-                className="w-full h-full object-contain max-h-[600px] transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-contain max-h-[600px]"
                 style={{ objectFit: "contain" }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-5">
-                <div className="text-white">
-                  <h4 className="font-bold text-lg">Poster #{index + 1}</h4>
-                  <p className="text-orange-200 text-sm">
-                    Click download to save
-                  </p>
-                </div>
-              </div>
               <button
                 onClick={() => onDownload(poster, index)}
-                className="absolute top-4 right-4 bg-orange-500 text-white rounded-full p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-orange-600 transform hover:scale-110"
+                className="absolute top-4 right-4 bg-orange-500 text-white rounded-full p-3 shadow-lg hover:bg-orange-600 transition-colors"
+                title="Download poster"
               >
                 <svg
                   className="w-5 h-5"

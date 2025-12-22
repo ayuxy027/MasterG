@@ -133,7 +133,7 @@ Be EXTREMELY specific and educational. Return ONLY the JSON:`;
       const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
       const ollamaModel = process.env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
 
-      const enhancementPrompt = `You are an expert prompt engineer for Stable Diffusion/ComfyUI, specializing in educational content.
+      const enhancementPrompt = `You are an expert prompt engineer for Stable Diffusion/ComfyUI, specializing in educational visual content.
 
 TOPIC: "${query}"
 ANALYSIS: ${JSON.stringify(analysis)}
@@ -141,21 +141,34 @@ CONTEXT: ${educationalContext}
 LANGUAGE: ${language}
 ASPECT RATIO: ${aspectRatio}
 
-Task: Generate the BEST Positive and Negative prompts for an SDXL text-to-image model.
+Task: Generate the BEST Positive and Negative prompts for an SDXL text-to-image model to create a PURELY VISUAL educational poster.
+
+CRITICAL REQUIREMENTS:
+1. NO TEXT, NO WORDS, NO LETTERS, NO LABELS on the image
+2. Concepts must be explained through VISUAL ELEMENTS ONLY
+3. Use clear, recognizable symbols, diagrams, illustrations, and visual metaphors
+4. Simple but detailed visual storytelling
+5. Educational concept should be immediately understandable from visuals alone
 
 Positive Prompt Requirements:
-- High quality, masterpiece, 8k, ultra detailed
-- Specific visual elements from analysis
-- Clean style, educational poster style, flat design or detailed illustration
-- Text descriptions (though SDXL struggles with text, include description of where labels go)
+- Start with: "NO TEXT, NO WORDS, NO LABELS, purely visual educational illustration"
+- High quality, masterpiece, 8k, ultra detailed, professional illustration
+- Specific visual elements that explain the concept (diagrams, symbols, visual metaphors)
+- Clean educational poster style, flat design or detailed scientific illustration
+- Clear visual hierarchy and composition
+- Vibrant colors for educational clarity
+- Simple background to focus on concept
+- Visual storytelling elements that explain the topic
 
 Negative Prompt Requirements:
-- Ugly, bad anatomy, blurry, low quality, watermark, text, signature, distortion
+- Start with: "text, words, letters, labels, captions, titles, writing, typography, numbers, symbols with text"
+- Add: ugly, bad anatomy, blurry, low quality, watermark, signature, distortion, cluttered, messy, confusing
+- Emphasize: "any form of written text or characters"
 
 Return ONLY valid JSON:
 {
-  "positive": "your detailed positive prompt string",
-  "negative": "your detailed negative prompt string"
+  "positive": "NO TEXT, NO WORDS, NO LABELS, [your detailed visual-only prompt]",
+  "negative": "text, words, letters, labels, captions, titles, writing, typography, [your other negative elements]"
 }
 `;
 
@@ -191,8 +204,8 @@ Return ONLY valid JSON:
 
     // Fallback
     return {
-      positive: `(Masterpiece), educational poster about ${query}, ${category} style, detailed, 8k, sharp focus, nice lighting`,
-      negative: "blurry, low quality, ugly, deformed, noisy"
+      positive: `NO TEXT, NO WORDS, NO LABELS, purely visual educational illustration, masterpiece, ${query} concept explained through visuals only, ${category} style, detailed diagrams and symbols, clear visual metaphors, 8k, sharp focus, professional educational poster, vibrant colors, simple background`,
+      negative: "text, words, letters, labels, captions, titles, writing, typography, numbers, any written characters, blurry, low quality, ugly, deformed, noisy, cluttered, messy, confusing, watermark, signature"
     };
   }
 
