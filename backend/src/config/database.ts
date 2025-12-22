@@ -1,16 +1,15 @@
 import mongoose from 'mongoose';
-import env from './env';
 
 export async function connectDatabase(): Promise<void> {
   try {
-    if (!env.MONGODB_URI) {
-      return;
-    }
+    // Hardcode localhost MongoDB
+    const mongoUri = "mongodb://localhost:27017/masterg";
 
-    await mongoose.connect(env.MONGODB_URI);
+    await mongoose.connect(mongoUri);
     console.log('MongoDB connected');
   } catch (error) {
     // Don't throw - allow app to run without MongoDB for basic RAG functionality
+    console.warn('MongoDB connection failed (app will continue without session persistence):', error instanceof Error ? error.message : error);
   }
 }
 

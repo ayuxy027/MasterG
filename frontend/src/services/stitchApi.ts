@@ -66,6 +66,35 @@ export interface StitchTranslateStreamChunk {
   error?: string;
 }
 
+export interface StitchSession {
+  userId: string;
+  sessionId: string;
+  sessionName?: string;
+  topic: string;
+  grade: string;
+  subject: string;
+  customGrade?: string;
+  customSubject?: string;
+  englishContent: string;
+  thinkingText?: string;
+  translatedContent: Record<string, string>;
+  markdownEnabled?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StitchSessionListItem {
+  sessionId: string;
+  sessionName?: string;
+  topic: string;
+  grade: string;
+  subject: string;
+  hasContent: boolean;
+  translationCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class StitchApiError extends Error {
   constructor(message: string) {
     super(message);
@@ -324,6 +353,143 @@ class StitchApi {
     }
   }
 
+  /**
+   * Get all Stitch sessions for a user
+   */
+  async getAllSessions(userId: string): Promise<StitchSessionListItem[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stitch/sessions/${userId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new StitchApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data.sessions || [];
+    } catch (error) {
+      if (error instanceof StitchApiError) {
+        throw error;
+      }
+      throw new StitchApiError(
+        error instanceof Error ? error.message : "Failed to get sessions"
+      );
+    }
+  }
+
+  /**
+   * Get a specific Stitch session
+   */
+  async getSessionDetails(
+    userId: string,
+    sessionId: string
+  ): Promise<StitchSession> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/stitch/sessions/${userId}/${sessionId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new StitchApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data.session;
+    } catch (error) {
+      if (error instanceof StitchApiError) {
+        throw error;
+      }
+      throw new StitchApiError(
+        error instanceof Error ? error.message : "Failed to get session"
+      );
+    }
+  }
+
+  /**
+   * Save or update a Stitch session
+   */
+  async saveSession(
+    userId: string,
+    sessionId: string,
+    sessionData: Partial<Omit<StitchSession, "userId" | "sessionId" | "createdAt" | "updatedAt">>
+  ): Promise<StitchSession> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/stitch/sessions/${userId}/${sessionId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(sessionData),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new StitchApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data.session;
+    } catch (error) {
+      if (error instanceof StitchApiError) {
+        throw error;
+      }
+      throw new StitchApiError(
+        error instanceof Error ? error.message : "Failed to save session"
+      );
+    }
+  }
+
+  /**
+   * Delete a Stitch session
+   */
+  async deleteSession(userId: string, sessionId: string): Promise<void> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/stitch/sessions/${userId}/${sessionId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new StitchApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof StitchApiError) {
+        throw error;
+      }
+      throw new StitchApiError(
+        error instanceof Error ? error.message : "Failed to delete session"
+      );
+    }
+  }
 }
 
 export const stitchAPI = new StitchApi();

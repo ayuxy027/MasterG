@@ -1,7 +1,23 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, Component, ErrorInfo, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { stitchAPI, StitchApiError } from "../../services/stitchApi";
+import { stitchAPI, StitchApiError, StitchSessionListItem } from "../../services/stitchApi";
+import StitchSessionSidebar from "./StitchSessionSidebar";
+
+// User ID and Session ID utilities (same as chat)
+const generateUserId = (): string => {
+  const stored = localStorage.getItem("masterji_userId");
+  if (stored) return stored;
+  const newUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  localStorage.setItem("masterji_userId", newUserId);
+  return newUserId;
+};
+
+const getUserId = (): string => generateUserId();
+
+const generateSessionId = (): string => {
+  return `stitch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+};
 
 // All 22 scheduled Indian languages + English (from language service)
 const ALL_LANGUAGES = [
@@ -307,11 +323,11 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
 
   // Fallback component for when markdown fails
   const fallbackContent = (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
-            {content}
-          </pre>
-        </div>
+    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+        {content}
+      </pre>
+    </div>
   );
 
   return (
@@ -320,7 +336,7 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
         <MarkdownErrorBoundary fallback={fallbackContent}>
           <div className="p-6">
             <SafeMarkdownRenderer content={content} />
-      </div>
+          </div>
         </MarkdownErrorBoundary>
       ) : (
         <div className="p-6">
@@ -332,6 +348,17 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
 };
 
 const StitchPage: React.FC = () => {
+  // User & Session Management
+  const [userId] = useState(() => getUserId());
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => {
+    // Try to get sessionId from localStorage, or generate new one
+    const stored = localStorage.getItem("masterji_stitch_sessionId");
+    return stored || generateSessionId();
+  });
+  const [sessions, setSessions] = useState<StitchSessionListItem[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   const [selectedGrade, setSelectedGrade] = useState("8");
   const [customGrade, setCustomGrade] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("mathematics");
@@ -339,7 +366,6 @@ const StitchPage: React.FC = () => {
   const [topic, setTopic] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [generatedContent, setGeneratedContent] = useState("");
   const [englishContent, setEnglishContent] = useState(""); // Store original English content
   const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
   const [translatingLanguages, setTranslatingLanguages] = useState<Set<string>>(new Set()); // Track languages currently being translated
@@ -402,7 +428,6 @@ const StitchPage: React.FC = () => {
 
   // Clear all content
   const handleClear = useCallback(() => {
-    setGeneratedContent("");
     setEnglishContent("");
     setTranslatedContent({});
     setThinkingText("");
@@ -426,7 +451,7 @@ const StitchPage: React.FC = () => {
   const getActiveContent = useCallback((): string => {
     return activeTab === "english" ? englishContent : translatedContent[activeTab] || "";
   }, [activeTab, englishContent, translatedContent]);
-  
+
   // Reset markdown toggle when switching away from English tab
   useEffect(() => {
     if (activeTab !== "english") {
@@ -522,11 +547,11 @@ const StitchPage: React.FC = () => {
         err instanceof StitchApiError
           ? err.message
           : err instanceof Error
-          ? err.message
-          : "Translation failed. Please try again.";
+            ? err.message
+            : "Translation failed. Please try again.";
       setError(msg);
       showToast(`Translation failed: ${msg}`, "error");
-      
+
       // Remove from translating set on error
       setTranslatingLanguages(prev => {
         const newSet = new Set(prev);
@@ -538,7 +563,7 @@ const StitchPage: React.FC = () => {
         delete newPrev[targetLang];
         return newPrev;
       });
-      
+
       // If translation failed and no content was set, remove the tab
       if (!translatedContent[targetLang]) {
         setTranslatedContent(prev => {
@@ -568,7 +593,7 @@ const StitchPage: React.FC = () => {
     }
 
     const languagesToTranslate = ALL_LANGUAGES.filter((lang) => lang.code !== "en" && !translatedContent[lang.code] && !translatingLanguages.has(lang.code));
-    
+
     if (languagesToTranslate.length === 0) {
       showToast("All languages already translated!", "info");
       return;
@@ -585,10 +610,128 @@ const StitchPage: React.FC = () => {
     showToast("Bulk translation completed!", "success");
   }, [englishContent, translatedContent, translatingLanguages, showToast, handleTranslate]);
 
+  // Load all sessions
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const sessionsList = await stitchAPI.getAllSessions(userId);
+      const sortedSessions = sessionsList.sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+      setSessions(sortedSessions);
+    } catch (error) {
+      console.error("Failed to load sessions:", error);
+      if (error instanceof StitchApiError) {
+        // Graceful degradation - backend might not have MongoDB
+        setSessions([]);
+      }
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [userId]);
+
+  // Load session data - ONLY thinking and results (English + all languages), NOT inputs
+  const loadSessionData = useCallback(async (sessionId: string) => {
+    if (!sessionId || !userId) {
+      return;
+    }
+
+    try {
+      const session = await stitchAPI.getSessionDetails(userId, sessionId);
+
+      if (!session) {
+        return;
+      }
+
+      // ONLY load thinking and results - NOT inputs (topic, grade, subject, etc.)
+      if (session.thinkingText) {
+        setThinkingText(session.thinkingText);
+      }
+      if (session.englishContent) {
+        setEnglishContent(session.englishContent);
+      }
+      if (session.translatedContent && Object.keys(session.translatedContent).length > 0) {
+        setTranslatedContent(session.translatedContent);
+      }
+      if (session.markdownEnabled !== undefined) {
+        setMarkdownEnabled(session.markdownEnabled);
+      }
+
+      showToast("Session loaded", "success");
+    } catch (error) {
+      console.error("Failed to load session:", error);
+      // Start fresh if session doesn't exist - don't show error toast
+      if (error instanceof StitchApiError) {
+        // Only log, don't show toast for 404s
+        if (!error.message.includes("404") && !error.message.includes("not found")) {
+          showToast("Failed to load session", "error");
+        }
+      }
+    }
+  }, [userId, showToast]);
+
+  // Auto-save session
+  const autoSaveSession = useCallback(async () => {
+    if (!currentSessionId) return;
+
+    try {
+      await stitchAPI.saveSession(userId, currentSessionId, {
+        topic,
+        grade: selectedGrade,
+        subject: selectedSubject,
+        customGrade: customGrade || undefined,
+        customSubject: customSubject || undefined,
+        englishContent,
+        thinkingText: thinkingText || undefined,
+        translatedContent,
+        markdownEnabled,
+      });
+    } catch (error) {
+      console.error("Failed to auto-save session:", error);
+      // Don't show error toast for auto-save failures
+    }
+  }, [userId, currentSessionId, topic, selectedGrade, selectedSubject, customGrade, customSubject, englishContent, thinkingText, translatedContent, markdownEnabled]);
+
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions();
+  }, [userId, loadSessions]);
+
+  // Track previous sessionId to avoid reloading same session
+  const previousSessionIdRef = useRef<string | null>(null);
+
+  // Load session data when sessionId changes (but not on initial mount if no sessionId)
+  useEffect(() => {
+    if (currentSessionId && currentSessionId !== previousSessionIdRef.current) {
+      localStorage.setItem("masterji_stitch_sessionId", currentSessionId);
+      previousSessionIdRef.current = currentSessionId;
+      loadSessionData(currentSessionId);
+    }
+  }, [currentSessionId, loadSessionData]);
+
+  // Auto-save session when content changes (debounced)
+  // Use ref to avoid including autoSaveSession in dependencies (prevents infinite loops)
+  const autoSaveSessionRef = useRef(autoSaveSession);
+  useEffect(() => {
+    autoSaveSessionRef.current = autoSaveSession;
+  }, [autoSaveSession]);
+
+  useEffect(() => {
+    if (!currentSessionId || (!englishContent && Object.keys(translatedContent).length === 0)) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      autoSaveSessionRef.current();
+    }, 2000); // Debounce by 2 seconds
+
+    return () => clearTimeout(timeoutId);
+  }, [englishContent, translatedContent, topic, selectedGrade, selectedSubject, customGrade, customSubject, markdownEnabled, currentSessionId]);
+
   // Check Ollama status on mount
   useEffect(() => {
     checkOllamaStatus();
-    
+
     // Cleanup: Cancel content generation on unmount
     return () => {
       if (abortControllerRef.current) {
@@ -596,6 +739,50 @@ const StitchPage: React.FC = () => {
       }
     };
   }, []);
+
+  // Create new session
+  const handleNewSession = useCallback(() => {
+    const newSessionId = generateSessionId();
+    setCurrentSessionId(newSessionId);
+
+    // Clear current content
+    setTopic("");
+    setSelectedGrade("8");
+    setCustomGrade("");
+    setSelectedSubject("mathematics");
+    setCustomSubject("");
+    setEnglishContent("");
+    setThinkingText("");
+    setTranslatedContent({});
+    setMarkdownEnabled(false);
+    setActiveTab("english");
+    setError(null);
+
+    showToast("New session created", "info");
+  }, [showToast]);
+
+  // Select existing session
+  const handleSessionSelect = useCallback((sessionId: string) => {
+    setCurrentSessionId(sessionId);
+  }, []);
+
+  // Delete session
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    try {
+      await stitchAPI.deleteSession(userId, sessionId);
+      setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
+
+      // If deleted session was current, create new one
+      if (currentSessionId === sessionId) {
+        handleNewSession();
+      }
+
+      showToast("Session deleted", "success");
+    } catch (error) {
+      console.error("Failed to delete session:", error);
+      showToast("Failed to delete session", "error");
+    }
+  }, [userId, currentSessionId, handleNewSession, showToast]);
 
   const checkOllamaStatus = async () => {
     setOllamaStatus({ connected: false, checking: true });
@@ -626,6 +813,12 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // Ensure we have a sessionId
+    if (!currentSessionId) {
+      const newSessionId = generateSessionId();
+      setCurrentSessionId(newSessionId);
+    }
+
     // Abort any existing generation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -636,7 +829,6 @@ const StitchPage: React.FC = () => {
     setIsGenerating(true);
     setError(null);
     setThinkingText("");
-    setGeneratedContent("");
     setEnglishContent("");
     setTranslatedContent({});
     setActiveTab("english");
@@ -693,17 +885,15 @@ const StitchPage: React.FC = () => {
             const data = line.slice(6);
             try {
               const parsed = JSON.parse(data);
-              
+
               if (parsed.type === "thinking") {
                 accumulatedThinking += parsed.content;
                 setThinkingText(accumulatedThinking);
               } else if (parsed.type === "response") {
                 accumulatedResponse += parsed.content;
-                setGeneratedContent(accumulatedResponse);
                 setEnglishContent(accumulatedResponse); // Store English version
               } else if (parsed.type === "complete") {
                 const finalContent = parsed.content || accumulatedResponse;
-                setGeneratedContent(finalContent);
                 setEnglishContent(finalContent); // Store English version
                 // Reset markdown toggle to false when new content is generated
                 setMarkdownEnabled(false); // Always start with plain text view after generation
@@ -728,8 +918,8 @@ const StitchPage: React.FC = () => {
           err instanceof StitchApiError
             ? err.message
             : err instanceof Error
-            ? err.message
-            : "Failed to generate content. Please try again.";
+              ? err.message
+              : "Failed to generate content. Please try again.";
         setError(errorMessage);
       }
     } finally {
@@ -753,7 +943,19 @@ const StitchPage: React.FC = () => {
   }, [translatedContent, translatingLanguages]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30 relative">
+      {/* Session Sidebar */}
+      <StitchSessionSidebar
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onSessionSelect={handleSessionSelect}
+        onNewSession={handleNewSession}
+        onDeleteSession={handleDeleteSession}
+        isLoading={sessionsLoading}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((toast) => (
@@ -765,7 +967,7 @@ const StitchPage: React.FC = () => {
         ))}
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8">
+      <div className={`max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-0' : 'lg:ml-64'}`}>
         {/* Header */}
         <div className="mb-6 sm:mb-8 text-center">
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-800 mb-2 sm:mb-3">
@@ -819,11 +1021,10 @@ const StitchPage: React.FC = () => {
                             setSelectedGrade(grade.value);
                             setCustomGrade("");
                           }}
-                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
-                            selectedGrade === grade.value && selectedGrade !== "custom"
-                              ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
-                              : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
-                          }`}
+                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === grade.value && selectedGrade !== "custom"
+                            ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                            : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
+                            }`}
                         >
                           {grade.label}
                         </button>
@@ -834,11 +1035,10 @@ const StitchPage: React.FC = () => {
                         setSelectedGrade("custom");
                         setCustomGrade("");
                       }}
-                      className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
-                        selectedGrade === "custom"
-                          ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
-                          : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === "custom"
+                        ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                        : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white"
+                        }`}
                     >
                       Custom
                     </button>
@@ -867,11 +1067,10 @@ const StitchPage: React.FC = () => {
                         setCustomSubject("");
                       }
                     }}
-                    className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${
-                      selectedSubject && selectedSubject !== ""
-                        ? "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
-                        : "border-gray-200 focus:border-orange-300"
-                    } focus:ring-2 focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300`}
+                    className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${selectedSubject && selectedSubject !== ""
+                      ? "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
+                      : "border-gray-200 focus:border-orange-300"
+                      } focus:ring-2 focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300`}
                   >
                     {CORE_SUBJECTS.map((subject) => (
                       <option key={subject.value} value={subject.value}>
@@ -1169,11 +1368,10 @@ const StitchPage: React.FC = () => {
                 <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6 overflow-x-auto items-center">
                   <button
                     onClick={() => setActiveTab("english")}
-                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                      activeTab === "english"
-                        ? "border-orange-400 text-orange-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
-                    }`}
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === "english"
+                      ? "border-orange-400 text-orange-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
+                      }`}
                   >
                     English
                   </button>
@@ -1183,17 +1381,15 @@ const StitchPage: React.FC = () => {
                       <span className="text-xs text-gray-600 font-medium">Markdown:</span>
                       <button
                         onClick={() => setMarkdownEnabled(!markdownEnabled)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
-                          markdownEnabled ? "bg-orange-500" : "bg-gray-300"
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${markdownEnabled ? "bg-orange-500" : "bg-gray-300"
+                          }`}
                         role="switch"
                         aria-checked={markdownEnabled}
                         aria-label="Toggle markdown rendering (only available after generation completes)"
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            markdownEnabled ? "translate-x-6" : "translate-x-1"
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${markdownEnabled ? "translate-x-6" : "translate-x-1"
+                            }`}
                         />
                       </button>
                       <span className="text-xs text-gray-500 font-medium">
@@ -1206,11 +1402,10 @@ const StitchPage: React.FC = () => {
                     <button
                       key={langCode}
                       onClick={() => setActiveTab(langCode)}
-                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-                        activeTab === langCode
-                          ? "border-orange-400 text-orange-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
-                      }`}
+                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === langCode
+                        ? "border-orange-400 text-orange-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
+                        }`}
                     >
                       {getLanguageName(langCode)}
                       {translatingLanguages.has(langCode) && (
@@ -1245,9 +1440,9 @@ const StitchPage: React.FC = () => {
                 {activeTab === "english" ? (
                   // Only allow markdown rendering after generation completes (not during streaming)
                   // During generation (isGenerating), always show plain text
-                  <ContentPreview 
-                    content={englishContent} 
-                    isMarkdown={markdownEnabled && !isGenerating && activeTab === "english"} 
+                  <ContentPreview
+                    content={englishContent}
+                    isMarkdown={markdownEnabled && !isGenerating && activeTab === "english"}
                   />
                 ) : translatingLanguages.has(activeTab) ? (
                   // UX IMPROVEMENT: Show skeleton/loading UI while translating

@@ -24,9 +24,6 @@ interface EnvConfig {
   CHROMA_URL: string;
   CHROMA_COLLECTION_NAME: string;
 
-  // MongoDB
-  MONGODB_URI?: string;
-
   // File Storage
   UPLOAD_DIR: string;
   MAX_FILE_SIZE: number;
@@ -77,8 +74,7 @@ export const env: EnvConfig = {
   CHROMA_URL: getEnvVariable("CHROMA_URL", "http://localhost:8000"),
   CHROMA_COLLECTION_NAME: getEnvVariable("CHROMA_COLLECTION_NAME", "edu_notes"),
 
-  // MongoDB (optional - chat history feature)
-  MONGODB_URI: process.env.MONGODB_URI,
+  // MongoDB - hardcoded to localhost (removed from env)
 
   // File Storage
   UPLOAD_DIR: getEnvVariable("UPLOAD_DIR", "./uploads"),
