@@ -237,15 +237,11 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
   if not units:
     return {"success": False, "error": "No sentences found in input text"}
   
-  # Filter empty units (but be lenient - keep units with minimal content)
+  # Filter empty units
   units = [u.strip() for u in units if u.strip()]
   
-  # If still no units, try to use the original text as a single unit
   if not units:
-    if clean_text.strip():
-      units = [clean_text.strip()]
-    else:
-      return {"success": False, "error": "No valid sentences found in input text"}
+    return {"success": False, "error": "No valid sentences found in input text"}
   
   translated_sentences = []
   
@@ -263,7 +259,7 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
   else:
     sys.stderr.write(f"Warning: Could not find language code '{tgt_lang}', using default\n")
     tgt_lang_id = 256068  # Fallback to a common language code ID
-      
+  
   # CPU Optimization: Process batches in parallel for CPU
   # GPU: Sequential batches (GPU handles parallelism internally - no need for parallel batches)
   # NOTE: GPU is always preferred - parallel batches only used when device == "cpu"
@@ -311,22 +307,18 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
       for i, translation in enumerate(translations):
         if translation and translation.strip():
           batch_translations.append(translation.strip())
-      else:
+        else:
           # Fallback to original if translation failed
           sys.stderr.write(f"Warning: Decoding failed for sentence: {batch[i][:50]}\n")
           batch_translations.append(batch[i])
-        
+      
     except Exception as e:
       # If batch fails, fall back to individual processing for this batch
       sys.stderr.write(f"Warning: Batch translation failed, processing individually: {e}\n")
       for sentence in batch:
         try:
           # Fallback to single-sentence processing
-          # Handle very long sentences by truncating if needed
-          max_sentence_length = 2000  # Reasonable limit for single sentence
-          processed_sentence = sentence[:max_sentence_length] if len(sentence) > max_sentence_length else sentence
-          
-          inputs = tokenizer(processed_sentence, return_tensors="pt", truncation=True, max_length=512)
+          inputs = tokenizer(sentence, return_tensors="pt")
           inputs = {k: v.to(device) for k, v in inputs.items()}
           
           with torch.inference_mode():
@@ -343,12 +335,10 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
           if translation and len(translation) > 0:
             batch_translations.append(translation[0].strip())
           else:
-            # Fallback to original sentence
             batch_translations.append(sentence)
         except Exception as e2:
-          # ULTIMATE FALLBACK: Always return something, never fail completely
           sys.stderr.write(f"Warning: Exception translating sentence '{sentence[:50]}': {e2}\n")
-          batch_translations.append(sentence)  # Return original as fallback
+          batch_translations.append(sentence)
     
     return (batch_idx, batch_translations)
   
@@ -410,19 +400,11 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
       if total_batches > 1:
         sys.stderr.write(f"Translated batch {batch_num}/{total_batches} ({len(batch)} sentences)\n")
   
-  # ROBUST: Always return something, never fail completely
   if not translated_sentences:
-    # Last resort: return original text if all translations failed
-    sys.stderr.write("Warning: All translations failed, returning original text\n")
-    return {"success": True, "translated": clean_text}
+    return {"success": False, "error": "All translation sentences failed"}
   
   # Join translated sentences with proper spacing
   combined_translation = " ".join(translated_sentences)
-  
-  # Ensure we always return a non-empty result
-  if not combined_translation.strip():
-    sys.stderr.write("Warning: Translation result is empty, returning original text\n")
-    return {"success": True, "translated": clean_text}
   
   return {"success": True, "translated": combined_translation}
 
@@ -526,21 +508,21 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
       for i, translation in enumerate(translations):
         idx = batch_idx + i
         translated = translation.strip() if translation and translation.strip() else batch[i]
-      translated_sentences.append(translated)
+        translated_sentences.append(translated)
 
-      sys.stdout.write(
-        json.dumps(
-          {
-            "success": True,
-            "type": "chunk",
-            "index": idx,
-            "total": total,
-            "translated": translated,
-          }
+        sys.stdout.write(
+          json.dumps(
+            {
+              "success": True,
+              "type": "chunk",
+              "index": idx,
+              "total": total,
+              "translated": translated,
+            }
+          )
+          + "\n"
         )
-        + "\n"
-      )
-      sys.stdout.flush()
+        sys.stdout.flush()
 
     except Exception as e:
       # Fallback to individual processing for this batch
@@ -548,11 +530,7 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
       for i, sentence in enumerate(batch):
         idx = batch_idx + i
         try:
-          # Handle very long sentences
-          max_sentence_length = 2000
-          processed_sentence = sentence[:max_sentence_length] if len(sentence) > max_sentence_length else sentence
-          
-          inputs = tokenizer(processed_sentence, return_tensors="pt", truncation=True, max_length=512)
+          inputs = tokenizer(sentence, return_tensors="pt")
           inputs = {k: v.to(device) for k, v in inputs.items()}
           
           with torch.inference_mode():
@@ -568,37 +546,39 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
           translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
           translated = translation[0].strip() if translation and len(translation) > 0 else sentence
         except Exception as e2:
-          # ULTIMATE FALLBACK: Always return original sentence
-          sys.stderr.write(f"Warning: Individual translation failed: {e2}\n")
           translated = sentence
         
-      translated_sentences.append(translated)
-
-      sys.stdout.write(
-        json.dumps(
-          {
-            "success": True,
-            "type": "chunk",
-            "index": idx,
-            "total": total,
-            "translated": translated,
-          }
+        translated_sentences.append(translated)
+        
+        sys.stdout.write(
+          json.dumps(
+            {
+              "success": True,
+              "type": "chunk",
+              "index": idx,
+              "total": total,
+              "translated": translated,
+            }
+          )
+          + "\n"
         )
-        + "\n"
-      )
-      sys.stdout.flush()
+        sys.stdout.flush()
 
-  # ROBUST: Always return something, never fail completely
   if not translated_sentences:
-    # Last resort: return original text
-    sys.stderr.write("Warning: All translations failed in stream, returning original text\n")
-    combined_translation = clean_text
-  else:
-    combined_translation = " ".join(translated_sentences)
-  
-  # Ensure non-empty result
-  if not combined_translation.strip():
-    combined_translation = clean_text
+    sys.stdout.write(
+      json.dumps(
+        {
+          "success": False,
+          "type": "error",
+          "error": "All translation sentences failed",
+        }
+      )
+      + "\n"
+    )
+    sys.stdout.flush()
+    return
+
+  combined_translation = " ".join(translated_sentences)
 
   # Final complete event
   sys.stdout.write(
@@ -623,7 +603,7 @@ def main():
     load_model()
     sys.stderr.write("✅ NLLB-200 model loaded and ready!\n")
     
-    # Read requests from stdin (processes sequentially to avoid mixing responses)
+    # Read requests from stdin
     while True:
       try:
         line = sys.stdin.readline()
@@ -635,45 +615,29 @@ def main():
           continue
         
         req = json.loads(line)
-        request_id = req.get("id")  # Optional request ID for tracking
         text = str(req.get("text") or "").strip()
         src_lang = str(req.get("src_lang") or "eng_Latn")
         tgt_lang = str(req.get("tgt_lang") or "hin_Deva")
         stream = bool(req.get("stream") or False)
-        batch_size = req.get("batch_size")
-        if batch_size is not None:
-          batch_size = int(batch_size)
-        else:
-          batch_size = None  # Auto-detect
+        batch_size = int(req.get("batch_size") or 8)  # Default batch size of 8
         
         if not text:
           result = {"success": False, "error": "Missing or empty 'text' field"}
-          if request_id:
-            result["id"] = request_id
         else:
           if stream:
             # Stream sentence-by-sentence; function writes directly to stdout
             translate_stream(text, src_lang, tgt_lang, batch_size)
           else:
             result = translate(text, src_lang, tgt_lang, batch_size)
-            # Include request ID in response if provided
-            if request_id:
-              result["id"] = request_id
             # Write single response to stdout
             sys.stdout.write(json.dumps(result) + "\n")
             sys.stdout.flush()
         
       except json.JSONDecodeError as e:
-        error_result = {"success": False, "error": f"Invalid JSON: {e}"}
-        if "request_id" in locals():
-          error_result["id"] = request_id
-        sys.stdout.write(json.dumps(error_result) + "\n")
+        sys.stdout.write(json.dumps({"success": False, "error": f"Invalid JSON: {e}"}) + "\n")
         sys.stdout.flush()
       except Exception as e:
-        error_result = {"success": False, "error": f"Translation failed: {e}"}
-        if "request_id" in locals():
-          error_result["id"] = request_id
-        sys.stdout.write(json.dumps(error_result) + "\n")
+        sys.stdout.write(json.dumps({"success": False, "error": f"Translation failed: {e}"}) + "\n")
         sys.stdout.flush()
         
   except KeyboardInterrupt:

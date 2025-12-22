@@ -16,13 +16,6 @@ export class NLLBService {
   private pythonProcess: ChildProcess | null = null; // Persistent Python process
   private translationCache: Map<string, string> = new Map(); // Simple in-memory cache
   private readonly CACHE_MAX_SIZE = 1000; // Limit cache size
-  private requestQueue: Array<{
-    id: string;
-    payload: string;
-    resolve: (value: { success: boolean; translated?: string; error?: string }) => void;
-  }> = []; // Queue for concurrent requests
-  private isProcessing = false; // Track if processing a request
-  private requestIdCounter = 0; // Generate unique request IDs
 
   constructor() {
     this.scriptPath = path.resolve(
@@ -95,22 +88,6 @@ export class NLLBService {
         }, 5000);
       }
     });
-
-    // Graceful shutdown: Clean up Python process on Node.js exit
-    process.on("SIGINT", () => this.cleanup());
-    process.on("SIGTERM", () => this.cleanup());
-    process.on("exit", () => this.cleanup());
-  }
-
-  /**
-   * Clean up Python process on shutdown
-   */
-  private cleanup(): void {
-    if (this.pythonProcess) {
-      console.log("🛑 Shutting down NLLB server...");
-      this.pythonProcess.kill("SIGTERM");
-      this.pythonProcess = null;
-    }
   }
 
   /**
@@ -313,59 +290,20 @@ export class NLLBService {
     options: NLLBTranslateOptions,
     resolve: (value: { success: boolean; translated?: string; error?: string }) => void
   ) {
-    // ROBUST: Ensure server is running, start if needed
     if (!this.pythonProcess) {
-      this.startServer();
-      // Wait a bit longer for server to be ready
-      setTimeout(() => {
-        if (!this.pythonProcess) {
-          resolve({
-            success: false,
-            error: "NLLB server failed to start. Please check Python environment.",
-          });
-          return;
-        }
-        this.sendRequest(text, options, resolve);
-      }, 3000); // Increased wait time
+      resolve({
+        success: false,
+        error: "NLLB server is not running",
+      });
       return;
     }
 
-    // CONCURRENT REQUEST HANDLING: Generate unique request ID and queue request
-    const requestId = `req_${++this.requestIdCounter}_${Date.now()}`;
     const payload = JSON.stringify({
-      id: requestId, // Add request ID for matching responses
       text,
       src_lang: options.srcLang,
       tgt_lang: options.tgtLang,
       batch_size: options.batchSize || undefined, // Auto-detect if not specified
     }) + "\n";
-
-    // Add to queue
-    this.requestQueue.push({
-      id: requestId,
-      payload,
-      resolve,
-    });
-
-    // Process queue if not already processing
-    this.processQueue();
-  }
-
-  /**
-   * Process translation requests sequentially to avoid mixing responses
-   * CONCURRENT TRANSLATION FIX: Queue requests and process one at a time
-   * This ensures Hindi and Marathi translations don't interfere with each other
-   */
-  private processQueue() {
-    if (this.isProcessing || this.requestQueue.length === 0) {
-      return;
-    }
-
-    const request = this.requestQueue.shift();
-    if (!request) return;
-
-    this.isProcessing = true;
-    console.log(`[NLLB] Processing translation request ${request.id} (${this.requestQueue.length} in queue)`);
 
     let stdoutBuffer = "";
 
@@ -377,59 +315,38 @@ export class NLLBService {
         const responseLine = lines[0];
         stdoutBuffer = lines.slice(1).join("\n");
 
-        // Remove listeners to avoid processing this response again
         this.pythonProcess!.stdout.removeListener("data", dataHandler);
-        this.pythonProcess!.stderr.removeListener("data", errorHandler);
 
         try {
           const parsed = JSON.parse(responseLine);
-          
-          // ROBUST: Ensure we always return something
-          if (!parsed.success && !parsed.translated) {
-            request.resolve({
-              success: false,
-              error: parsed.error || "Translation failed",
-            });
-          } else {
-            request.resolve(parsed);
-          }
-        } catch (err: unknown) {
-          // ROBUST: Even if JSON parsing fails, return error
-          const errorMessage = err instanceof Error ? err.message : "Unknown error";
-          console.error(`Invalid JSON from NLLB server: ${errorMessage}. Output: ${responseLine.substring(0, 200)}`);
-          request.resolve({
+          resolve(parsed);
+        } catch (err: any) {
+          resolve({
             success: false,
-            error: `Invalid response from translation server`,
+            error: `Invalid JSON from NLLB server: ${err.message}. Output: ${responseLine.substring(0, 200)}`,
           });
         }
-
-        // Process next request in queue after a small delay
-        this.isProcessing = false;
-        setTimeout(() => this.processQueue(), 50); // Small delay to ensure clean separation
       }
     };
 
     const errorHandler = (data: Buffer) => {
       const stderr = data.toString();
       // Only treat as fatal error if it's a Traceback or Fatal error
+      // Ignore "Warning" messages - those are expected and handled gracefully
       if (stderr.includes("Traceback") || stderr.includes("Fatal error") || (stderr.includes("Error") && !stderr.includes("Warning"))) {
-        this.pythonProcess!.stdout.removeListener("data", dataHandler);
         this.pythonProcess!.stderr.removeListener("data", errorHandler);
-        request.resolve({
+        resolve({
           success: false,
           error: `NLLB server error: ${stderr.substring(0, 500)}`,
         });
-        this.isProcessing = false;
-        setTimeout(() => this.processQueue(), 50);
       }
     };
 
-    // Use 'once' to ensure handler is removed after processing
-    this.pythonProcess.stdout.once("data", dataHandler);
-    this.pythonProcess.stderr.once("data", errorHandler);
+    this.pythonProcess.stdout.on("data", dataHandler);
+    this.pythonProcess.stderr.on("data", errorHandler);
 
-    // Send request to Python server
-    this.pythonProcess.stdin.write(request.payload);
+    // Send request
+    this.pythonProcess.stdin.write(payload);
   }
 }
 

@@ -44,7 +44,7 @@ export class StitchController {
         stream,
       } = req.body;
 
-      // Input validation: Keep it cool - validate but don't restrict unnecessarily
+      // Input validation and sanitization
       if (!topic || typeof topic !== "string") {
         res.status(400).json({
           success: false,
@@ -53,8 +53,8 @@ export class StitchController {
         return;
       }
 
-      // Sanitize topic (remove excessive whitespace, but allow any reasonable length)
-      const sanitizedTopic = topic.trim();
+      // Sanitize topic (remove excessive whitespace, limit length)
+      const sanitizedTopic = topic.trim().slice(0, 500);
       if (!sanitizedTopic) {
         res.status(400).json({
           success: false,
@@ -63,20 +63,20 @@ export class StitchController {
         return;
       }
 
-      // Validate grade (be lenient - allow any string)
-      if (grade && typeof grade !== "string") {
+      // Validate grade
+      if (grade && (typeof grade !== "string" || grade.length > 50)) {
         res.status(400).json({
           success: false,
-          error: "Grade must be a string",
+          error: "Invalid grade format",
         });
         return;
       }
 
-      // Validate subject (be lenient - allow any string)
-      if (subject && typeof subject !== "string") {
+      // Validate subject
+      if (subject && (typeof subject !== "string" || subject.length > 100)) {
         res.status(400).json({
           success: false,
-          error: "Subject must be a string",
+          error: "Invalid subject format",
         });
         return;
       }
@@ -222,7 +222,7 @@ export class StitchController {
         batchSize?: number;
       };
 
-      // Input validation: Keep it cool - validate but don't restrict
+      // Input validation and sanitization
       if (!text || typeof text !== "string" || !text.trim()) {
         res.status(400).json({
           success: false,
@@ -231,26 +231,23 @@ export class StitchController {
         return;
       }
 
-      // REMOVED: Text length limit - system can handle any length
-      // The batch processing and streaming are designed to handle large texts gracefully
-      // Just log a warning for very long texts
-      if (text.length > 100000) {
-        console.warn(`Very long text detected (${text.length} chars). Translation may take longer.`);
+      // Limit text length to prevent memory issues
+      const MAX_TEXT_LENGTH = 50000;
+      if (text.length > MAX_TEXT_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: `Text too long. Maximum length is ${MAX_TEXT_LENGTH} characters.`,
+        });
+        return;
       }
 
-      // Validate batch size if provided (be more lenient)
-      if (batchSize !== undefined) {
-        if (typeof batchSize !== "number" || batchSize < 1) {
-          res.status(400).json({
-            success: false,
-            error: "Batch size must be a positive number",
-          });
-          return;
-        }
-        // Allow larger batch sizes - system will auto-optimize if needed
-        if (batchSize > 64) {
-          console.warn(`Large batch size requested (${batchSize}). System will auto-optimize.`);
-        }
+      // Validate batch size if provided
+      if (batchSize !== undefined && (typeof batchSize !== "number" || batchSize < 1 || batchSize > 32)) {
+        res.status(400).json({
+          success: false,
+          error: "Batch size must be between 1 and 32",
+        });
+        return;
       }
 
       const srcCode =
@@ -399,64 +396,62 @@ export class StitchController {
     const subjectName = subjectNames[params.subject] || params.subject;
 
     let prompt = `
-You are an expert Indian educator creating educational content for students.
+You are an expert Indian educator and curriculum designer specializing in NCERT, CBSE, and State Board curricula.
 
-Generate comprehensive, ready-to-use educational content with these specifications:
+Generate comprehensive educational content with the following details:
 
 Topic: ${params.topic}
 Subject: ${subjectName}
 Grade Level: Class ${params.grade}
+Curriculum Alignment: Follow NCERT, CBSE, and State Board standards
 
-CRITICAL INSTRUCTIONS:
-- Generate the ACTUAL CONTENT that students will read - not assessments, not instructions, not meta-commentary
-- Write directly what should appear in the final output - the content itself
-- Focus on GENERATING educational material, not evaluating or assessing
-- The output should be the final content, ready to be displayed to students
-- Write in clear, translation-friendly English (will be translated to Indian languages)
+IMPORTANT: This content will be translated into multiple Indian languages. Write in clear, translation-friendly English.
 
-Content Generation Guidelines:
-- Create comprehensive explanations suitable for Class ${params.grade} students
-- Use clear, simple sentences that translate well
-- Include detailed explanations, examples, and real-world applications
-- Structure with clear headings and sections using markdown format
-- Provide thorough coverage of the topic from basics to advanced concepts
-- Maintain factual accuracy aligned with NCERT, CBSE, and State Board standards
+Content Requirements:
+- Provide comprehensive, detailed explanations suitable for Class ${params.grade} level
+- Use clear, simple sentences that are easy to translate
+- Include sufficient context and detail - aim for thorough coverage of the topic
+- Maintain high factual accuracy aligned with NCERT, CBSE, and State Board curricula
+- Structure content with clear sections and logical flow
 
-Formatting:
-- Use markdown formatting: # for main headings, ## for subheadings, **bold** for emphasis
-- Use bullet points (-) and numbered lists (1.) where appropriate
-- Use line breaks between paragraphs
-- Format code, formulas, and technical terms clearly
-- The output should be markdown-formatted and ready to render
-
-Content Focus:
-- Generate the actual educational content (explanations, concepts, examples)
-- Do NOT generate assessment questions, quizzes, or evaluation criteria
-- Do NOT include instructions like "explain this" or "describe that"
-- Write the content directly: "Photosynthesis is..." not "You should explain photosynthesis..."
-- Focus on teaching and explaining, not on creating assignments
+Formatting Rules:
+- Output MUST be plain text only - NO markdown, bullets, numbering, asterisks, or special formatting characters
+- Use simple line breaks to separate sentences and paragraphs
+- Do NOT use any markdown syntax (no #, *, -, [], (), etc.)
+- Write naturally but ensure each major idea is clearly separated
 
 Pedagogical Approach:
-- Start with clear introduction of the topic
-- Break down complex concepts into understandable parts
-- Use examples relevant to Class ${params.grade} level
-- Include step-by-step explanations where needed
-- Connect concepts to real-world applications
-- Use appropriate terminology for the grade level
+- Adjust depth and complexity appropriately for Class ${params.grade}
+- Include relevant examples and real-world applications
+- Explain concepts thoroughly with adequate detail
+- Use definitions, step-by-step explanations, and illustrative examples
+- Maintain an educational, teacher-friendly tone suitable for classroom use
 
 Scientific & Mathematical Accuracy:
 - Use correct scientific and mathematical terminology
-- Preserve formulas, symbols, units, and notation accurately
-- Ensure all facts are curriculum-aligned and accurate
+- Preserve all symbols, formulas, units, and notation exactly
+- Ensure all facts are accurate and curriculum-aligned
+- Do NOT simplify or modify established scientific facts
 
-Output Requirements:
-- Generate comprehensive content covering the topic thoroughly
-- Write in a clear, professional, educational tone
-- Make content engaging and easy to understand
-- Ensure content is versatile and can be used directly by teachers
-- Output should be the final educational material, not a template or instructions
+Content Scope:
+- Generate comprehensive content that thoroughly covers the topic
+- Include multiple aspects, examples, and explanations
+- Provide enough detail for students to understand the concept fully
+- Cover the topic from introduction through key concepts to applications
 
-Begin generating the educational content now. Write the actual content that students will read.
+Educational Guardrails:
+- ONLY generate content related to educational topics
+- Reject any requests for non-educational content
+- Focus strictly on curriculum-aligned educational material
+- Maintain professional, appropriate tone throughout
+
+Output Style:
+- Write in clear, professional English
+- Avoid emojis, slang, or overly casual expressions
+- Do not include meta-commentary about the generation process
+- Ensure content is ready for direct use in educational contexts
+
+Begin generating the comprehensive educational content now.
 `;
 
     return prompt.trim();
