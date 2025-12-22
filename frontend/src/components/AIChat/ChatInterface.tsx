@@ -4,7 +4,9 @@ import {
   uploadFile,
   ChatApiError,
   getSessionDocuments,
+  translateMessage,
 } from "../../services/chatApi";
+import { INDIAN_LANGUAGES } from "../../constants/appConstants";
 import type { MessageUI, UploadProgress, FileListItem, MentionedFile, SourceCitation } from "../../types/chat";
 import MarkdownRenderer from "../ui/MarkdownRenderer";
 import Accordion from "../ui/Accordion";
@@ -21,6 +23,7 @@ interface ChatInterfaceProps {
   onSessionUpdate: (firstUserMessage?: string) => void;
   initialPrompt?: string | null;
   onInitialPromptConsumed?: () => void;
+  selectedLanguage: string;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -31,6 +34,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSessionUpdate,
   initialPrompt,
   onInitialPromptConsumed,
+  selectedLanguage,
 }) => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -159,6 +163,47 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTranslateMessage = async (messageId: string, content: string) => {
+    // Find message and check if already translated
+    const message = messages.find(m => m.id === messageId);
+    if (!message) return;
+
+    // Allow re-translation regardless of previous state to support language switching
+
+
+    setMessages(prev => prev.map(msg =>
+      msg.id === messageId ? { ...msg, isTranslating: true } : msg
+    ));
+
+    try {
+      const response = await translateMessage(
+        userId,
+        sessionId,
+        content,
+        "en",
+        selectedLanguage  // Global selected language
+      );
+
+      if (response.success && response.translated) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId ? {
+            ...msg,
+            translatedContent: response.translated,
+            isTranslating: false
+          } : msg
+        ));
+      } else {
+        throw new Error(response.error || "Translation failed");
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId ? { ...msg, isTranslating: false } : msg
+      ));
+      // Optionally show a toast or error indicator
     }
   };
 
@@ -410,6 +455,62 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             </Accordion>
                           </div>
                         )}
+
+                        {/* Translation Section */}
+                        {message.role === "assistant" &&
+                          !message.isStreaming &&
+                          !message.id.startsWith("system-") &&
+                          !message.id.startsWith("error-") && (
+                            <div className="mt-3">
+                              <Accordion
+                                title="Translation"
+                                icon={
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                  </svg>
+                                }
+                              >
+                                <div className="space-y-3 p-1">
+                                  {/* Translated Content */}
+                                  {message.translatedContent ? (
+                                    <div className="p-3 bg-orange-50 rounded-lg border border-orange-100">
+                                      <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                        {message.translatedContent}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-gray-500 italic">
+                                      No translation generated yet.
+                                    </p>
+                                  )}
+
+                                  {/* Translate Action */}
+                                  <button
+                                    onClick={() => handleTranslateMessage(message.id, message.content)}
+                                    disabled={message.isTranslating}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors text-xs font-semibold"
+                                  >
+                                    {message.isTranslating ? (
+                                      <>
+                                        <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Translating to {INDIAN_LANGUAGES.find(l => l.code === selectedLanguage)?.name || selectedLanguage}...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                        </svg>
+                                        {message.translatedContent ? "Translate Again" : "Translate"} to {INDIAN_LANGUAGES.find(l => l.code === selectedLanguage)?.name || selectedLanguage}
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </Accordion>
+                            </div>
+                          )}
                       </div>
                     </div>
                   )}

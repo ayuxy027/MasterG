@@ -65,7 +65,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
     };
 
     const handleStudyNode = async (node: TreeNode) => {
-        console.log(`[DocumentTree] Starting study for node: ${node.title} (ID: ${node.id})`);
+
         try {
             setOptimizingNodeId(node.id);
 
@@ -77,7 +77,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
             const nodeDesc = node.description || '';
             const nodeKeywords = node.keywords?.join(', ') || '';
             const context = `${nodeDesc}. Keywords: ${nodeKeywords}`;
-            // console.log(`[DocumentTree] Calling optimizePrompt with grade: ${grade}`);
+
 
             // 3. Call Backend (Parallel with min delay)
             const [optimizedPrompt] = await Promise.all([
@@ -85,12 +85,12 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
                 minDelayPromise
             ]);
 
-            // console.log(`[DocumentTree] Received optimized prompt:`, optimizedPrompt.substring(0, 50) + "...");
+
 
             // 4. Switch to Chat with result
             onSwitchToStudy(optimizedPrompt);
         } catch (error: any) {
-            console.error("[DocumentTree] Study optimization failed:", error);
+
             // Fallback with error visibility for debugging
             // User sees: "Error: [Message] -> Explain..."
             // This helps Identify if it's a network error, 500, or logical error.
@@ -191,7 +191,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
                                 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2
                                 ${isLoading
                                     ? 'bg-gray-100 text-gray-400'
-                                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                                    : 'bg-orange-500 text-white hover:bg-orange-600'
                                 }
                             `}
                         >

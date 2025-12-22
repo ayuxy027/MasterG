@@ -35,9 +35,8 @@ const Navbar: React.FC = () => {
   return (
     <>
       <header
-        className={`flex items-center justify-between px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 shadow-lg max-w-5xl rounded-full mx-auto w-full bg-white/80 backdrop-blur-md border border-orange-200/60 fixed top-6 left-0 right-0 z-50 transition-transform duration-300 ${
-          isVisible ? "translate-y-0" : "-translate-y-24"
-        }`}
+        className={`flex items-center justify-between px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 shadow-lg max-w-5xl rounded-full mx-auto w-full bg-white/80 backdrop-blur-md border border-orange-200/60 fixed top-6 left-0 right-0 z-50 transition-transform duration-300 ${isVisible ? "translate-y-0" : "-translate-y-24"
+          }`}
       >
         <a
           href="/"
@@ -231,21 +230,19 @@ const Navbar: React.FC = () => {
       <>
         {/* Backdrop */}
         <div
-          className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ease-out ${
-            isMenuOpen
+          className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300 ease-out ${isMenuOpen
               ? "opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
-          }`}
+            }`}
           onClick={closeMenu}
         />
 
         {/* Mobile Menu Panel */}
         <div
-          className={`fixed top-20 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm bg-white/95 backdrop-blur-md border-2 border-orange-200/60 rounded-xl shadow-xl z-50 md:hidden py-2.5 px-3 transition-all duration-300 ease-out ${
-            isMenuOpen
+          className={`fixed top-20 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm bg-white/95 backdrop-blur-md border-2 border-orange-200/60 rounded-xl shadow-xl z-50 md:hidden py-2.5 px-3 transition-all duration-300 ease-out ${isMenuOpen
               ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
               : "opacity-0 -translate-y-4 scale-95 pointer-events-none"
-          }`}
+            }`}
         >
           <nav className="flex flex-col gap-1">
             <a

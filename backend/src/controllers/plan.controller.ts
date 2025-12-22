@@ -35,11 +35,19 @@ export class PlanController {
                 return;
             }
 
-            const plan = await planService.getLatestPlan(userId as string, sessionId as string);
+            const planDoc = await planService.getLatestPlan(userId as string, sessionId as string);
 
+            if (!planDoc) {
+                res.status(404).json({ success: false, error: "Plan not found" });
+                return;
+            }
+
+            // Return both the main plan and available translations
             res.status(200).json({
                 success: true,
-                plan
+                plan: planDoc.generatedPlan,
+                translations: planDoc.translations ? Object.fromEntries(planDoc.translations) : {},
+                createdAt: planDoc.createdAt
             });
         } catch (error: any) {
             res.status(500).json({
@@ -66,6 +74,30 @@ export class PlanController {
             });
         } catch (error: any) {
             console.error("Prompt optimization error:", error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    async translate(req: Request, res: Response): Promise<void> {
+        try {
+            const { userId, sessionId, targetLang } = req.body;
+
+            if (!userId || !sessionId || !targetLang) {
+                res.status(400).json({ error: "userId, sessionId, and targetLang are required" });
+                return;
+            }
+
+            const translatedPlan = await planService.translatePlan(userId, sessionId, targetLang);
+
+            res.status(200).json({
+                success: true,
+                translatedPlan
+            });
+        } catch (error: any) {
+            console.error("Plan translation error:", error);
             res.status(500).json({
                 success: false,
                 error: error.message

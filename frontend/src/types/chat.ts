@@ -1,5 +1,10 @@
 // Chat API Types - matching backend response structures
 
+export interface ChatSettings {
+  language: string;
+  grade: string;
+}
+
 export interface SourceCitation {
   pdfName: string;
   pageNo: number;
@@ -27,6 +32,8 @@ export interface ChatMessage {
   timestamp: Date;
   sources?: SourceCitation[];
   metadata?: QueryMetadata;
+  translatedContent?: string;
+  translatedLanguage?: string;
 }
 
 export interface ChatSession {
@@ -34,6 +41,8 @@ export interface ChatSession {
   sessionId: string;
   chromaCollectionName: string;
   messages: ChatMessage[];
+  language?: string;
+  grade?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -96,6 +105,9 @@ export interface MessageUI {
   isLoading?: boolean;
   isStreaming?: boolean; // NEW: indicates message is currently streaming
   streamingLayer?: string; // NEW: current layer being used for streaming
+  translatedContent?: string; // Content translated to Hindi/other languages
+  translatedLanguage?: string; // NEW: The language it was translated to
+  isTranslating?: boolean; // Loading state for translation
 }
 
 export interface UploadProgress {

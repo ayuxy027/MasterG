@@ -7,24 +7,23 @@ interface PlanDashboardProps {
     userId: string;
     sessionId: string;
     onSwitchToStudy: (prompt: string) => void;
+    selectedGrade: string;
 }
 
 const PlanDashboard: React.FC<PlanDashboardProps> = ({
     userId,
     sessionId,
     onSwitchToStudy,
+    selectedGrade,
 }) => {
     const [documents, setDocuments] = useState<DocumentInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-    const [grade, setGrade] = useState<string>('12'); // Default to Grade 12
 
     useEffect(() => {
         loadDocuments();
     }, [userId, sessionId]);
-
-    const grades = Array.from({ length: 10 }, (_, i) => (i + 3).toString()); // 3 to 12
 
     const loadDocuments = async () => {
         setIsLoading(true);
@@ -63,20 +62,9 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {/* Grade Selector */}
-                    <div className="flex items-center gap-2 bg-white rounded-lg p-1.5 border border-orange-200 shadow-sm">
-                        <span className="text-sm font-medium text-gray-600 pl-2">Grade:</span>
-                        <select
-                            value={grade}
-                            onChange={(e) => setGrade(e.target.value)}
-                            className="bg-transparent text-sm font-bold text-orange-600 focus:outline-none cursor-pointer py-1 pr-2"
-                        >
-                            {grades.map(g => (
-                                <option key={g} value={g}>{g}th</option>
-                            ))}
-                            <option value="Undergrad">Undergrad</option>
-                            <option value="Grad">Graduate</option>
-                        </select>
+                    {/* Grade indicator (read-only) */}
+                    <div className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-lg border border-orange-200 text-sm font-medium">
+                        Target: {selectedGrade === 'Undergrad' || selectedGrade === 'Grad' ? selectedGrade : `Class ${selectedGrade}`}
                     </div>
 
                     {documents.length > 0 && (
@@ -137,7 +125,7 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
                             userId={userId}
                             sessionId={sessionId}
                             onSwitchToStudy={onSwitchToStudy}
-                            grade={grade}
+                            grade={selectedGrade}
                         />
                     ))}
                 </div>

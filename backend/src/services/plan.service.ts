@@ -2,12 +2,15 @@ import { documentService } from "./document.service";
 import { ollamaChatService } from "./ollamaChat.service";
 // import { PlanModel } from "../models/plan.model"; // Will solve import later
 import mongoose from "mongoose";
+import { nllbService } from "./nllb.service";
+import { languageService } from "./language.service";
 
 // Define the interface for the document
 interface IPlan extends mongoose.Document {
     sessionId: string;
     userId: string;
     generatedPlan: string;
+    translations: Map<string, string>;
     createdAt: Date;
 }
 
@@ -16,6 +19,7 @@ const PlanSchema = new mongoose.Schema<IPlan>({
     sessionId: { type: String, required: true },
     userId: { type: String, required: true },
     generatedPlan: { type: String, required: true },
+    translations: { type: Map, of: String, default: {} },
     createdAt: { type: Date, default: Date.now },
 });
 // Create or retrieve the model with proper typing
@@ -27,7 +31,7 @@ export class PlanService {
      */
     async generatePlan(userId: string, sessionId: string): Promise<string> {
         try {
-            console.log(`🧠 Generating LMR Plan for session: ${sessionId}`);
+
 
             // 1. Fetch all documents for the session
             // We use the file info to get IDs, then fetch full content
@@ -56,7 +60,7 @@ export class PlanService {
             // I'll cap at 20,000 chars for now to prevent OOM/timeouts on local.
             const efficientContext = fullContext.substring(0, 25000);
 
-            console.log(`Starting plan generation with context length: ${efficientContext.length}`);
+
 
             // 2. Construct Planner Prompt
             const plannerPrompt = `You are an expert Study Planner and Prompt Engineer.
@@ -91,10 +95,11 @@ export class PlanService {
             await PlanModel.create({
                 userId,
                 sessionId,
-                generatedPlan
+                generatedPlan,
+                translations: {}
             });
 
-            console.log(`✅ Plan generated and saved.`);
+
 
             return generatedPlan;
 
@@ -104,9 +109,47 @@ export class PlanService {
         }
     }
 
-    async getLatestPlan(userId: string, sessionId: string): Promise<string | null> {
+    async getLatestPlan(userId: string, sessionId: string): Promise<IPlan | null> {
         const plan = await PlanModel.findOne({ userId, sessionId }).sort({ createdAt: -1 });
-        return plan ? plan.generatedPlan : null;
+        return plan;
+    }
+
+    async translatePlan(userId: string, sessionId: string, targetLang: string, sourceLang: string = "en"): Promise<string> {
+        const plan = await this.getLatestPlan(userId, sessionId);
+
+        if (!plan) {
+            throw new Error("No plan found for this session.");
+        }
+
+        const normalizedTarget = languageService.toNLLBCode(targetLang as any) || targetLang;
+        const normalizedSource = languageService.toNLLBCode(sourceLang as any) || "eng_Latn";
+
+        // Check if translation exists
+        if (plan.translations) {
+            if (plan.translations.get(targetLang)) return plan.translations.get(targetLang)!;
+            if (plan.translations.get(normalizedTarget)) return plan.translations.get(normalizedTarget)!;
+        }
+
+
+
+        // Generate translation
+        const translatedText = await nllbService.translate(plan.generatedPlan, {
+            srcLang: normalizedSource,
+            tgtLang: normalizedTarget
+        });
+
+        // Save translation
+        if (!plan.translations) {
+            plan.translations = new Map();
+        }
+        plan.translations.set(targetLang, translatedText);
+
+        await PlanModel.updateOne(
+            { _id: plan._id },
+            { $set: { [`translations.${targetLang}`]: translatedText } }
+        );
+
+        return translatedText;
     }
 
     /**
@@ -114,50 +157,41 @@ export class PlanService {
      */
     async optimizeStudyPrompt(topic: string, context: string, documentId: string, grade?: string): Promise<string> {
         try {
-            // console.log(`✨ Optimizing prompt for topic: ${topic} (Grade: ${grade || 'General'})`);
+
 
             const gradeInstruction = grade
                 ? `Target Audience Level: Grade ${grade} student. Ensure the explanation is appropriate for this academic level.`
                 : `Target Audience Level: General audience.`;
 
-            const prompt = `You are an expert Study Coach and Prompt Engineer.
+            const prompt = `You are a Study Coach. 
             
             OBJECTIVE:
-            Generate a HIGHLY EFFECTIVE, DETAILED USER PROMPT that a student (Grade: ${grade || 'General'}) should type into an AI Chatbot to learn about "${topic}" thoroughly.
+            Convert the following topic and context into a CONCISE, DIRECT query (max 4 lines) that a student would ask an AI.
             
-            CONTEXT FROM DOCUMENT:
-            ${context}
+            TOPIC: ${topic}
+            GRADE: ${grade || '12'}
+            CONTEXT: ${context.substring(0, 1000)}
             
-            INSTRUCTIONS:
-            1. The output must be the EXACT TEXT the student should type.
-            2. It should be phrased as a request from the student to the AI.
-            3. It must specify the learning level: "Explain this to me as a ${grade || 'student'}..."
-            4. It should explicitly ask for:
-               - A clear, simple definition
-               - Key concepts/mechanisms from the context
-               - Real-world examples appropriate for Grade ${grade || 'General'}
-               - A strict instruction to ONLY use the provided document context.
-            
-            OUTPUT FORMAT:
-            Just the prompt text. No quotes. No "Here is the prompt".
-            
-            EXAMPLE OUTPUT:
-            "Act as my tutor. Explain [Topic] to a Grade ${grade || 'User'} level. Focus on [Key Concept 1] and [Key Concept 2] as mentioned in the text. Provide 3 examples and a summary."
-            `;
+            RULES:
+            1. Output ONLY the query. No preamble, no "Here is your prompt".
+            2. Format: "Explain ${topic} to me like I'm in grade ${grade || '12'}. Focus on [keyword 1] and [keyword 2]. Provide a real-world example."
+            3. STRICT LIMIT: Maximum 4 lines of text.
+            4. Style: Direct student-to-teacher query.`;
 
             const optimizedPrompt = await ollamaChatService.chatCompletion([
                 { role: "user", content: prompt }
             ]);
 
-            // console.log(`✅ [PlanService] Optimization successful. Result length: ${optimizedPrompt.length}`);
-            return optimizedPrompt.replace(/"/g, '').trim(); // Remove quotes if any
+            // Clean up the response to ensure no leftover thinking tags or markdown blocks
+            let cleaned = optimizedPrompt;
+
+            // Remove markdown code blocks if the model ignored instructions
+            cleaned = cleaned.replace(/```[\s\S]*?```/g, m => m.replace(/```[a-z]*\n?|```/g, ''));
+            cleaned = cleaned.split('\n').filter(line => !line.toLowerCase().startsWith('here is') && !line.toLowerCase().startsWith('sure,')).join('\n');
+
+            return cleaned.trim() || `Explain the concept of ${topic} for a grade ${grade || '12'} student using details from the document.`;
         } catch (error: any) {
-            console.error("❌ [PlanService] Prompt optimization failed:", {
-                message: error.message,
-                stack: error.stack,
-                topic,
-                documentId
-            });
+
             // Fallback to simple prompt with error indicator for debugging
             return `[DEBUG: ${error.message}] Explain the concept of ${topic} in detail based on the study material.`;
         }

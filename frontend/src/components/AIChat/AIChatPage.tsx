@@ -13,9 +13,11 @@ import {
   deleteSession,
   generateChatName,
   updateChatName,
+  updateSessionSettings,
   ChatApiError,
 } from "../../services/chatApi";
 import type { MessageUI, SessionListItem } from "../../types/chat";
+import { INDIAN_LANGUAGES, GRADE_LEVELS } from "../../constants/appConstants";
 
 type TabType = "chat" | "resources" | "plan";
 
@@ -29,6 +31,10 @@ const AIChatPage: React.FC = () => {
   // Chat State
   const [messages, setMessages] = useState<MessageUI[]>([]);
   const [pendingStudyPrompt, setPendingStudyPrompt] = useState<string | null>(null);
+
+  // Global Settings
+  const [selectedLanguage, setSelectedLanguage] = useState("hi");
+  const [selectedGrade, setSelectedGrade] = useState("12");
 
   // UI State
   const [activeTab, setActiveTab] = useState<TabType>("chat");
@@ -87,9 +93,16 @@ const AIChatPage: React.FC = () => {
           timestamp: msg.timestamp,
           sources: msg.sources,
           metadata: msg.metadata,
+          translatedContent: msg.translatedContent,
+          translatedLanguage: msg.translatedLanguage,
         })
       );
       setMessages(uiMessages);
+
+      // Load session settings if available
+      if (sessionDetails.language) setSelectedLanguage(sessionDetails.language);
+      if (sessionDetails.grade) setSelectedGrade(sessionDetails.grade);
+
     } catch (error) {
       console.error("Failed to load session messages:", error);
       // Start fresh if session doesn't exist
@@ -192,8 +205,7 @@ const AIChatPage: React.FC = () => {
     }
   }, [userId, currentSessionId]);
 
-  // Only show empty state when no sessions and not loading
-  const showEmptyState = !sessionsLoading && sessions.length === 0 && !currentSessionId;
+
 
   return (
     <div className="flex flex-col overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30 pt-[90px]" style={{ height: '100dvh' }}>
@@ -247,6 +259,57 @@ const AIChatPage: React.FC = () => {
               Plan
             </button>
           </div>
+
+          {/* Global Settings Dropdowns (Right Side) */}
+          <div className="flex items-center gap-3 ml-4">
+            {/* Language Selector */}
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md rounded-lg p-1 border border-orange-200 shadow-sm">
+              <span className="text-xs font-semibold text-gray-500 pl-2">Lang:</span>
+              <select
+                value={selectedLanguage}
+                onChange={async (e) => {
+                  const newLang = e.target.value;
+                  setSelectedLanguage(newLang);
+                  if (currentSessionId) {
+                    try {
+                      await updateSessionSettings(userId, currentSessionId, { language: newLang });
+                    } catch (err) {
+                      console.error("Failed to save language setting", err);
+                    }
+                  }
+                }}
+                className="bg-transparent text-xs sm:text-sm font-bold text-orange-600 focus:outline-none cursor-pointer py-1 pr-1 max-w-[100px]"
+              >
+                {INDIAN_LANGUAGES.map(lang => (
+                  <option key={lang.code} value={lang.code}>{lang.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Grade Selector */}
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md rounded-lg p-1 border border-orange-200 shadow-sm">
+              <span className="text-xs font-semibold text-gray-500 pl-2">Grade:</span>
+              <select
+                value={selectedGrade}
+                onChange={async (e) => {
+                  const newGrade = e.target.value;
+                  setSelectedGrade(newGrade);
+                  if (currentSessionId) {
+                    try {
+                      await updateSessionSettings(userId, currentSessionId, { grade: newGrade });
+                    } catch (err) {
+                      console.error("Failed to save grade setting", err);
+                    }
+                  }
+                }}
+                className="bg-transparent text-xs sm:text-sm font-bold text-orange-600 focus:outline-none cursor-pointer py-1 pr-1"
+              >
+                {GRADE_LEVELS.map(g => (
+                  <option key={g.value} value={g.value}>{g.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -298,6 +361,7 @@ const AIChatPage: React.FC = () => {
               onSessionUpdate={handleSessionUpdate}
               initialPrompt={pendingStudyPrompt}
               onInitialPromptConsumed={() => setPendingStudyPrompt(null)}
+              selectedLanguage={selectedLanguage}
             />
           ) : activeTab === "resources" && currentSessionId ? (
             <ResourcesPanel userId={userId} sessionId={currentSessionId} />
@@ -309,6 +373,7 @@ const AIChatPage: React.FC = () => {
                 setPendingStudyPrompt(prompt);
                 setActiveTab("chat");
               }}
+              selectedGrade={selectedGrade}
             />
           ) : (
             <div className="h-full flex items-center justify-center text-gray-500">

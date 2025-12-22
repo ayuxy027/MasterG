@@ -363,7 +363,7 @@ ${question}
                     stream: false,
                     options: {
                         temperature: 0.1, // More deterministic
-                        num_predict: 2500, // Increased to prevent truncation
+                        num_predict: 4096, // Increased significantly or use -1 for no limit
                     },
                 },
                 {

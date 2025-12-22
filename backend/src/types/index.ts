@@ -29,12 +29,16 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   sources?: SourceCitation[]; // Sources for assistant messages
+  translatedContent?: string; // Stored translation
+  translatedLanguage?: string; // Language code of translation
 }
 
 export interface ChatHistory {
   userId: string;
   sessionId: string;
   messages: ChatMessage[];
+  language?: string;
+  grade?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -324,6 +324,8 @@ export async function getSessionDetails(
         })) || [],
       createdAt: new Date(data.session.createdAt),
       updatedAt: new Date(data.session.updatedAt),
+      language: data.session.language,
+      grade: data.session.grade,
     };
   } catch (error) {
     if (error instanceof ChatApiError) throw error;
@@ -414,6 +416,49 @@ export async function updateChatName(
   }
 }
 
+
+
+/**
+ * Update session settings (language, grade)
+ */
+export async function updateSessionSettings(
+  userId: string,
+  sessionId: string,
+  settings: { language?: string; grade?: string }
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/chats/${sessionId}/settings?userId=${encodeURIComponent(
+        userId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(settings),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ChatApiError(
+        errorData.message || "Failed to update settings",
+        response.status,
+        errorData
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ChatApiError) throw error;
+    throw new ChatApiError(
+      error instanceof Error ? error.message : "Network error",
+      undefined,
+      error
+    );
+  }
+}
 
 /**
  * Get all documents in a chat session
@@ -604,3 +649,52 @@ export async function deleteFile(
     );
   }
 }
+
+/**
+ * Translate a message using NLLB and persist to MongoDB
+ */
+export async function translateMessage(
+  userId: string,
+  sessionId: string,
+  text: string,
+  sourceLanguage: string,
+  targetLanguage: string
+): Promise<{ success: boolean; translated?: string; error?: string }> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/chats/${sessionId}/translate?userId=${encodeURIComponent(
+        userId
+      )}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          sourceLanguage,
+          targetLanguage,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ChatApiError(
+        errorData.error || "Failed to translate message",
+        response.status,
+        errorData
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ChatApiError) throw error;
+    throw new ChatApiError(
+      error instanceof Error ? error.message : "Network error",
+      undefined,
+      error
+    );
+  }
+}
+
