@@ -186,7 +186,15 @@ const StitchPage: React.FC = () => {
   const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
   const [translatingLanguages, setTranslatingLanguages] = useState<Set<string>>(new Set()); // Track languages currently being translated
   const [targetLanguageForTranslation, setTargetLanguageForTranslation] = useState("hi");
+  const [markdownEnabled, setMarkdownEnabled] = useState(false); // Toggle for markdown rendering in English tab ONLY (ONLY after generation completes, never during streaming)
   const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
+  
+  // Reset markdown toggle when switching away from English tab
+  useEffect(() => {
+    if (activeTab !== "english") {
+      setMarkdownEnabled(false);
+    }
+  }, [activeTab]);
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
@@ -315,6 +323,8 @@ const StitchPage: React.FC = () => {
                 const finalContent = parsed.content || accumulatedResponse;
                 setGeneratedContent(finalContent);
                 setEnglishContent(finalContent); // Store English version
+                // Reset markdown toggle to false when new content is generated
+                setMarkdownEnabled(false); // Always start with plain text view after generation
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }
@@ -792,7 +802,7 @@ const StitchPage: React.FC = () => {
 
               {/* Tabs */}
               {englishContent && (
-                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6 overflow-x-auto">
+                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6 overflow-x-auto items-center">
                   <button
                     onClick={() => setActiveTab("english")}
                     className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -803,6 +813,30 @@ const StitchPage: React.FC = () => {
                   >
                     English
                   </button>
+                  {/* Markdown Toggle - Only show when English tab is active AND generation is complete */}
+                  {activeTab === "english" && !isGenerating && englishContent && (
+                    <div className="ml-4 flex items-center gap-2 border-l border-orange-200 pl-4">
+                      <span className="text-xs text-gray-600 font-medium">Markdown:</span>
+                      <button
+                        onClick={() => setMarkdownEnabled(!markdownEnabled)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                          markdownEnabled ? "bg-orange-500" : "bg-gray-300"
+                        }`}
+                        role="switch"
+                        aria-checked={markdownEnabled}
+                        aria-label="Toggle markdown rendering (only available after generation completes)"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            markdownEnabled ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                      <span className="text-xs text-gray-500 font-medium">
+                        {markdownEnabled ? "On" : "Off"}
+                      </span>
+                    </div>
+                  )}
                   {/* Show all languages that are either translated or currently translating */}
                   {availableTabs.map((langCode) => (
                     <button
@@ -845,7 +879,12 @@ const StitchPage: React.FC = () => {
               {/* Tab Content */}
               <div className="flex-1 overflow-hidden">
                 {activeTab === "english" ? (
-                  <ContentPreview content={englishContent} isMarkdown={true} />
+                  // Only allow markdown rendering after generation completes (not during streaming)
+                  // During generation (isGenerating), always show plain text
+                  <ContentPreview 
+                    content={englishContent} 
+                    isMarkdown={markdownEnabled && !isGenerating} 
+                  />
                 ) : translatingLanguages.has(activeTab) ? (
                   // UX IMPROVEMENT: Show skeleton/loading UI while translating
                   <div className="h-full overflow-auto p-6 bg-white">
@@ -887,7 +926,8 @@ const StitchPage: React.FC = () => {
                     </div>
                   </div>
                 ) : translatedContent[activeTab] ? (
-                  <ContentPreview content={translatedContent[activeTab]} />
+                  // Translated content always shows as plain text (no markdown rendering - markdown toggle is English-only)
+                  <ContentPreview content={translatedContent[activeTab]} isMarkdown={false} />
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-400">
                     <p className="text-sm">No translation available for this language yet</p>
