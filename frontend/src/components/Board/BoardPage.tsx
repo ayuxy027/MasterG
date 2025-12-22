@@ -25,6 +25,13 @@ interface StickyNoteState {
   color: string;
   width: number;
   height: number;
+  enableMarkdown?: boolean;
+  ruled?: boolean;
+  fontSize?: number;
+  fontFamily?: string;
+  isBold?: boolean;
+  isItalic?: boolean;
+  isUnderline?: boolean;
 }
 
 // ============================================================================
@@ -300,6 +307,13 @@ const BoardPage: React.FC = () => {
         color: '#FFE4B5',
         width: 200,
         height: 150,
+        enableMarkdown: false,
+        ruled: false,
+        fontSize: 14,
+        fontFamily: 'Inter',
+        isBold: false,
+        isItalic: false,
+        isUnderline: false,
       };
       setStickyNotes(prev => [...prev, newNote]);
       return;
@@ -762,6 +776,13 @@ const BoardPage: React.FC = () => {
               color={note.color}
               width={note.width}
               height={note.height}
+              enableMarkdown={note.enableMarkdown}
+              ruled={note.ruled}
+              fontSize={note.fontSize}
+              fontFamily={note.fontFamily}
+              isBold={note.isBold}
+              isItalic={note.isItalic}
+              isUnderline={note.isUnderline}
               zoom={zoom}
               selectionMode={currentTool === 'select'}
               onUpdate={handleStickyNoteUpdate}
