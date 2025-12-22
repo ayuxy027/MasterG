@@ -80,37 +80,37 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
             className="markdown-content"
             remarkPlugins={[remarkGfm]}
             components={{
-              h1: ({ children }) => <h1 className="text-3xl font-bold mb-4 mt-6 text-gray-900">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-2xl font-semibold mb-3 mt-5 text-gray-900">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-xl font-semibold mb-2 mt-4 text-gray-900">{children}</h3>,
-              h4: ({ children }) => <h4 className="text-lg font-semibold mb-2 mt-3 text-gray-800">{children}</h4>,
-              p: ({ children }) => <p className="mb-4 leading-relaxed text-gray-700">{children}</p>,
-              ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ol>,
-              li: ({ children }) => <li className="ml-2">{children}</li>,
-              strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-              em: ({ children }) => <em className="italic text-gray-800">{children}</em>,
-              code: ({ children, className }) => {
-                const isInline = !className;
+              h1: ({ children, ...props }) => <h1 {...props} className="text-3xl font-bold mb-4 mt-6 text-gray-900">{children}</h1>,
+              h2: ({ children, ...props }) => <h2 {...props} className="text-2xl font-semibold mb-3 mt-5 text-gray-900">{children}</h2>,
+              h3: ({ children, ...props }) => <h3 {...props} className="text-xl font-semibold mb-2 mt-4 text-gray-900">{children}</h3>,
+              h4: ({ children, ...props }) => <h4 {...props} className="text-lg font-semibold mb-2 mt-3 text-gray-800">{children}</h4>,
+              p: ({ children, ...props }) => <p {...props} className="mb-4 leading-relaxed text-gray-700">{children}</p>,
+              ul: ({ children, ...props }) => <ul {...props} className="list-disc list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ul>,
+              ol: ({ children, ...props }) => <ol {...props} className="list-decimal list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ol>,
+              li: ({ children, ...props }) => <li {...props} className="ml-2">{children}</li>,
+              strong: ({ children, ...props }) => <strong {...props} className="font-semibold text-gray-900">{children}</strong>,
+              em: ({ children, ...props }) => <em {...props} className="italic text-gray-800">{children}</em>,
+              code: ({ children, className: codeClassName, ...props }) => {
+                const isInline = !codeClassName;
                 return isInline ? (
-                  <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
+                  <code {...props} className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
                 ) : (
-                  <code className="block bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono text-gray-800">{children}</code>
+                  <code {...props} className={codeClassName} style={{ display: 'block', backgroundColor: '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', overflowX: 'auto', marginBottom: '1rem', fontSize: '0.875rem', fontFamily: 'monospace' }}>{children}</code>
                 );
               },
-              pre: ({ children }) => <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">{children}</pre>,
-              blockquote: ({ children }) => <blockquote className="border-l-4 border-orange-300 pl-4 italic my-4 text-gray-600">{children}</blockquote>,
-              hr: () => <hr className="my-6 border-gray-300" />,
+              pre: ({ children, ...props }) => <pre {...props} className="bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">{children}</pre>,
+              blockquote: ({ children, ...props }) => <blockquote {...props} className="border-l-4 border-orange-300 pl-4 italic my-4 text-gray-600">{children}</blockquote>,
+              hr: ({ ...props }) => <hr {...props} className="my-6 border-gray-300" />,
             }}
           >
             {content}
           </ReactMarkdown>
         ) : (
-          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-            <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
-              {content}
-            </pre>
-          </div>
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+            {content}
+          </pre>
+        </div>
         )}
       </div>
     </div>

@@ -623,7 +623,7 @@ def main():
     load_model()
     sys.stderr.write("✅ NLLB-200 model loaded and ready!\n")
     
-    # Read requests from stdin
+    # Read requests from stdin (processes sequentially to avoid mixing responses)
     while True:
       try:
         line = sys.stdin.readline()
@@ -635,29 +635,45 @@ def main():
           continue
         
         req = json.loads(line)
+        request_id = req.get("id")  # Optional request ID for tracking
         text = str(req.get("text") or "").strip()
         src_lang = str(req.get("src_lang") or "eng_Latn")
         tgt_lang = str(req.get("tgt_lang") or "hin_Deva")
         stream = bool(req.get("stream") or False)
-        batch_size = int(req.get("batch_size") or 8)  # Default batch size of 8
+        batch_size = req.get("batch_size")
+        if batch_size is not None:
+          batch_size = int(batch_size)
+        else:
+          batch_size = None  # Auto-detect
         
         if not text:
           result = {"success": False, "error": "Missing or empty 'text' field"}
+          if request_id:
+            result["id"] = request_id
         else:
           if stream:
             # Stream sentence-by-sentence; function writes directly to stdout
             translate_stream(text, src_lang, tgt_lang, batch_size)
           else:
             result = translate(text, src_lang, tgt_lang, batch_size)
+            # Include request ID in response if provided
+            if request_id:
+              result["id"] = request_id
             # Write single response to stdout
             sys.stdout.write(json.dumps(result) + "\n")
             sys.stdout.flush()
         
       except json.JSONDecodeError as e:
-        sys.stdout.write(json.dumps({"success": False, "error": f"Invalid JSON: {e}"}) + "\n")
+        error_result = {"success": False, "error": f"Invalid JSON: {e}"}
+        if "request_id" in locals():
+          error_result["id"] = request_id
+        sys.stdout.write(json.dumps(error_result) + "\n")
         sys.stdout.flush()
       except Exception as e:
-        sys.stdout.write(json.dumps({"success": False, "error": f"Translation failed: {e}"}) + "\n")
+        error_result = {"success": False, "error": f"Translation failed: {e}"}
+        if "request_id" in locals():
+          error_result["id"] = request_id
+        sys.stdout.write(json.dumps(error_result) + "\n")
         sys.stdout.flush()
         
   except KeyboardInterrupt:
