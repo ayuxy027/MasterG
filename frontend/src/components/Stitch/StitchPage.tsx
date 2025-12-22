@@ -357,7 +357,6 @@ const StitchPage: React.FC = () => {
   });
   const [sessions, setSessions] = useState<StitchSessionListItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   const [selectedGrade, setSelectedGrade] = useState("8");
   const [customGrade, setCustomGrade] = useState("");
@@ -970,39 +969,6 @@ const StitchPage: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 min-h-0 flex overflow-hidden max-w-[1920px] w-full mx-auto">
-        {/* Session Sidebar */}
-        {!sidebarCollapsed && (
-          <StitchSessionSidebar
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            onSessionSelect={handleSessionSelect}
-            onNewSession={handleNewSession}
-            onDeleteSession={handleDeleteSession}
-            isLoading={sessionsLoading}
-          />
-        )}
-
-        {/* Sidebar Toggle Button */}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="w-6 bg-white/80 hover:bg-orange-50 border-r-2 border-orange-100 flex items-center justify-center transition-colors"
-          title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-        >
-          <svg
-            className={`w-4 h-4 text-gray-600 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8">
@@ -1534,6 +1500,18 @@ const StitchPage: React.FC = () => {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Session History - Horizontal Layout Below Content Preview and Ollama Status */}
+              <div className="mt-6">
+                <StitchSessionSidebar
+                  sessions={sessions}
+                  currentSessionId={currentSessionId}
+                  onSessionSelect={handleSessionSelect}
+                  onNewSession={handleNewSession}
+                  onDeleteSession={handleDeleteSession}
+                  isLoading={sessionsLoading}
+                />
               </div>
             </div>
           </div>
