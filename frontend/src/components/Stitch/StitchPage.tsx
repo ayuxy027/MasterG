@@ -93,6 +93,7 @@ const StitchPage: React.FC = () => {
   const [generatedContent, setGeneratedContent] = useState("");
   const [englishContent, setEnglishContent] = useState(""); // Store original English content
   const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
+  const [translatingLanguages, setTranslatingLanguages] = useState<Set<string>>(new Set()); // Track languages currently being translated
   const [targetLanguageForTranslation, setTargetLanguageForTranslation] = useState("hi");
   const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
   const [thinkingText, setThinkingText] = useState("");
@@ -268,24 +269,93 @@ const StitchPage: React.FC = () => {
       return;
     }
 
+    // UX IMPROVEMENT: Create tab immediately with skeleton UI
+    setTranslatingLanguages(prev => new Set(prev).add(targetLang));
+    setActiveTab(targetLang); // Switch to the new tab immediately
     setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
     setError(null);
 
+    // Initialize empty content for progressive updates
+    setTranslatedContent(prev => ({ ...prev, [targetLang]: "" }));
+
     try {
-      const resp = await stitchAPI.translateContent({
-        text: englishContent,
-        sourceLanguage: "en",
-        targetLanguage: targetLang,
+      // Use streaming translation for progressive updates
+      const API_BASE_URL = import.meta.env.VITE_API_URL
+        ? `${import.meta.env.VITE_API_URL}/api`
+        : "http://localhost:5001/api";
+
+      const response = await fetch(`${API_BASE_URL}/stitch/translate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: englishContent,
+          sourceLanguage: "en",
+          targetLanguage: targetLang,
+          stream: true, // Enable streaming
+        }),
       });
 
-      if (resp.success && resp.translated) {
-        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
-        setActiveTab(targetLang);
-        setError(null);
-      } else {
-        const errorMsg = resp.error || "Translation failed. Please try again.";
-        setError(errorMsg);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body for streaming");
+      }
+
+      let buffer = "";
+      let accumulatedTranslation = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Handle SSE format: "data: {...}\n\n"
+        let sepIndex = buffer.indexOf("\n\n");
+        while (sepIndex !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex).trim();
+          buffer = buffer.slice(sepIndex + 2);
+          
+          if (rawEvent.startsWith("data: ")) {
+            const data = rawEvent.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.type === "chunk" && parsed.translated) {
+                // Progressive update: accumulate translated chunks (each chunk is a sentence)
+                accumulatedTranslation += parsed.translated + " ";
+                setTranslatedContent(prev => ({ ...prev, [targetLang]: accumulatedTranslation.trim() }));
+              } else if (parsed.type === "complete" && parsed.translated) {
+                // Final complete translation (use this as final result)
+                setTranslatedContent(prev => ({ ...prev, [targetLang]: parsed.translated }));
+                accumulatedTranslation = parsed.translated;
+              } else if (parsed.type === "error") {
+                throw new Error(parsed.error || "Translation failed");
+              }
+            } catch (e) {
+              // Skip invalid JSON, continue processing
+              console.warn("Failed to parse stream chunk:", e);
+            }
+          }
+          
+          sepIndex = buffer.indexOf("\n\n");
+        }
+      }
+
+      // Translation complete
+      setTranslatingLanguages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(targetLang);
+        return newSet;
+      });
+      setError(null);
     } catch (err) {
       const msg =
         err instanceof StitchApiError
@@ -294,6 +364,20 @@ const StitchPage: React.FC = () => {
           ? err.message
           : "Translation failed. Please try again.";
       setError(msg);
+      
+      // Remove from translating set on error
+      setTranslatingLanguages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(targetLang);
+        return newSet;
+      });
+      
+      // Remove empty translation on error
+      setTranslatedContent(prev => {
+        const newPrev = { ...prev };
+        delete newPrev[targetLang];
+        return newPrev;
+      });
     } finally {
       setIsTranslating(prev => ({ ...prev, [targetLang]: false }));
     }
@@ -655,10 +739,10 @@ const StitchPage: React.FC = () => {
 
               {/* Tabs */}
               {englishContent && (
-                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6">
+                <div className="flex border-b-2 border-orange-200/60 px-4 sm:px-6 overflow-x-auto">
                   <button
                     onClick={() => setActiveTab("english")}
-                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === "english"
                         ? "border-orange-400 text-orange-600"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
@@ -666,17 +750,40 @@ const StitchPage: React.FC = () => {
                   >
                     English
                   </button>
-                  {Object.keys(translatedContent).map((langCode) => (
+                  {/* Show all languages that are either translated or currently translating */}
+                  {Array.from(new Set([...Object.keys(translatedContent), ...Array.from(translatingLanguages)])).map((langCode) => (
                     <button
                       key={langCode}
                       onClick={() => setActiveTab(langCode)}
-                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
                         activeTab === langCode
                           ? "border-orange-400 text-orange-600"
                           : "border-transparent text-gray-500 hover:text-gray-700 hover:border-orange-200"
                       }`}
                     >
                       {getLanguageName(langCode)}
+                      {translatingLanguages.has(langCode) && (
+                        <svg
+                          className="animate-spin h-3 w-3 text-orange-500"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -686,6 +793,58 @@ const StitchPage: React.FC = () => {
               <div className="flex-1 overflow-hidden">
                 {activeTab === "english" ? (
                   <ContentPreview content={englishContent} />
+                ) : translatingLanguages.has(activeTab) ? (
+                  // UX IMPROVEMENT: Show skeleton/loading UI while translating
+                  <div className="h-full overflow-auto p-6 bg-white">
+                    <div className="space-y-4">
+                      {/* Skeleton loading animation */}
+                      {translatedContent[activeTab] ? (
+                        // Show partial content if available (streaming)
+                        <div className="prose max-w-none">
+                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+                              {translatedContent[activeTab]}
+                            </pre>
+                          </div>
+                        </div>
+                      ) : (
+                        // Show skeleton while waiting for first chunk
+                        <div className="space-y-3">
+                          {[1, 2, 3, 4].map((i) => (
+                            <div key={i} className="animate-pulse">
+                              <div className="h-4 bg-gray-200 rounded w-full"></div>
+                              <div className="h-4 bg-gray-200 rounded w-5/6 mt-2"></div>
+                              <div className="h-4 bg-gray-200 rounded w-4/6 mt-2"></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Loading indicator */}
+                      <div className="flex items-center justify-center gap-2 text-orange-500 mt-4">
+                        <svg
+                          className="animate-spin h-5 w-5"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        <span className="text-sm font-medium">Translating...</span>
+                      </div>
+                    </div>
+                  </div>
                 ) : translatedContent[activeTab] ? (
                   <ContentPreview content={translatedContent[activeTab]} />
                 ) : (
