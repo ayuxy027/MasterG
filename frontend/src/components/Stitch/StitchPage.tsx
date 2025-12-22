@@ -20,31 +20,32 @@ const generateSessionId = (): string => {
 };
 
 // All 22 scheduled Indian languages + English (from language service)
+// Sorted alphabetically by name
 const ALL_LANGUAGES = [
-  { code: "en", name: "English", native: "English" },
-  { code: "hi", name: "Hindi", native: "हिंदी" },
-  { code: "mr", name: "Marathi", native: "मराठी" },
-  { code: "gu", name: "Gujarati", native: "ગુજરાતી" },
-  { code: "bn", name: "Bengali", native: "বাংলা" },
-  { code: "ta", name: "Tamil", native: "தமிழ்" },
-  { code: "te", name: "Telugu", native: "తెలుగు" },
-  { code: "kn", name: "Kannada", native: "ಕನ್ನಡ" },
-  { code: "ml", name: "Malayalam", native: "മലയാളം" },
-  { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
-  { code: "ur", name: "Urdu", native: "اردو" },
-  { code: "or", name: "Odia", native: "ଓଡ଼ିଆ" },
   { code: "as", name: "Assamese", native: "অসমীয়া" },
+  { code: "bn", name: "Bengali", native: "বাংলা" },
+  { code: "bho", name: "Bhojpuri", native: "भोजपुरी" },
+  { code: "brx", name: "Bodo", native: "बर'" },
+  { code: "en", name: "English", native: "English" },
+  { code: "doi", name: "Dogri", native: "डोगरी" },
+  { code: "gu", name: "Gujarati", native: "ગુજરાતી" },
+  { code: "hi", name: "Hindi", native: "हिंदी" },
+  { code: "kn", name: "Kannada", native: "ಕನ್ನಡ" },
   { code: "ks", name: "Kashmiri", native: "कॉशुर" },
   { code: "kok", name: "Konkani", native: "कोंकणी" },
   { code: "mai", name: "Maithili", native: "मैथिली" },
+  { code: "ml", name: "Malayalam", native: "മലയാളം" },
   { code: "mni", name: "Manipuri", native: "ꯃꯅꯤꯄꯨꯔꯤ" },
+  { code: "mr", name: "Marathi", native: "मराठी" },
   { code: "ne", name: "Nepali", native: "नेपाली" },
+  { code: "or", name: "Odia", native: "ଓଡ଼ିଆ" },
+  { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
   { code: "sa", name: "Sanskrit", native: "संस्कृत" },
-  { code: "sd", name: "Sindhi", native: "سنڌي" },
   { code: "sat", name: "Santali", native: "ᱥᱟᱱᱛᱟᱲᱤ" },
-  { code: "brx", name: "Bodo", native: "बर'" },
-  { code: "doi", name: "Dogri", native: "डोगरी" },
-  { code: "bho", name: "Bhojpuri", native: "भोजपुरी" },
+  { code: "sd", name: "Sindhi", native: "سنڌي" },
+  { code: "ta", name: "Tamil", native: "தமிழ்" },
+  { code: "te", name: "Telugu", native: "తెలుగు" },
+  { code: "ur", name: "Urdu", native: "اردو" },
 ];
 
 const GRADE_LEVELS = [
@@ -380,6 +381,12 @@ const StitchPage: React.FC = () => {
     connected: boolean;
     checking: boolean;
   }>({ connected: false, checking: true });
+  const [nllbStatus, setNllbStatus] = useState<{
+    connected: boolean;
+    enabled: boolean;
+    checking: boolean;
+    error?: string;
+  }>({ connected: false, enabled: false, checking: true });
 
   // OPTIMIZATION: Memoize language name lookup (define early to avoid hoisting issues)
   const getLanguageName = useCallback((code: string) => {
@@ -789,9 +796,10 @@ const StitchPage: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [englishContent, translatedContent, topic, selectedGrade, selectedSubject, customGrade, customSubject, markdownEnabled, currentSessionId]);
 
-  // Check Ollama status on mount
+  // Check Ollama and NLLB status on mount
   useEffect(() => {
     checkOllamaStatus();
+    checkNLLBStatus();
 
     // Cleanup: Cancel content generation on unmount
     return () => {
@@ -856,6 +864,27 @@ const StitchPage: React.FC = () => {
     } catch (err) {
       setOllamaStatus({ connected: false, checking: false });
       console.error("Failed to check Ollama status:", err);
+    }
+  };
+
+  const checkNLLBStatus = async () => {
+    setNllbStatus(prev => ({ ...prev, checking: true }));
+    try {
+      const status = await stitchAPI.checkNLLBStatus();
+      setNllbStatus({
+        connected: status.connected,
+        enabled: status.enabled,
+        checking: false,
+        error: status.error,
+      });
+    } catch (err) {
+      setNllbStatus({
+        connected: false,
+        enabled: true,
+        checking: false,
+        error: err instanceof Error ? err.message : "Service unavailable",
+      });
+      console.error("Failed to check NLLB status:", err);
     }
   };
 
@@ -1245,78 +1274,66 @@ const StitchPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Ollama Status */}
+                {/* Service Status - Combined */}
                 <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-4 sm:p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs sm:text-sm font-semibold text-gray-800">Ollama Status</span>
-                    {ollamaStatus.checking ? (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                        Checking...
-                      </span>
-                    ) : ollamaStatus.connected ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
-                        Connected
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
-                        Not Connected
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm sm:text-base font-semibold text-gray-800">Service Status</h2>
+                    <button
+                      onClick={() => {
+                        checkOllamaStatus();
+                        checkNLLBStatus();
+                      }}
+                      className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                    >
+                      Refresh All
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">
-                    {ollamaStatus.connected
-                      ? "Offline LLM is ready"
-                      : "Connect to Ollama for offline LLM"}
-                  </p>
-                  <button
-                    onClick={checkOllamaStatus}
-                    className="text-xs text-orange-600 hover:text-orange-700 font-medium"
-                  >
-                    Refresh Status
-                  </button>
-                </div>
 
-                {/* Save Session Button */}
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-4 sm:p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <svg
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-green-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                      />
-                    </svg>
-                    <h2 className="text-sm sm:text-base font-semibold text-gray-800">Save Session</h2>
+                  <div className="space-y-3">
+                    {/* Ollama Status */}
+                    <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-700">Ollama (DeepSeek R1)</span>
+                      </div>
+                      {ollamaStatus.checking ? (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
+                          Checking...
+                        </span>
+                      ) : ollamaStatus.connected ? (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
+                          Connected
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">
+                          Not Connected
+                        </span>
+                      )}
+                    </div>
+
+                    {/* NLLB Status */}
+                    <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-700">NLLB-200</span>
+                      </div>
+                      {nllbStatus.checking ? (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
+                          Checking...
+                        </span>
+                      ) : !nllbStatus.enabled ? (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-medium">
+                          Not Enabled
+                        </span>
+                      ) : nllbStatus.connected ? (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
+                          Connected
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">
+                          Not Connected
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Manually save your current work to the database
-                  </p>
-                  <button
-                    onClick={handleSaveSession}
-                    disabled={!currentSessionId && !englishContent && !topic}
-                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 active:from-green-700 active:to-green-800 transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300 flex items-center justify-center gap-2"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    Save to Database
-                  </button>
                 </div>
               </div>
 
@@ -1384,6 +1401,28 @@ const StitchPage: React.FC = () => {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Save Button - Simple Orange */}
+                      <button
+                        onClick={handleSaveSession}
+                        disabled={!currentSessionId && !englishContent && !topic}
+                        className="px-3 py-1.5 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 active:bg-orange-700 transition-all duration-200 shadow-sm hover:shadow disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300 flex items-center justify-center gap-1.5 text-xs sm:text-sm"
+                        title="Save session to database"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        <span className="hidden sm:inline">Save</span>
+                      </button>
                       {/* Quick Actions Bar */}
                       {getActiveContent() && (
                         <div className="flex items-center gap-1 mr-2 border-r border-orange-200 pr-2">
