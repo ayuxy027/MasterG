@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { stitchAPI, StitchApiError } from "../../services/stitchApi";
 
 // All 22 scheduled Indian languages + English (from language service)
@@ -46,7 +48,7 @@ interface ContentPreviewProps {
 }
 
 // OPTIMIZATION: Memoize ContentPreview to prevent unnecessary re-renders
-const ContentPreview: React.FC<ContentPreviewProps> = React.memo(({ content }) => {
+const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> = React.memo(({ content, isMarkdown = false }) => {
   if (!content) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 bg-gray-50 rounded-lg">
@@ -72,12 +74,44 @@ const ContentPreview: React.FC<ContentPreviewProps> = React.memo(({ content }) =
 
   return (
     <div className="h-full overflow-auto p-6 bg-white">
-      <div className="prose max-w-none">
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+      <div className="prose max-w-none prose-headings:text-gray-800 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700 prose-li:text-gray-700">
+        {isMarkdown ? (
+          <ReactMarkdown
+            className="markdown-content"
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: ({ children }) => <h1 className="text-3xl font-bold mb-4 mt-6 text-gray-900">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-2xl font-semibold mb-3 mt-5 text-gray-900">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-xl font-semibold mb-2 mt-4 text-gray-900">{children}</h3>,
+              h4: ({ children }) => <h4 className="text-lg font-semibold mb-2 mt-3 text-gray-800">{children}</h4>,
+              p: ({ children }) => <p className="mb-4 leading-relaxed text-gray-700">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2 ml-4 text-gray-700">{children}</ol>,
+              li: ({ children }) => <li className="ml-2">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+              em: ({ children }) => <em className="italic text-gray-800">{children}</em>,
+              code: ({ children, className }) => {
+                const isInline = !className;
+                return isInline ? (
+                  <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
+                ) : (
+                  <code className="block bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono text-gray-800">{children}</code>
+                );
+              },
+              pre: ({ children }) => <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">{children}</pre>,
+              blockquote: ({ children }) => <blockquote className="border-l-4 border-orange-300 pl-4 italic my-4 text-gray-600">{children}</blockquote>,
+              hr: () => <hr className="my-6 border-gray-300" />,
+            }}
+          >
             {content}
-          </pre>
-        </div>
+          </ReactMarkdown>
+        ) : (
+          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
+              {content}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -91,7 +125,6 @@ const StitchPage: React.FC = () => {
   const [topic, setTopic] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const translationAbortControllersRef = useRef<Map<string, AbortController>>(new Map()); // Track translation abort controllers
   const [generatedContent, setGeneratedContent] = useState("");
   const [englishContent, setEnglishContent] = useState(""); // Store original English content
   const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
@@ -110,18 +143,11 @@ const StitchPage: React.FC = () => {
   useEffect(() => {
     checkOllamaStatus();
     
-    // Cleanup: Cancel all ongoing translations on unmount
+    // Cleanup: Cancel content generation on unmount
     return () => {
-      // Cancel content generation
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      
-      // Cancel all translations
-      translationAbortControllersRef.current.forEach((controller) => {
-        controller.abort();
-      });
-      translationAbortControllersRef.current.clear();
     };
   }, []);
 
@@ -292,104 +318,27 @@ const StitchPage: React.FC = () => {
       return;
     }
 
-    // Cancel any existing translation for this language
-    const existingController = translationAbortControllersRef.current.get(targetLang);
-    if (existingController) {
-      existingController.abort();
-      translationAbortControllersRef.current.delete(targetLang);
-    }
-
-    // Create new abort controller for this translation
-    const controller = new AbortController();
-    translationAbortControllersRef.current.set(targetLang, controller);
-
     // UX IMPROVEMENT: Create tab immediately with skeleton UI
     setTranslatingLanguages(prev => new Set(prev).add(targetLang));
     setActiveTab(targetLang); // Switch to the new tab immediately
     setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
     setError(null);
 
-    // Initialize empty content for progressive updates
-    setTranslatedContent(prev => ({ ...prev, [targetLang]: "" }));
-
     try {
-      // Use streaming translation for progressive updates
-      const API_BASE_URL = import.meta.env.VITE_API_URL
-        ? `${import.meta.env.VITE_API_URL}/api`
-        : "http://localhost:5001/api";
-
-      const response = await fetch(`${API_BASE_URL}/stitch/translate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal, // Add abort signal for cancellation
-        body: JSON.stringify({
-          text: englishContent,
-          sourceLanguage: "en",
-          targetLanguage: targetLang,
-          stream: true, // Enable streaming
-        }),
+      // Use simple non-streaming translation (reliable and correct)
+      const resp = await stitchAPI.translateContent({
+        text: englishContent,
+        sourceLanguage: "en",
+        targetLanguage: targetLang,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error("No response body for streaming");
-      }
-
-      let buffer = "";
-      let accumulatedTranslation = "";
-      // REMOVED: Timeout limit - let it run as long as needed
-      // The system is designed to handle long translations gracefully
-
-      while (true) {
-        // Check if cancelled (user-initiated only)
-        if (controller.signal.aborted) {
-          reader.cancel();
-          throw new DOMException("Translation cancelled", "AbortError");
-        }
-
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Handle SSE format: "data: {...}\n\n"
-        let sepIndex = buffer.indexOf("\n\n");
-        while (sepIndex !== -1) {
-          const rawEvent = buffer.slice(0, sepIndex).trim();
-          buffer = buffer.slice(sepIndex + 2);
-          
-          if (rawEvent.startsWith("data: ")) {
-            const data = rawEvent.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-              
-              if (parsed.type === "chunk" && parsed.translated) {
-                // Progressive update: accumulate translated chunks (each chunk is a sentence)
-                accumulatedTranslation += parsed.translated + " ";
-                setTranslatedContent(prev => ({ ...prev, [targetLang]: accumulatedTranslation.trim() }));
-              } else if (parsed.type === "complete" && parsed.translated) {
-                // Final complete translation (use this as final result)
-                setTranslatedContent(prev => ({ ...prev, [targetLang]: parsed.translated }));
-                accumulatedTranslation = parsed.translated;
-              } else if (parsed.type === "error") {
-                throw new Error(parsed.error || "Translation failed");
-              }
-            } catch (e) {
-              // Skip invalid JSON, continue processing
-              console.warn("Failed to parse stream chunk:", e);
-            }
-          }
-          
-          sepIndex = buffer.indexOf("\n\n");
-        }
+      if (resp.success && resp.translated) {
+        setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
+        setActiveTab(targetLang);
+        setError(null);
+      } else {
+        const errorMsg = resp.error || "Translation failed. Please try again.";
+        setError(errorMsg);
       }
 
       // Translation complete
@@ -398,26 +347,7 @@ const StitchPage: React.FC = () => {
         newSet.delete(targetLang);
         return newSet;
       });
-      translationAbortControllersRef.current.delete(targetLang);
-      setError(null);
     } catch (err) {
-      // Don't show error if it was cancelled by user
-      if (err instanceof DOMException && err.name === "AbortError") {
-        // Cleanup on cancellation
-        setTranslatingLanguages(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(targetLang);
-          return newSet;
-        });
-        setTranslatedContent(prev => {
-          const newPrev = { ...prev };
-          delete newPrev[targetLang];
-          return newPrev;
-        });
-        translationAbortControllersRef.current.delete(targetLang);
-        return;
-      }
-
       const msg =
         err instanceof StitchApiError
           ? err.message
@@ -439,8 +369,6 @@ const StitchPage: React.FC = () => {
         delete newPrev[targetLang];
         return newPrev;
       });
-      
-      translationAbortControllersRef.current.delete(targetLang);
     } finally {
       setIsTranslating(prev => ({ ...prev, [targetLang]: false }));
     }
@@ -861,33 +789,21 @@ const StitchPage: React.FC = () => {
               {/* Tab Content */}
               <div className="flex-1 overflow-hidden">
                 {activeTab === "english" ? (
-                  <ContentPreview content={englishContent} />
+                  <ContentPreview content={englishContent} isMarkdown={true} />
                 ) : translatingLanguages.has(activeTab) ? (
                   // UX IMPROVEMENT: Show skeleton/loading UI while translating
                   <div className="h-full overflow-auto p-6 bg-white">
                     <div className="space-y-4">
                       {/* Skeleton loading animation */}
-                      {translatedContent[activeTab] ? (
-                        // Show partial content if available (streaming)
-                        <div className="prose max-w-none">
-                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                            <pre className="whitespace-pre-wrap text-sm font-sans text-gray-800 leading-relaxed">
-                              {translatedContent[activeTab]}
-                            </pre>
+                      <div className="space-y-3">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div key={i} className="animate-pulse">
+                            <div className="h-4 bg-gray-200 rounded w-full"></div>
+                            <div className="h-4 bg-gray-200 rounded w-5/6 mt-2"></div>
+                            <div className="h-4 bg-gray-200 rounded w-4/6 mt-2"></div>
                           </div>
-                        </div>
-                      ) : (
-                        // Show skeleton while waiting for first chunk
-                        <div className="space-y-3">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="animate-pulse">
-                              <div className="h-4 bg-gray-200 rounded w-full"></div>
-                              <div className="h-4 bg-gray-200 rounded w-5/6 mt-2"></div>
-                              <div className="h-4 bg-gray-200 rounded w-4/6 mt-2"></div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                        ))}
+                      </div>
                       {/* Loading indicator */}
                       <div className="flex items-center justify-center gap-2 text-orange-500 mt-4">
                         <svg
