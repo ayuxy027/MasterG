@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -44,6 +46,15 @@ const BenchmarksPage: React.FC = () => {
     { name: 'IndicTrans2\n200M', languages: 15, indic: 15, fill: '#fdba74' },
     { name: 'DeepSeek-R1', languages: 2, indic: 0, fill: '#fed7aa' },
     { name: 'Gemma\n270M', languages: 1, indic: 0, fill: '#fed7aa' },
+  ];
+
+  // Performance Evolution Data
+  const performanceEvolutionData = [
+    { phase: 'Phase 1\nIndicTrans2', time: 300, timeLabel: '5:00', speedup: 1, fill: '#fed7aa' },
+    { phase: 'Phase 2\nNLLB Initial', time: 240, timeLabel: '4:00', speedup: 1.25, fill: '#fdba74' },
+    { phase: 'Phase 3\nBatch Processing', time: 120, timeLabel: '2:00', speedup: 2.5, fill: '#fb923c' },
+    { phase: 'Phase 4\nCPU Threading', time: 90, timeLabel: '1:30', speedup: 3.3, fill: '#fa8c16' },
+    { phase: 'Phase 5\nFull Optimization', time: 30, timeLabel: '0:30', speedup: 10, fill: '#f97316' },
   ];
 
   const translationSizeData = [
@@ -606,6 +617,151 @@ const BenchmarksPage: React.FC = () => {
               <p className="text-gray-600 mt-3 text-sm">
                 It consistently outperforms smaller distilled MT models while remaining deployable on CPU systems.
               </p>
+            </div>
+
+            {/* Performance Evolution & Optimization */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-bold text-gray-900">Performance Evolution: 5 Minutes → 30 Seconds (10x Speedup)</h3>
+              </div>
+              <div className="p-6">
+                {/* Performance Evolution Chart */}
+                <div className="mb-6">
+                  <h4 className="text-base font-bold text-gray-900 mb-3">Translation Time Evolution</h4>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={performanceEvolutionData} margin={{ top: 20, right: 30, bottom: 80, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis
+                        dataKey="phase"
+                        tick={{ fontSize: 10, fill: '#64748b' }}
+                        interval={0}
+                        angle={-45}
+                        textAnchor="end"
+                        height={100}
+                        axisLine={{ stroke: '#e2e8f0' }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        axisLine={false}
+                        tickLine={false}
+                        label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#64748b' } }}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'time') {
+                            const minutes = Math.floor(value / 60);
+                            const seconds = value % 60;
+                            return [`${minutes}:${seconds.toString().padStart(2, '0')}`, 'Translation Time'];
+                          }
+                          return [value, name];
+                        }}
+                        cursor={{ stroke: '#f97316', strokeWidth: 2 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="time"
+                        stroke="#f97316"
+                        strokeWidth={3}
+                        dot={{ fill: '#f97316', r: 6 }}
+                        activeDot={{ r: 8 }}
+                        name="Translation Time"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Performance Timeline Table */}
+                <div className="mb-6">
+                  <h4 className="text-base font-bold text-gray-900 mb-3">Optimization Timeline</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="text-left p-3 font-semibold text-gray-900">Phase</th>
+                          <th className="text-left p-3 font-semibold text-gray-900">Model</th>
+                          <th className="text-center p-3 font-semibold text-gray-900">Time</th>
+                          <th className="text-center p-3 font-semibold text-gray-900">Speedup</th>
+                          <th className="text-left p-3 font-semibold text-gray-900">Key Optimization</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        <tr>
+                          <td className="p-3 font-medium text-gray-900">Phase 1</td>
+                          <td className="p-3 text-gray-700">IndicTrans2 (200M)</td>
+                          <td className="p-3 text-center text-gray-700">~5:00</td>
+                          <td className="p-3 text-center text-gray-700">Baseline</td>
+                          <td className="p-3 text-gray-700">Sequential sentence processing</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-medium text-gray-900">Phase 2</td>
+                          <td className="p-3 text-gray-700">NLLB-200 (600M)</td>
+                          <td className="p-3 text-center text-gray-700">~4:00</td>
+                          <td className="p-3 text-center text-orange-600 font-semibold">1.25x</td>
+                          <td className="p-3 text-gray-700">Better model quality</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-medium text-gray-900">Phase 3</td>
+                          <td className="p-3 text-gray-700">NLLB-200 + Batch</td>
+                          <td className="p-3 text-center text-gray-700">~2:00</td>
+                          <td className="p-3 text-center text-orange-600 font-semibold">2.5x</td>
+                          <td className="p-3 text-gray-700">Batch processing (8 sentences)</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-medium text-gray-900">Phase 4</td>
+                          <td className="p-3 text-gray-700">NLLB-200 + Threading</td>
+                          <td className="p-3 text-center text-gray-700">~1:30</td>
+                          <td className="p-3 text-center text-orange-600 font-semibold">3.3x</td>
+                          <td className="p-3 text-gray-700">CPU multi-threading, larger batches</td>
+                        </tr>
+                        <tr className="bg-orange-50/50">
+                          <td className="p-3 font-medium text-gray-900">Phase 5</td>
+                          <td className="p-3 text-gray-900 font-semibold">NLLB-200 + Full Opt</td>
+                          <td className="p-3 text-center text-orange-600 font-bold">~0:30</td>
+                          <td className="p-3 text-center text-orange-600 font-bold">10x</td>
+                          <td className="p-3 text-gray-900 font-semibold">Parallel batches, caching, auto-tuning</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Optimization Techniques */}
+                <div>
+                  <h4 className="text-base font-bold text-gray-900 mb-3">Optimization Techniques Applied</h4>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h5 className="font-semibold text-gray-900 mb-2">1. Batch Processing</h5>
+                      <p className="text-sm text-gray-700">Process 6-12 sentences simultaneously instead of one-by-one. <span className="font-semibold text-orange-600">8-10x speedup</span>.</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h5 className="font-semibold text-gray-900 mb-2">2. Parallel Batch Processing</h5>
+                      <p className="text-sm text-gray-700">ThreadPoolExecutor with 4 workers processes multiple batches in parallel. <span className="font-semibold text-orange-600">2-3x additional speedup</span>.</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h5 className="font-semibold text-gray-900 mb-2">3. Translation Caching</h5>
+                      <p className="text-sm text-gray-700">LRU cache with 1000 entries for instant retrieval of repeated translations. <span className="font-semibold text-orange-600">Near-instant for cached content</span>.</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h5 className="font-semibold text-gray-900 mb-2">4. Multi-threading Configuration</h5>
+                      <p className="text-sm text-gray-700">Optimized OMP, MKL, NUMEXPR, PyTorch threads for maximum CPU utilization. <span className="font-semibold text-orange-600">All CPU cores utilized</span>.</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h5 className="font-semibold text-gray-900 mb-2">5. CPU-Optimized Parameters</h5>
+                      <p className="text-sm text-gray-700">Greedy decoding (num_beams=1), lower penalties for faster inference. <span className="font-semibold text-orange-600">Faster with maintained quality</span>.</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <h5 className="font-semibold text-gray-900 mb-2">6. Auto-Detected Batch Sizing</h5>
+                      <p className="text-sm text-gray-700">Optimal batch size per device (CPU: 6-10, GPU: 12). <span className="font-semibold text-orange-600">Optimal for each hardware</span>.</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 md:col-span-2">
+                      <h5 className="font-semibold text-gray-900 mb-2">7. Model Caching</h5>
+                      <p className="text-sm text-gray-700">Persistent Python server keeps model loaded in memory. <span className="font-semibold text-orange-600">Zero startup overhead</span>.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Success Metrics */}
