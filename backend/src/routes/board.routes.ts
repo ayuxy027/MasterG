@@ -55,27 +55,17 @@ router.post("/generate", async (req: Request, res: Response) => {
 
     console.log(`📝 Board: Generating ${cardCount} cards for query: "${prompt}"...`);
 
-    // Updated prompt to generate results based on query, not prompts
-    const systemPrompt = `You are an educational content creator. The user has asked a question or provided a topic. Generate exactly ${cardCount} educational cards that answer their query or explain the topic.
+    // Simplified, clearer prompt for card generation
+    const systemPrompt = `Generate ${cardCount} cards about: ${prompt}
 
-RULES:
-1. Each card must have a clear, descriptive title (3-8 words)
-2. Content should directly address the user's query/topic (20-50 words per card)
-3. Content should be informative, educational, and well-structured
-4. Use simple, clear language suitable for students
-5. Each card should cover a different aspect or subtopic related to the query
-6. Return ONLY valid JSON array, no other text
+Rules:
+- Title: exactly 3 words
+- Content: max 3 sentences
+- JSON only
 
-OUTPUT FORMAT (strict JSON):
 [
-  {"title": "Card Title 1", "content": "Content that answers the query (20-50 words)..."},
-  {"title": "Card Title 2", "content": "Content that answers the query (20-50 words)..."},
-  {"title": "Card Title 3", "content": "Content that answers the query (20-50 words)..."}
-]
-
-User's query/topic: ${prompt}
-
-Generate exactly ${cardCount} cards as JSON array:`;
+  {"title": "Three Word Title", "content": "Sentence one. Sentence two. Sentence three."}
+]`;
 
     // Set up streaming headers
     if (stream) {
@@ -284,104 +274,289 @@ router.post("/action", async (req: Request, res: Response) => {
     console.log(`🎯 Board: Performing "${action}" on ${cardContents.length} cards`);
 
     const combinedContent = cardContents.join("\n\n---\n\n");
+    const cardTitles = cardContents.map((_, idx) => `Card ${idx + 1}`).join(", ");
     
+    // Helper function to parse partial JSON and extract cards incrementally
+    const parsePartialCards = (text: string): any[] => {
+      const cards: any[] = [];
+      try {
+        // Look for complete card objects in the text (handle escaped quotes)
+        const cardPattern = /\{\s*"title"\s*:\s*"((?:[^"\\]|\\.)+)"\s*,\s*"content"\s*:\s*"((?:[^"\\]|\\.)+)"\s*\}/g;
+        let match;
+        while ((match = cardPattern.exec(text)) !== null) {
+          cards.push({
+            title: match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n'),
+            content: match[2].replace(/\\"/g, '"').replace(/\\n/g, '\n')
+          });
+        }
+      } catch (e) {
+        // Ignore parsing errors for partial content
+      }
+      return cards;
+    };
+    
+    // Enhanced prompts for each action
+    const actionPrompts: Record<string, string> = {
+      summarize: `You are an expert educational content summarizer. Analyze the following educational content and create a comprehensive, well-structured summary.
+
+CONTENT TO SUMMARIZE:
+${combinedContent}
+
+REQUIREMENTS:
+1. Create a concise yet comprehensive summary (3-5 sentences)
+2. Capture the main ideas, key concepts, and essential takeaways
+3. Maintain logical flow and coherence
+4. Use clear, educational language suitable for students
+5. Highlight the most important information
+6. Ensure the summary stands alone as a complete understanding
+
+OUTPUT FORMAT:
+Write only the summary text. No prefixes, no labels, just the summary itself.
+
+Summary:`,
+      
+      actionPoints: `You are an expert at extracting actionable insights from educational content. Analyze the following content and extract clear, specific, actionable points.
+
+CONTENT TO ANALYZE:
+${combinedContent}
+
+REQUIREMENTS:
+1. Extract 5-7 key actionable points
+2. Each point should be:
+   - Specific and concrete (not vague)
+   - Actionable (something a student can actually do)
+   - Directly related to the content
+   - Clear and concise (one sentence per point)
+3. Format as bullet points using "•" symbol
+4. Prioritize points by importance
+5. Make each point independent and valuable
+
+OUTPUT FORMAT:
+• First actionable point
+• Second actionable point
+• Third actionable point
+(Continue with 5-7 total points)
+
+Action Points:`,
+      
+      mindMap: `You are an expert at creating educational mind maps. Analyze the following content and create a conceptual mind map with interconnected ideas.
+
+CONTENT TO ANALYZE:
+${combinedContent}
+
+REQUIREMENTS:
+1. Identify 4-6 core concepts or themes from the content
+2. Each concept should be:
+   - A distinct, important idea
+   - Related to other concepts in the map
+   - Clearly explained (40-60 words)
+3. Create a logical hierarchy or relationship structure
+4. Ensure concepts cover different aspects of the content
+5. Make titles concise (2-4 words) and descriptive
+
+OUTPUT FORMAT (JSON array only):
+[
+  {"title": "Core Concept 1", "content": "Detailed explanation of this concept and its importance..."},
+  {"title": "Core Concept 2", "content": "Detailed explanation of this concept and its relationships..."},
+  {"title": "Core Concept 3", "content": "Detailed explanation of this concept and its connections..."},
+  {"title": "Core Concept 4", "content": "Detailed explanation of this concept and its role..."}
+]
+
+Generate the JSON array:`,
+      
+      flashcards: `You are an expert at creating effective educational flashcards. Analyze the following content and create high-quality Q&A flashcards for studying.
+
+CONTENT TO ANALYZE:
+${combinedContent}
+
+REQUIREMENTS:
+1. Create 5-6 flashcards covering key information
+2. Each flashcard should have:
+   - A clear, specific question (as the title)
+   - A comprehensive answer (50-80 words)
+   - Focus on important facts, concepts, or applications
+   - Be suitable for active recall practice
+3. Questions should test understanding, not just recall
+4. Answers should be complete and educational
+5. Cover different aspects: definitions, processes, examples, applications
+
+OUTPUT FORMAT (JSON array only):
+[
+  {"title": "What is [key concept]?", "content": "Comprehensive answer explaining the concept, its importance, and relevant details..."},
+  {"title": "How does [process] work?", "content": "Step-by-step explanation of the process with key details..."},
+  {"title": "Why is [concept] important?", "content": "Explanation of importance, applications, and real-world relevance..."}
+]
+
+Generate the JSON array:`,
+    };
+
+    const prompt = actionPrompts[action];
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        message: `Unknown action: ${action}`,
+      });
+    }
+
     // Actions that generate cards
     const cardGeneratingActions = ["mindMap", "flashcards"];
     
     if (cardGeneratingActions.includes(action)) {
-      // Generate cards for mind map or flashcards
-      const actionPrompts: Record<string, string> = {
-        mindMap: `Create a mind map from this content. Generate exactly 4 concept cards in JSON format.\n\nRULES:\n1. Each card represents a key concept or idea\n2. Title: short concept name (2-5 words)\n3. Content: brief explanation (30-50 words)\n4. Return ONLY valid JSON array\n\nContent:\n${combinedContent}\n\nGenerate JSON array of 4 cards:`,
-        flashcards: `Create flashcards from this content. Generate exactly 4 Q&A flashcards in JSON format.\n\nRULES:\n1. Title: Question (as a question)\n2. Content: Clear answer (30-50 words)\n3. Make it educational and memorable\n4. Return ONLY valid JSON array\n\nContent:\n${combinedContent}\n\nGenerate JSON array of 4 flashcards:`,
-      };
+      // Use streaming for card-generating actions
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
 
-      const prompt = actionPrompts[action] || actionPrompts.mindMap;
+      let responseText = "";
+      let accumulatedResponse = "";
 
-      const response = await axios.post(
-        `${OLLAMA_URL}/api/generate`,
-        {
-          model: OLLAMA_MODEL,
-          prompt,
-          stream: false,
-          options: { temperature: 0.7, num_predict: 2000 },
-        },
-        { timeout: 120000 }
-      );
-
-      let cards = [];
-      let aiResponse = response.data.response || "";
-      aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-
-      // Parse JSON from response
       try {
-        const match = aiResponse.match(/\[[\s\S]*\]/);
-        if (match) {
-          cards = JSON.parse(match[0]);
-        }
-      } catch (e) {
-        console.log("Failed to parse AI response for cards");
-      }
-
-      // Fallback if parsing failed
-      if (!Array.isArray(cards) || cards.length === 0) {
-        cards = [
-          { title: "Concept 1", content: "Key idea from the selected cards." },
-          { title: "Concept 2", content: "Another important point." },
-          { title: "Concept 3", content: "Supporting detail or example." },
-          { title: "Concept 4", content: "Summary or conclusion." },
-        ];
-      }
-
-      // Normalize cards
-      cards = cards.slice(0, 4).map((c: any, idx: number) => ({
-        id: `${action}-${Date.now()}-${idx}`,
-        title: c.title || `Card ${idx + 1}`,
-        content: c.content || "",
-      }));
-
-      console.log(`✅ Board: Action "${action}" generated ${cards.length} cards`);
-
-      res.json({
-        success: true,
-        action,
-        cards,
-      });
-    } else {
-      // Text-based actions (summarize, actionPoints)
-      const actionPrompts: Record<string, string> = {
-        summarize: `Summarize the following content in 2-3 concise, well-structured sentences. Focus on the main ideas and key takeaways.\n\nContent:\n${combinedContent}\n\nSummary:`,
-        actionPoints: `Extract 4-5 clear, actionable bullet points from this content. Each point should be specific and useful for a student.\n\nContent:\n${combinedContent}\n\nAction Points:\n•`,
-      };
-
-      const prompt = actionPrompts[action] || actionPrompts.summarize;
-
-      const response = await axios.post(
-        `${OLLAMA_URL}/api/generate`,
-        {
+        // Use streaming generation
+        for await (const chunk of ollamaService.generateStream(prompt, {
           model: OLLAMA_MODEL,
-          prompt,
-          stream: false,
-          options: { temperature: 0.5, num_predict: 1500 },
-        },
-        { timeout: 90000 }
-      );
+          temperature: 0.7,
+        })) {
+          if (chunk.type === "response") {
+            responseText += chunk.content;
+            accumulatedResponse += chunk.content;
 
-      let result = response.data.response || "";
-      // Clean thinking tags
-      result = result.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+            // Try to parse partial cards as they stream in
+            const partialCards = parsePartialCards(accumulatedResponse);
+            if (partialCards.length > 0) {
+              const normalizedPartial = partialCards.map((c: any, idx: number) => ({
+                id: `${action}-partial-${Date.now()}-${idx}`,
+                title: c.title || `Card ${idx + 1}`,
+                content: c.content || "",
+              }));
+              res.write(`data: ${JSON.stringify({ type: "card", cards: normalizedPartial, partial: true })}\n\n`);
+            }
+          }
+        }
 
-      // For action points, ensure bullet format
-      if (action === "actionPoints" && !result.startsWith("•")) {
-        result = "• " + result;
+        // Final JSON parsing with multiple strategies (reuse extractJSON from generate endpoint)
+        let cards: any[] = [];
+        let cleanResponse = responseText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        
+        // Try extraction strategies (same as generate endpoint)
+        const extractJSON = (text: string): any[] | null => {
+          // Strategy 1: Direct JSON array
+          try {
+            const directMatch = text.match(/\[[\s\S]*\]/);
+            if (directMatch) return JSON.parse(directMatch[0]);
+          } catch (e) {}
+          
+          // Strategy 2: Markdown code blocks
+          try {
+            const codeBlockMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+            if (codeBlockMatch) return JSON.parse(codeBlockMatch[1]);
+          } catch (e) {}
+          
+          // Strategy 3: After prefixes
+          try {
+            const prefixMatch = text.match(/(?:cards?|result|output|json):?\s*(\[[\s\S]*?\])/i);
+            if (prefixMatch) return JSON.parse(prefixMatch[1]);
+          } catch (e) {}
+          
+          // Strategy 4: Individual card objects
+          try {
+            const cardMatches = text.matchAll(/\{\s*"title"\s*:\s*"([^"]+)"\s*,\s*"content"\s*:\s*"([^"]+)"\s*\}/g);
+            const extracted: any[] = [];
+            for (const match of cardMatches) {
+              extracted.push({ title: match[1], content: match[2] });
+            }
+            if (extracted.length > 0) return extracted;
+          } catch (e) {}
+          
+          return null;
+        };
+
+        const extracted = extractJSON(cleanResponse);
+        if (extracted && Array.isArray(extracted) && extracted.length > 0) {
+          cards = extracted;
+          console.log(`✅ Board: Successfully parsed ${cards.length} cards for "${action}"`);
+        } else {
+          console.log(`⚠️ Board: Failed to parse JSON for "${action}". Response preview:`, cleanResponse.slice(0, 200));
+          // Fallback
+          cards = action === "mindMap" ? [
+            { title: "Core Concept 1", content: "Key concept extracted from the selected cards." },
+            { title: "Core Concept 2", content: "Another important concept or theme." },
+            { title: "Core Concept 3", content: "Supporting concept or related idea." },
+            { title: "Core Concept 4", content: "Additional concept or application." },
+          ] : [
+            { title: "What is the main concept?", content: "Key information from the selected cards." },
+            { title: "How does this work?", content: "Explanation based on the content provided." },
+            { title: "Why is this important?", content: "Significance and relevance of the topic." },
+            { title: "What are the key details?", content: "Important details and examples." },
+          ];
+        }
+
+        // Normalize cards
+        cards = cards.slice(0, action === "mindMap" ? 6 : 6).map((c: any, idx: number) => ({
+          id: `${action}-${Date.now()}-${idx}`,
+          title: c.title || `${action === "mindMap" ? "Concept" : "Question"} ${idx + 1}`,
+          content: c.content || "",
+        }));
+
+        console.log(`✅ Board: Action "${action}" generated ${cards.length} cards`);
+
+        res.write(`data: ${JSON.stringify({ type: "complete", cards })}\n\n`);
+        res.end();
+      } catch (streamError: any) {
+        console.error(`Streaming error for ${action}:`, streamError.message);
+        res.write(`data: ${JSON.stringify({ type: "error", error: streamError.message })}\n\n`);
+        res.end();
       }
+    } else {
+      // Text-based actions (summarize, actionPoints) - use streaming for better UX
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
 
-      console.log(`✅ Board: Action "${action}" completed`);
+      let responseText = "";
+      let accumulatedText = "";
 
-      res.json({
-        success: true,
-        action,
-        result,
-      });
+      try {
+        // Use streaming generation
+        for await (const chunk of ollamaService.generateStream(prompt, {
+          model: OLLAMA_MODEL,
+          temperature: action === "summarize" ? 0.6 : 0.7,
+        })) {
+          if (chunk.type === "response") {
+            responseText += chunk.content;
+            accumulatedText += chunk.content;
+            
+            // Stream partial results for real-time updates
+            res.write(`data: ${JSON.stringify({ type: "partial", content: accumulatedText })}\n\n`);
+          }
+        }
+
+        let result = responseText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
+        // Post-process action points to ensure proper formatting
+        if (action === "actionPoints") {
+          // Ensure bullet points
+          if (!result.includes("•")) {
+            // Split by lines and add bullets
+            const lines = result.split("\n").filter(line => line.trim().length > 0);
+            result = lines.map(line => {
+              const trimmed = line.trim();
+              if (trimmed.startsWith("•") || trimmed.startsWith("-") || trimmed.startsWith("*")) {
+                return trimmed;
+              }
+              return `• ${trimmed}`;
+            }).join("\n");
+          }
+        }
+
+        console.log(`✅ Board: Action "${action}" completed`);
+
+        res.write(`data: ${JSON.stringify({ type: "complete", result })}\n\n`);
+        res.end();
+      } catch (streamError: any) {
+        console.error(`Streaming error for ${action}:`, streamError.message);
+        res.write(`data: ${JSON.stringify({ type: "error", error: streamError.message })}\n\n`);
+        res.end();
+      }
     }
   } catch (error: any) {
     console.error("Board action error:", error.message);

@@ -150,11 +150,12 @@ export async function generateCards(
 }
 
 /**
- * Perform AI action on selected cards
+ * Perform AI action on selected cards (with streaming support)
  */
 export async function performCardAction(
   action: CardAction,
-  cardContents: string[]
+  cardContents: string[],
+  onPartialUpdate?: (data: { type: string; cards?: CardData[]; content?: string }) => void
 ): Promise<ActionResponse> {
   try {
     if (cardContents.length === 0) {
@@ -176,7 +177,81 @@ export async function performCardAction(
       throw new Error(err.message || "Failed to perform action");
     }
 
-    return response.json();
+    // Handle streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      // Fallback to non-streaming
+      return response.json();
+    }
+
+    let buffer = "";
+    let cards: CardData[] = [];
+    let result = "";
+    let partialCards: CardData[] = [];
+    let partialResult = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          try {
+            const parsed = JSON.parse(data);
+
+            if (parsed.type === "card" && parsed.cards) {
+              // Partial card updates
+              partialCards = parsed.cards;
+              if (onPartialUpdate) {
+                onPartialUpdate({ type: "card", cards: partialCards });
+              }
+            } else if (parsed.type === "partial" && parsed.content) {
+              // Partial text updates (for summarize, actionPoints)
+              partialResult = parsed.content;
+              if (onPartialUpdate) {
+                onPartialUpdate({ type: "partial", content: partialResult });
+              }
+            } else if (parsed.type === "complete") {
+              if (parsed.cards) {
+                cards = parsed.cards;
+              }
+              if (parsed.result) {
+                result = parsed.result;
+              }
+            } else if (parsed.type === "error") {
+              throw new Error(parsed.error);
+            }
+          } catch (e) {
+            // Skip invalid JSON
+            continue;
+          }
+        }
+      }
+    }
+
+    // Return final result
+    if (cards.length > 0) {
+      return {
+        success: true,
+        action,
+        cards,
+      };
+    } else if (result) {
+      return {
+        success: true,
+        action,
+        result,
+      };
+    } else {
+      throw new Error("No result received from action");
+    }
   } catch (error: any) {
     console.error("Board API: Action error:", error);
     return {

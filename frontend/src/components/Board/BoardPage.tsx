@@ -85,8 +85,9 @@ const BoardPage: React.FC = () => {
   // Space key for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);
 
-  // Track streaming card IDs for real-time updates
-  const streamingCardIdsRef = useRef<Set<string>>(new Set());
+  // Track streaming action card IDs for real-time updates
+  const streamingActionCardIdsRef = useRef<Set<string>>(new Set());
+  const resultCardIdRef = useRef<string | null>(null);
 
   // ============================================================================
   // OLLAMA STATUS CHECK
@@ -421,51 +422,59 @@ const BoardPage: React.FC = () => {
     setThinkingText("");
     setShowThinkingModal(true);
 
-    // Clear previous streaming cards
-    streamingCardIdsRef.current.clear();
+    // Clear previous AI-generated sticky notes
     const screenCenterX = window.innerWidth / 2;
     const screenCenterY = window.innerHeight / 2;
     const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
     const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
-    const cardWidth = 280;
-    const cardHeight = 180;
+    const noteWidth = 250;
+    const noteHeight = 200;
     const spacing = 30;
 
-    const updateCardsPosition = (cardsToUpdate: CardData[]) => {
-      const totalWidth = cardsToUpdate.length * cardWidth + (cardsToUpdate.length - 1) * spacing;
+    // Convert cards to sticky notes
+    const updateStickyNotesFromCards = (cardsToUpdate: CardData[]) => {
+      const totalWidth = cardsToUpdate.length * noteWidth + (cardsToUpdate.length - 1) * spacing;
       const startX = canvasCenterX - totalWidth / 2;
 
-      setCards(prev => {
-        // Remove old streaming cards
-        const filtered = prev.filter(card => !streamingCardIdsRef.current.has(card.id));
+      setStickyNotes(prev => {
+        // Remove old streaming sticky notes (track by a prefix in ID)
+        const filtered = prev.filter(note => !note.id.startsWith('ai-generated-'));
 
-        // Add/update streaming cards
-        const updatedCards = cardsToUpdate.map((card, index) => {
-          const existingCard = filtered.find(c => c.id === card.id);
-          if (existingCard) {
-            // Update existing card position and content
+        // Create/update sticky notes from cards
+        const updatedNotes = cardsToUpdate.map((card, index) => {
+          const noteId = `ai-generated-${card.id}`;
+          const existingNote = filtered.find(n => n.id === noteId);
+
+          if (existingNote) {
+            // Update existing note
             return {
-              ...existingCard,
-              title: card.title,
-              content: card.content,
-              x: startX + index * (cardWidth + spacing),
-              y: canvasCenterY - cardHeight / 2,
+              ...existingNote,
+              text: `${card.title}\n\n${card.content}`,
+              x: startX + index * (noteWidth + spacing),
+              y: canvasCenterY - noteHeight / 2,
             };
           } else {
-            // Add new card
-            streamingCardIdsRef.current.add(card.id);
+            // Create new sticky note
             return {
-              ...card,
-              x: startX + index * (cardWidth + spacing),
-              y: canvasCenterY - cardHeight / 2,
-              width: cardWidth,
-              height: cardHeight,
-              isSelected: false,
+              id: noteId,
+              x: startX + index * (noteWidth + spacing),
+              y: canvasCenterY - noteHeight / 2,
+              text: `${card.title}\n\n${card.content}`,
+              color: '#FFE4B5', // Default peach color
+              width: noteWidth,
+              height: noteHeight,
+              enableMarkdown: false,
+              ruled: false,
+              fontSize: 14,
+              fontFamily: 'Inter',
+              isBold: false,
+              isItalic: false,
+              isUnderline: false,
             };
           }
         });
 
-        return [...filtered, ...updatedCards];
+        return [...filtered, ...updatedNotes];
       });
     };
 
@@ -477,18 +486,17 @@ const BoardPage: React.FC = () => {
           setThinkingText(thinking);
         },
         (streamingCards) => {
-          // Real-time card updates as they stream in
-          updateCardsPosition(streamingCards);
+          // Real-time sticky note updates as they stream in
+          updateStickyNotesFromCards(streamingCards);
         }
       );
 
-      // Final update with complete cards
-      updateCardsPosition(newCards);
+      // Final update with complete sticky notes
+      updateStickyNotesFromCards(newCards);
     } catch (error) {
       console.error('Failed to generate cards:', error);
     } finally {
       setIsGenerating(false);
-      streamingCardIdsRef.current.clear();
       // Keep thinking modal open briefly, then auto-close after 2 seconds
       setTimeout(() => {
         setShowThinkingModal(false);
@@ -509,55 +517,113 @@ const BoardPage: React.FC = () => {
     }
 
     setIsPerformingAction(true);
+    setThinkingText("");
+    setShowThinkingModal(true);
+
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
+    const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
+    const cardWidth = 280;
+    const cardHeight = 180;
+    const spacing = 30;
+
+
+    const updateActionCardsPosition = (cardsToUpdate: CardData[]) => {
+      const totalWidth = cardsToUpdate.length * cardWidth + (cardsToUpdate.length - 1) * spacing;
+      const startX = canvasCenterX - totalWidth / 2;
+
+      setCards(prev => {
+        // Remove old streaming action cards
+        const filtered = prev.filter(card => !streamingActionCardIdsRef.current.has(card.id));
+
+        // Add/update streaming cards
+        const updatedCards = cardsToUpdate.map((card, index) => {
+          const existingCard = filtered.find(c => c.id === card.id);
+          if (existingCard) {
+            return {
+              ...existingCard,
+              title: card.title,
+              content: card.content,
+              x: startX + index * (cardWidth + spacing),
+              y: canvasCenterY + 200,
+            };
+          } else {
+            streamingActionCardIdsRef.current.add(card.id);
+            return {
+              ...card,
+              x: startX + index * (cardWidth + spacing),
+              y: canvasCenterY + 200,
+              width: cardWidth,
+              height: cardHeight,
+              isSelected: false,
+            };
+          }
+        });
+
+        return [...filtered, ...updatedCards];
+      });
+    };
+
+    const updateActionResult = (content: string) => {
+      const resultCardId = resultCardIdRef.current || `result-${Date.now()}`;
+      resultCardIdRef.current = resultCardId;
+
+      setCards(prev => {
+        const existing = prev.find(c => c.id === resultCardId);
+        if (existing) {
+          // Update existing result card
+          return prev.map(c =>
+            c.id === resultCardId
+              ? { ...c, content }
+              : c
+          );
+        } else {
+          // Create new result card
+          const actionTitles: Record<CardAction, string> = {
+            summarize: 'Summary',
+            actionPoints: 'Action Points',
+            mindMap: 'Mind Map',
+            flashcards: 'Flashcards',
+          };
+          return [...prev, {
+            id: resultCardId,
+            title: actionTitles[action] || 'Result',
+            content,
+            x: canvasCenterX - 160,
+            y: canvasCenterY + 150,
+            width: 320,
+            height: action === 'actionPoints' ? 280 : 220,
+            isSelected: false,
+          }];
+        }
+      });
+    };
 
     try {
       const selectedCards = cards.filter(c => selectedCardIds.has(c.id));
       const contents = selectedCards.map(c => c.content);
-      const result = await performCardAction(action, contents);
+
+      const result = await performCardAction(action, contents, (partialData) => {
+        if (partialData.type === "card" && partialData.cards) {
+          // Real-time card updates for mindMap/flashcards
+          updateActionCardsPosition(partialData.cards);
+        } else if (partialData.type === "partial" && partialData.content) {
+          // Real-time text updates for summarize/actionPoints
+          updateActionResult(partialData.content);
+        }
+      });
 
       if (!result.success) {
         console.error('Action failed:', result.message);
         return;
       }
 
-      const screenCenterX = window.innerWidth / 2;
-      const screenCenterY = window.innerHeight / 2;
-      const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
-      const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
-
-      // Check if action generated cards (mindMap, flashcards)
+      // Final update with complete results
       if (result.cards && result.cards.length > 0) {
-        // Add generated cards
-        const cardWidth = 280;
-        const cardHeight = 180;
-        const spacing = 30;
-        const totalWidth = result.cards.length * cardWidth + (result.cards.length - 1) * spacing;
-        const startX = canvasCenterX - totalWidth / 2;
-
-        const cardsWithPosition: CardState[] = result.cards.map((card, index) => ({
-          ...card,
-          x: startX + index * (cardWidth + spacing),
-          y: canvasCenterY + 200,
-          width: cardWidth,
-          height: cardHeight,
-          isSelected: false,
-        }));
-
-        setCards(prev => [...prev, ...cardsWithPosition]);
+        updateActionCardsPosition(result.cards);
       } else if (result.result) {
-        // Create a single result card (summarize, actionPoints)
-        const newCard: CardState = {
-          id: `result-${Date.now()}`,
-          title: action === 'summarize' ? 'Summary' : action === 'actionPoints' ? 'Action Points' : `${action} Result`,
-          content: result.result,
-          x: canvasCenterX - 160,
-          y: canvasCenterY + 150,
-          width: 320,
-          height: 220,
-          isSelected: false,
-        };
-
-        setCards(prev => [...prev, newCard]);
+        updateActionResult(result.result);
       }
 
       setSelectedCardIds(new Set());
@@ -565,6 +631,13 @@ const BoardPage: React.FC = () => {
       console.error('Failed to perform card action:', error);
     } finally {
       setIsPerformingAction(false);
+      streamingActionCardIdsRef.current.clear();
+      resultCardIdRef.current = null;
+      // Keep thinking modal open briefly, then auto-close after 2 seconds
+      setTimeout(() => {
+        setShowThinkingModal(false);
+        setThinkingText("");
+      }, 2000);
     }
   }, [selectedCardIds, cards, isPerformingAction, viewOffset, zoom]);
 
