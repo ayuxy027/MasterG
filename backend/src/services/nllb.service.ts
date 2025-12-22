@@ -95,6 +95,22 @@ export class NLLBService {
         }, 5000);
       }
     });
+
+    // Graceful shutdown: Clean up Python process on Node.js exit
+    process.on("SIGINT", () => this.cleanup());
+    process.on("SIGTERM", () => this.cleanup());
+    process.on("exit", () => this.cleanup());
+  }
+
+  /**
+   * Clean up Python process on shutdown
+   */
+  private cleanup(): void {
+    if (this.pythonProcess) {
+      console.log("🛑 Shutting down NLLB server...");
+      this.pythonProcess.kill("SIGTERM");
+      this.pythonProcess = null;
+    }
   }
 
   /**
@@ -377,9 +393,10 @@ export class NLLBService {
           } else {
             request.resolve(parsed);
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           // ROBUST: Even if JSON parsing fails, return error
-          console.error(`Invalid JSON from NLLB server: ${err.message}. Output: ${responseLine.substring(0, 200)}`);
+          const errorMessage = err instanceof Error ? err.message : "Unknown error";
+          console.error(`Invalid JSON from NLLB server: ${errorMessage}. Output: ${responseLine.substring(0, 200)}`);
           request.resolve({
             success: false,
             error: `Invalid response from translation server`,

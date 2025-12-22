@@ -329,30 +329,30 @@ const StitchPage: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, englishContent, translatedContent]);
+  }, [activeTab, englishContent, translatedContent, handleCopy, handleDownload]);
 
   // Toast notification helpers
-  const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+  const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
-  };
+  }, []);
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
 
   // Copy to clipboard
-  const handleCopy = async (content: string) => {
+  const handleCopy = useCallback(async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
       showToast("Copied to clipboard!", "success");
     } catch (err) {
       showToast("Failed to copy to clipboard", "error");
     }
-  };
+  }, [showToast]);
 
   // Download as file
-  const handleDownload = (content: string, filename: string) => {
+  const handleDownload = useCallback((content: string, filename: string) => {
     try {
       const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -367,10 +367,10 @@ const StitchPage: React.FC = () => {
     } catch (err) {
       showToast("Failed to download file", "error");
     }
-  };
+  }, [showToast]);
 
   // Clear all content
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setGeneratedContent("");
     setEnglishContent("");
     setTranslatedContent({});
@@ -379,7 +379,7 @@ const StitchPage: React.FC = () => {
     setMarkdownEnabled(false);
     setError(null);
     showToast("Content cleared", "info");
-  };
+  }, [showToast]);
 
   // Word and character count
   const getWordCount = (text: string): number => {
