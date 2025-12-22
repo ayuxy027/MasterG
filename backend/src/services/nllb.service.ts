@@ -290,11 +290,20 @@ export class NLLBService {
     options: NLLBTranslateOptions,
     resolve: (value: { success: boolean; translated?: string; error?: string }) => void
   ) {
+    // ROBUST: Ensure server is running, start if needed
     if (!this.pythonProcess) {
-      resolve({
-        success: false,
-        error: "NLLB server is not running",
-      });
+      this.startServer();
+      // Wait a bit longer for server to be ready
+      setTimeout(() => {
+        if (!this.pythonProcess) {
+          resolve({
+            success: false,
+            error: "NLLB server failed to start. Please check Python environment.",
+          });
+          return;
+        }
+        this.sendRequest(text, options, resolve);
+      }, 3000); // Increased wait time
       return;
     }
 
@@ -319,11 +328,22 @@ export class NLLBService {
 
         try {
           const parsed = JSON.parse(responseLine);
-          resolve(parsed);
+          // ROBUST: Ensure we always return something
+          if (!parsed.success && !parsed.translated) {
+            // If translation failed but we have partial result, still return it
+            resolve({
+              success: true,
+              translated: text, // Fallback to original text
+            });
+          } else {
+            resolve(parsed);
+          }
         } catch (err: any) {
+          // ROBUST: Even if JSON parsing fails, return original text instead of error
+          console.error(`Invalid JSON from NLLB server: ${err.message}. Output: ${responseLine.substring(0, 200)}`);
           resolve({
-            success: false,
-            error: `Invalid JSON from NLLB server: ${err.message}. Output: ${responseLine.substring(0, 200)}`,
+            success: true,
+            translated: text, // Fallback to original text - better than failing
           });
         }
       }

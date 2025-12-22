@@ -279,10 +279,11 @@ const StitchPage: React.FC = () => {
       return;
     }
 
-    // Input validation: Check content length (prevent extremely long texts)
-    if (englishContent.length > 50000) {
-      setError("Content too long. Please limit to 50,000 characters.");
-      return;
+    // Input validation: Only warn for extremely long texts, don't block
+    // Let the system handle it - it's designed to work with any length
+    if (englishContent.length > 100000) {
+      // Just warn, don't block - system can handle it
+      console.warn("Very long content detected. Translation may take longer.");
     }
 
     // Check if already translated
@@ -344,16 +345,11 @@ const StitchPage: React.FC = () => {
 
       let buffer = "";
       let accumulatedTranslation = "";
-      const TIMEOUT_MS = 300000; // 5 minutes timeout
-      const startTime = Date.now();
+      // REMOVED: Timeout limit - let it run as long as needed
+      // The system is designed to handle long translations gracefully
 
       while (true) {
-        // Check timeout
-        if (Date.now() - startTime > TIMEOUT_MS) {
-          throw new Error("Translation timeout. The content may be too long.");
-        }
-
-        // Check if cancelled
+        // Check if cancelled (user-initiated only)
         if (controller.signal.aborted) {
           reader.cancel();
           throw new DOMException("Translation cancelled", "AbortError");

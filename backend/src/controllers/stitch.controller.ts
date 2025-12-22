@@ -44,7 +44,7 @@ export class StitchController {
         stream,
       } = req.body;
 
-      // Input validation and sanitization
+      // Input validation: Keep it cool - validate but don't restrict unnecessarily
       if (!topic || typeof topic !== "string") {
         res.status(400).json({
           success: false,
@@ -53,8 +53,8 @@ export class StitchController {
         return;
       }
 
-      // Sanitize topic (remove excessive whitespace, limit length)
-      const sanitizedTopic = topic.trim().slice(0, 500);
+      // Sanitize topic (remove excessive whitespace, but allow any reasonable length)
+      const sanitizedTopic = topic.trim();
       if (!sanitizedTopic) {
         res.status(400).json({
           success: false,
@@ -63,20 +63,20 @@ export class StitchController {
         return;
       }
 
-      // Validate grade
-      if (grade && (typeof grade !== "string" || grade.length > 50)) {
+      // Validate grade (be lenient - allow any string)
+      if (grade && typeof grade !== "string") {
         res.status(400).json({
           success: false,
-          error: "Invalid grade format",
+          error: "Grade must be a string",
         });
         return;
       }
 
-      // Validate subject
-      if (subject && (typeof subject !== "string" || subject.length > 100)) {
+      // Validate subject (be lenient - allow any string)
+      if (subject && typeof subject !== "string") {
         res.status(400).json({
           success: false,
-          error: "Invalid subject format",
+          error: "Subject must be a string",
         });
         return;
       }
@@ -222,7 +222,7 @@ export class StitchController {
         batchSize?: number;
       };
 
-      // Input validation and sanitization
+      // Input validation: Keep it cool - validate but don't restrict
       if (!text || typeof text !== "string" || !text.trim()) {
         res.status(400).json({
           success: false,
@@ -231,23 +231,26 @@ export class StitchController {
         return;
       }
 
-      // Limit text length to prevent memory issues
-      const MAX_TEXT_LENGTH = 50000;
-      if (text.length > MAX_TEXT_LENGTH) {
-        res.status(400).json({
-          success: false,
-          error: `Text too long. Maximum length is ${MAX_TEXT_LENGTH} characters.`,
-        });
-        return;
+      // REMOVED: Text length limit - system can handle any length
+      // The batch processing and streaming are designed to handle large texts gracefully
+      // Just log a warning for very long texts
+      if (text.length > 100000) {
+        console.warn(`Very long text detected (${text.length} chars). Translation may take longer.`);
       }
 
-      // Validate batch size if provided
-      if (batchSize !== undefined && (typeof batchSize !== "number" || batchSize < 1 || batchSize > 32)) {
-        res.status(400).json({
-          success: false,
-          error: "Batch size must be between 1 and 32",
-        });
-        return;
+      // Validate batch size if provided (be more lenient)
+      if (batchSize !== undefined) {
+        if (typeof batchSize !== "number" || batchSize < 1) {
+          res.status(400).json({
+            success: false,
+            error: "Batch size must be a positive number",
+          });
+          return;
+        }
+        // Allow larger batch sizes - system will auto-optimize if needed
+        if (batchSize > 64) {
+          console.warn(`Large batch size requested (${batchSize}). System will auto-optimize.`);
+        }
       }
 
       const srcCode =
