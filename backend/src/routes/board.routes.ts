@@ -86,6 +86,90 @@ Generate exactly ${cardCount} cards as JSON array:`;
 
     let thinkingText = "";
     let responseText = "";
+    let accumulatedResponse = "";
+
+    // Helper function to extract and parse JSON from text
+    const extractJSON = (text: string): any[] | null => {
+      // Strategy 1: Try to find JSON array directly
+      try {
+        const directMatch = text.match(/\[[\s\S]*\]/);
+        if (directMatch) {
+          return JSON.parse(directMatch[0]);
+        }
+      } catch (e) {
+        // Continue to next strategy
+      }
+
+      // Strategy 2: Look for JSON in markdown code blocks
+      try {
+        const codeBlockMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+        if (codeBlockMatch) {
+          return JSON.parse(codeBlockMatch[1]);
+        }
+      } catch (e) {
+        // Continue to next strategy
+      }
+
+      // Strategy 3: Try to find JSON after common prefixes
+      try {
+        const prefixMatch = text.match(/(?:cards?|result|output|json):?\s*(\[[\s\S]*?\])/i);
+        if (prefixMatch) {
+          return JSON.parse(prefixMatch[1]);
+        }
+      } catch (e) {
+        // Continue to next strategy
+      }
+
+      // Strategy 4: Try to extract individual card objects and combine
+      try {
+        const cardMatches = text.matchAll(/\{\s*"title"\s*:\s*"([^"]+)"\s*,\s*"content"\s*:\s*"([^"]+)"\s*\}/g);
+        const cards: any[] = [];
+        for (const match of cardMatches) {
+          cards.push({ title: match[1], content: match[2] });
+        }
+        if (cards.length > 0) {
+          return cards;
+        }
+      } catch (e) {
+        // Continue to next strategy
+      }
+
+      // Strategy 5: Try to fix common JSON issues (trailing commas, unquoted keys)
+      try {
+        let fixedText = text
+          .replace(/,\s*}/g, '}')  // Remove trailing commas in objects
+          .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
+          .replace(/(\w+):/g, '"$1":'); // Quote unquoted keys
+        
+        const match = fixedText.match(/\[[\s\S]*\]/);
+        if (match) {
+          return JSON.parse(match[0]);
+        }
+      } catch (e) {
+        // All strategies failed
+      }
+
+      return null;
+    };
+
+    // Helper function to parse partial JSON and extract cards incrementally
+    const parsePartialCards = (text: string): any[] => {
+      const cards: any[] = [];
+      try {
+        // Look for complete card objects in the text
+        const cardPattern = /\{\s*"title"\s*:\s*"([^"]+)"\s*,\s*"content"\s*:\s*"([^"]+)"\s*\}/g;
+        let match;
+        while ((match = cardPattern.exec(text)) !== null) {
+          cards.push({
+            title: match[1],
+            content: match[2]
+          });
+        }
+      } catch (e) {
+        // Ignore parsing errors for partial content
+      }
+      return cards;
+    };
 
     try {
       // Use streaming generation
@@ -100,27 +184,44 @@ Generate exactly ${cardCount} cards as JSON array:`;
           }
         } else if (chunk.type === "response") {
           responseText += chunk.content;
+          accumulatedResponse += chunk.content;
+
+          // Try to parse partial cards as they stream in
+          if (stream) {
+            const partialCards = parsePartialCards(accumulatedResponse);
+            if (partialCards.length > 0) {
+              // Send partial cards for real-time updates
+              const normalizedPartial = partialCards.map((c: any, idx: number) => ({
+                id: `card-partial-${Date.now()}-${idx}`,
+                title: c.title || `Card ${idx + 1}`,
+                content: c.content || "",
+              }));
+              res.write(`data: ${JSON.stringify({ type: "card", cards: normalizedPartial, partial: true })}\n\n`);
+            }
+          }
         }
       }
 
-      // Parse JSON from response
+      // Final JSON parsing with multiple strategies
       let cards: any[] = [];
-      try {
-        let cleanResponse = responseText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-        const match = cleanResponse.match(/\[[\s\S]*\]/);
-        if (match) {
-          cards = JSON.parse(match[0]);
-        }
-      } catch (e) {
-        console.log("Failed to parse AI response, using fallback");
-      }
-
-      // Fallback if parsing failed
-      if (!Array.isArray(cards) || cards.length === 0) {
+      let cleanResponse = responseText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      
+      // Try extraction strategies
+      const extracted = extractJSON(cleanResponse);
+      if (extracted && Array.isArray(extracted) && extracted.length > 0) {
+        cards = extracted;
+        console.log(`✅ Board: Successfully parsed ${cards.length} cards from AI response`);
+      } else {
+        // Log the response for debugging
+        console.log("⚠️ Board: Failed to parse JSON. Response preview:", cleanResponse.slice(0, 200));
+        console.log("⚠️ Board: Full response length:", cleanResponse.length);
+        
+        // Fallback: create cards from prompt
         cards = Array.from({ length: cardCount }, (_, idx) => ({
           title: `Key Point ${idx + 1}`,
           content: `Information about: ${prompt.slice(0, 50)}...`,
         }));
+        console.log("⚠️ Board: Using fallback cards");
       }
 
       // Normalize cards

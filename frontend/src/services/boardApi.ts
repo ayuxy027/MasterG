@@ -58,7 +58,8 @@ export async function checkOllamaStatus(): Promise<OllamaStatus> {
 export async function generateCards(
   prompt: string,
   cardCount: number = 3,
-  onThinkingUpdate?: (text: string) => void
+  onThinkingUpdate?: (text: string) => void,
+  onCardUpdate?: (cards: CardData[]) => void
 ): Promise<CardData[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/board/generate`, {
@@ -83,6 +84,7 @@ export async function generateCards(
     let buffer = "";
     let accumulatedThinking = "";
     let cards: CardData[] = [];
+    let latestPartialCards: CardData[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -103,9 +105,19 @@ export async function generateCards(
               if (onThinkingUpdate) {
                 onThinkingUpdate(accumulatedThinking);
               }
+            } else if (parsed.type === "card" && parsed.cards) {
+              // Real-time card updates as they're generated
+              latestPartialCards = parsed.cards;
+              if (onCardUpdate) {
+                onCardUpdate(latestPartialCards);
+              }
             } else if (parsed.type === "complete") {
               if (parsed.cards) {
                 cards = parsed.cards;
+                // Send final update
+                if (onCardUpdate) {
+                  onCardUpdate(cards);
+                }
               }
               if (parsed.thinkingText && onThinkingUpdate) {
                 onThinkingUpdate(parsed.thinkingText);
@@ -119,6 +131,11 @@ export async function generateCards(
           }
         }
       }
+    }
+
+    // Use final cards or fallback to partial cards
+    if (cards.length === 0 && latestPartialCards.length > 0) {
+      cards = latestPartialCards;
     }
 
     if (cards.length === 0) {

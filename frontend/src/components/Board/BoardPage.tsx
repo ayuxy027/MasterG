@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { FileText, ListChecks, Brain, BookOpen } from 'lucide-react';
 import { DottedBackground, CanvasDock, StickyNote } from './index';
 import { getToolById, Point, DrawingPath } from './tools';
 import Card from './Card';
@@ -83,6 +84,9 @@ const BoardPage: React.FC = () => {
 
   // Space key for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+
+  // Track streaming card IDs for real-time updates
+  const streamingCardIdsRef = useRef<Set<string>>(new Set());
 
   // ============================================================================
   // OLLAMA STATUS CHECK
@@ -417,35 +421,74 @@ const BoardPage: React.FC = () => {
     setThinkingText("");
     setShowThinkingModal(true);
 
-    try {
-      const newCards = await generateCards(prompt, count, (thinking) => {
-        setThinkingText(thinking);
-      });
-      const screenCenterX = window.innerWidth / 2;
-      const screenCenterY = window.innerHeight / 2;
-      const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
-      const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
+    // Clear previous streaming cards
+    streamingCardIdsRef.current.clear();
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
+    const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
+    const cardWidth = 280;
+    const cardHeight = 180;
+    const spacing = 30;
 
-      const cardWidth = 280;
-      const cardHeight = 180;
-      const spacing = 30;
-      const totalWidth = newCards.length * cardWidth + (newCards.length - 1) * spacing;
+    const updateCardsPosition = (cardsToUpdate: CardData[]) => {
+      const totalWidth = cardsToUpdate.length * cardWidth + (cardsToUpdate.length - 1) * spacing;
       const startX = canvasCenterX - totalWidth / 2;
 
-      const cardsWithPosition: CardState[] = newCards.map((card, index) => ({
-        ...card,
-        x: startX + index * (cardWidth + spacing),
-        y: canvasCenterY - cardHeight / 2,
-        width: cardWidth,
-        height: cardHeight,
-        isSelected: false,
-      }));
+      setCards(prev => {
+        // Remove old streaming cards
+        const filtered = prev.filter(card => !streamingCardIdsRef.current.has(card.id));
 
-      setCards(prev => [...prev, ...cardsWithPosition]);
+        // Add/update streaming cards
+        const updatedCards = cardsToUpdate.map((card, index) => {
+          const existingCard = filtered.find(c => c.id === card.id);
+          if (existingCard) {
+            // Update existing card position and content
+            return {
+              ...existingCard,
+              title: card.title,
+              content: card.content,
+              x: startX + index * (cardWidth + spacing),
+              y: canvasCenterY - cardHeight / 2,
+            };
+          } else {
+            // Add new card
+            streamingCardIdsRef.current.add(card.id);
+            return {
+              ...card,
+              x: startX + index * (cardWidth + spacing),
+              y: canvasCenterY - cardHeight / 2,
+              width: cardWidth,
+              height: cardHeight,
+              isSelected: false,
+            };
+          }
+        });
+
+        return [...filtered, ...updatedCards];
+      });
+    };
+
+    try {
+      const newCards = await generateCards(
+        prompt,
+        count,
+        (thinking) => {
+          setThinkingText(thinking);
+        },
+        (streamingCards) => {
+          // Real-time card updates as they stream in
+          updateCardsPosition(streamingCards);
+        }
+      );
+
+      // Final update with complete cards
+      updateCardsPosition(newCards);
     } catch (error) {
       console.error('Failed to generate cards:', error);
     } finally {
       setIsGenerating(false);
+      streamingCardIdsRef.current.clear();
       // Keep thinking modal open briefly, then auto-close after 2 seconds
       setTimeout(() => {
         setShowThinkingModal(false);
@@ -815,7 +858,7 @@ const BoardPage: React.FC = () => {
                   className="flex flex-col items-center gap-1 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Generate a concise summary"
                 >
-                  <span className="text-base">📝</span>
+                  <FileText className="w-5 h-5" />
                   <span>Summarize</span>
                 </button>
 
@@ -824,7 +867,7 @@ const BoardPage: React.FC = () => {
                   className="flex flex-col items-center gap-1 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Extract actionable bullet points"
                 >
-                  <span className="text-base">✅</span>
+                  <ListChecks className="w-5 h-5" />
                   <span>Action Points</span>
                 </button>
 
@@ -833,7 +876,7 @@ const BoardPage: React.FC = () => {
                   className="flex flex-col items-center gap-1 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Generate concept cards as mind map"
                 >
-                  <span className="text-base">🧠</span>
+                  <Brain className="w-5 h-5" />
                   <span>Mind Map</span>
                 </button>
 
@@ -842,7 +885,7 @@ const BoardPage: React.FC = () => {
                   className="flex flex-col items-center gap-1 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Create Q&A flashcards for studying"
                 >
-                  <span className="text-base">🎴</span>
+                  <BookOpen className="w-5 h-5" />
                   <span>Flashcards</span>
                 </button>
               </div>
