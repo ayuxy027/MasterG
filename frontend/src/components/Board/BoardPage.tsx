@@ -946,9 +946,9 @@ const BoardPage: React.FC = () => {
               isItalic={note.isItalic}
               isUnderline={note.isUnderline}
               zoom={zoom}
-              selectionMode={currentTool === 'select'}
+              selectionMode={currentTool === 'select' || currentTool === 'operate'}
               isSelected={selectedStickyNoteIds.has(note.id)}
-              onSelect={handleStickyNoteSelect}
+              onSelect={currentTool === 'operate' ? handleStickyNoteSelect : undefined}
               onUpdate={handleStickyNoteUpdate}
               onDelete={handleStickyNoteDelete}
             />
@@ -956,8 +956,8 @@ const BoardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* AI Actions Panel (when sticky notes or cards selected) */}
-      {(selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0) && (
+      {/* AI Actions Panel (when operate tool is active and sticky notes selected) */}
+      {currentTool === 'operate' && (selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-orange-200 p-4 flex items-center gap-3">
           {isPerformingAction ? (
             <div className="flex items-center gap-3 px-3 py-2">

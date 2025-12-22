@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { HiOutlineCursorClick } from 'react-icons/hi';
 import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuWrench } from 'react-icons/lu';
 import { MdOutlineEventNote } from 'react-icons/md';
-import { Bot, X, ZoomIn, ZoomOut, Maximize2, FileText, ListChecks, Brain, BookOpen } from 'lucide-react';
+import { Bot, X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 interface CanvasDockProps {
   currentTool: string;
@@ -35,9 +35,7 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
   onZoomChange,
   onZoomReset,
   onGenerateCards,
-  onCardAction,
   isGenerating = false,
-  hasSelection = false,
 }) => {
   const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
   const [generatePrompt, setGeneratePrompt] = useState('');
@@ -70,6 +68,7 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
       { id: 'pen', icon: LuPencil, label: 'Pen' },
       { id: 'eraser', icon: LuEraser, label: 'Eraser' },
       { id: 'sticky-note', icon: MdOutlineEventNote, label: 'Note' },
+      { id: 'operate', icon: LuWrench, label: 'Operate' },
     ],
     []
   );
@@ -173,92 +172,6 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Operate Button */}
-            <div className="relative" ref={operatePanelRef}>
-              <button
-                onClick={() => setIsOperatePanelOpen(!isOperatePanelOpen)}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${isOperatePanelOpen
-                    ? 'bg-orange-500 text-white shadow-lg'
-                    : hasSelection
-                      ? 'text-orange-600 hover:bg-orange-50'
-                      : 'text-gray-400 hover:bg-gray-50'
-                  }`}
-                title="AI Actions (Select notes first)"
-                disabled={!hasSelection}
-              >
-                <LuWrench size={18} />
-                <span className="text-xs font-medium">Operate</span>
-              </button>
-
-              {/* Operate Panel */}
-              {isOperatePanelOpen && hasSelection && onCardAction && (
-                <div className="absolute bottom-14 left-0 w-80 bg-white rounded-xl shadow-xl border border-orange-200 p-4 z-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <LuWrench size={20} className="text-orange-500" />
-                      <h3 className="font-semibold text-gray-800">AI Actions</h3>
-                    </div>
-                    <button
-                      onClick={() => setIsOperatePanelOpen(false)}
-                      className="p-1 hover:bg-gray-100 rounded-lg"
-                    >
-                      <X size={16} className="text-gray-500" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => {
-                        onCardAction('summarize');
-                        setIsOperatePanelOpen(false);
-                      }}
-                      className="flex flex-col items-center gap-2 px-4 py-3 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
-                      title="Generate a concise summary"
-                    >
-                      <FileText className="w-5 h-5" />
-                      <span>Summarize</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        onCardAction('actionPoints');
-                        setIsOperatePanelOpen(false);
-                      }}
-                      className="flex flex-col items-center gap-2 px-4 py-3 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
-                      title="Extract actionable bullet points"
-                    >
-                      <ListChecks className="w-5 h-5" />
-                      <span>Action Points</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        onCardAction('mindMap');
-                        setIsOperatePanelOpen(false);
-                      }}
-                      className="flex flex-col items-center gap-2 px-4 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
-                      title="Generate concept cards as mind map"
-                    >
-                      <Brain className="w-5 h-5" />
-                      <span>Mind Map</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        onCardAction('flashcards');
-                        setIsOperatePanelOpen(false);
-                      }}
-                      className="flex flex-col items-center gap-2 px-4 py-3 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
-                      title="Create Q&A flashcards for studying"
-                    >
-                      <BookOpen className="w-5 h-5" />
-                      <span>Flashcards</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-          </div>
 
           {/* Divider */}
           <div className="w-px h-8 bg-orange-200" />
