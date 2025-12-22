@@ -691,6 +691,58 @@ const StitchPage: React.FC = () => {
     }
   }, [userId, currentSessionId, topic, selectedGrade, selectedSubject, customGrade, customSubject, englishContent, thinkingText, translatedContent, markdownEnabled]);
 
+  // Manual save session
+  const handleSaveSession = useCallback(async () => {
+    if (!currentSessionId) {
+      // Create new session if none exists
+      const newSessionId = generateSessionId();
+      setCurrentSessionId(newSessionId);
+      // Wait a bit for state to update, then save
+      setTimeout(async () => {
+        try {
+          await stitchAPI.saveSession(userId, newSessionId, {
+            topic,
+            grade: selectedGrade,
+            subject: selectedSubject,
+            customGrade: customGrade || undefined,
+            customSubject: customSubject || undefined,
+            englishContent,
+            thinkingText: thinkingText || undefined,
+            translatedContent,
+            markdownEnabled,
+          });
+          showToast("Session saved successfully!", "success");
+          // Reload sessions list to show the new one
+          loadSessions();
+        } catch (error) {
+          console.error("Failed to save session:", error);
+          showToast("Failed to save session", "error");
+        }
+      }, 100);
+      return;
+    }
+
+    try {
+      await stitchAPI.saveSession(userId, currentSessionId, {
+        topic,
+        grade: selectedGrade,
+        subject: selectedSubject,
+        customGrade: customGrade || undefined,
+        customSubject: customSubject || undefined,
+        englishContent,
+        thinkingText: thinkingText || undefined,
+        translatedContent,
+        markdownEnabled,
+      });
+      showToast("Session saved successfully!", "success");
+      // Reload sessions list to update the UI
+      loadSessions();
+    } catch (error) {
+      console.error("Failed to save session:", error);
+      showToast("Failed to save session", "error");
+    }
+  }, [userId, currentSessionId, topic, selectedGrade, selectedSubject, customGrade, customSubject, englishContent, thinkingText, translatedContent, markdownEnabled, showToast, loadSessions]);
+
   // Load sessions on mount
   useEffect(() => {
     loadSessions();
@@ -1221,6 +1273,49 @@ const StitchPage: React.FC = () => {
                     className="text-xs text-orange-600 hover:text-orange-700 font-medium"
                   >
                     Refresh Status
+                  </button>
+                </div>
+
+                {/* Save Session Button */}
+                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-orange-200/60 p-4 sm:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-green-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                      />
+                    </svg>
+                    <h2 className="text-sm sm:text-base font-semibold text-gray-800">Save Session</h2>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Manually save your current work to the database
+                  </p>
+                  <button
+                    onClick={handleSaveSession}
+                    disabled={!currentSessionId && !englishContent && !topic}
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 active:from-green-700 active:to-green-800 transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    Save to Database
                   </button>
                 </div>
               </div>
