@@ -634,8 +634,8 @@ const BenchmarksPage: React.FC = () => {
                     <AreaChart data={performanceEvolutionData} margin={{ top: 20, right: 30, bottom: 80, left: 20 }}>
                       <defs>
                         <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#fed7aa" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#fed7aa" stopOpacity={0.05} />
+                          <stop offset="5%" stopColor="#fed7aa" stopOpacity={0.6} />
+                          <stop offset="95%" stopColor="#fed7aa" stopOpacity={0.15} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -653,6 +653,7 @@ const BenchmarksPage: React.FC = () => {
                         tick={{ fontSize: 11, fill: '#64748b' }}
                         axisLine={false}
                         tickLine={false}
+                        tickFormatter={(value) => `${value} sec`}
                         label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#64748b' } }}
                       />
                       <Tooltip
