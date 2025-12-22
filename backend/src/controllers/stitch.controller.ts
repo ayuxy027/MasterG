@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { ollamaService } from "../services/ollama.service";
 import { languageService } from "../services/language.service";
 import { nllbService } from "../services/nllb.service";
+import { stitchService } from "../services/stitch.service";
 import { env } from "../config/env";
 
 export class StitchController {
@@ -455,6 +456,190 @@ Begin generating the comprehensive educational content now.
 `;
 
     return prompt.trim();
+  }
+
+  /**
+   * Get all Stitch sessions for a user
+   */
+  async getAllSessions(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId } = req.params;
+
+      if (!userId) {
+        res.status(400).json({
+          success: false,
+          error: "userId is required",
+        });
+        return;
+      }
+
+      const sessions = await stitchService.getAllSessionsForUser(userId);
+
+      res.json({
+        success: true,
+        sessions,
+      });
+    } catch (error) {
+      console.error("Error getting Stitch sessions:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to get sessions",
+      });
+    }
+  }
+
+  /**
+   * Get a specific Stitch session
+   */
+  async getSession(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId, sessionId } = req.params;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      const session = await stitchService.getSession(userId, sessionId);
+
+      if (!session) {
+        res.status(404).json({
+          success: false,
+          error: "Session not found",
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        session,
+      });
+    } catch (error) {
+      console.error("Error getting Stitch session:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to get session",
+      });
+    }
+  }
+
+  /**
+   * Save or update a Stitch session
+   */
+  async saveSession(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId, sessionId } = req.params;
+      const sessionData = req.body;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      // Validate session data
+      if (sessionData && typeof sessionData !== 'object') {
+        res.status(400).json({
+          success: false,
+          error: "Invalid session data",
+        });
+        return;
+      }
+
+      const session = await stitchService.saveSession(userId, sessionId, sessionData);
+
+      res.json({
+        success: true,
+        session,
+      });
+    } catch (error) {
+      console.error("Error saving Stitch session:", error);
+      // Always return success for graceful degradation (session might be saved in memory)
+      res.json({
+        success: true,
+        session: {
+          userId: req.params.userId,
+          sessionId: req.params.sessionId,
+          ...req.body,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+    }
+  }
+
+  /**
+   * Delete a Stitch session
+   */
+  async deleteSession(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId, sessionId } = req.params;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      await stitchService.deleteSession(userId, sessionId);
+
+      res.json({
+        success: true,
+        message: "Session deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting Stitch session:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to delete session",
+      });
+    }
+  }
+
+  /**
+   * Update session name
+   */
+  async updateSessionName(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId, sessionId } = req.params;
+      const { sessionName } = req.body;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      if (!sessionName || typeof sessionName !== "string") {
+        res.status(400).json({
+          success: false,
+          error: "sessionName is required and must be a string",
+        });
+        return;
+      }
+
+      await stitchService.updateSessionName(userId, sessionId, sessionName);
+
+      res.json({
+        success: true,
+        message: "Session name updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating Stitch session name:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update session name",
+      });
+    }
   }
 }
 

@@ -18,7 +18,6 @@ frontend/node_modules/
 dist/
 build/
 out/
-.next/
 .vercel/
 coverage/
 *.tsbuildinfo

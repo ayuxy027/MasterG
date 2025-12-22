@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   Area,
   AreaChart,
   XAxis,
@@ -240,7 +238,10 @@ const BenchmarksPage: React.FC = () => {
                     />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}
-                      formatter={(value: number) => [`${value}%`, 'Reasoning Score']}
+                      formatter={(value: number | undefined) => {
+                        if (value === undefined) return '';
+                        return [`${value}%`, 'Reasoning Score'];
+                      }}
                       cursor={{ fill: 'rgba(249, 115, 22, 0.05)' }}
                     />
                     <Bar dataKey="score" radius={[6, 6, 0, 0]}>
@@ -276,7 +277,10 @@ const BenchmarksPage: React.FC = () => {
                     />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}
-                      formatter={(value: number) => [`${value} t/s`, 'Inference Speed']}
+                      formatter={(value: number | undefined) => {
+                        if (value === undefined) return '';
+                        return [`${value} t/s`, 'Inference Speed'];
+                      }}
                       cursor={{ fill: 'rgba(249, 115, 22, 0.05)' }}
                     />
                     <Bar dataKey="speed" radius={[6, 6, 0, 0]}>
@@ -299,7 +303,11 @@ const BenchmarksPage: React.FC = () => {
                   <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => `${value} GB`} />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}
-                    formatter={(value: number, name: string) => [`${value} GB`, name === 'disk' ? 'Disk Size (Quantized)' : 'RAM Usage']}
+                    formatter={(value: number | undefined, name: string | undefined) => {
+                      if (value === undefined) return '';
+                      const label = name === 'disk' ? 'Disk Size (Quantized)' : 'RAM Usage';
+                      return [`${value} GB`, label];
+                    }}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="disk" fill="#f97316" name="Disk Size (Quantized)" radius={[6, 6, 0, 0]} />
@@ -504,7 +512,10 @@ const BenchmarksPage: React.FC = () => {
                     <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}
-                      formatter={(value: number) => [`${value} languages`, 'Total Languages']}
+                      formatter={(value: number | undefined) => {
+                        if (value === undefined) return '';
+                        return [`${value} languages`, 'Total Languages'];
+                      }}
                       cursor={{ fill: 'rgba(249, 115, 22, 0.05)' }}
                     />
                     <Bar dataKey="languages" name="Total Languages" radius={[6, 6, 0, 0]}>
@@ -535,7 +546,11 @@ const BenchmarksPage: React.FC = () => {
                     <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => `${value} GB`} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}
-                      formatter={(value: number, name: string) => [`${value} GB`, name === 'modelSize' ? 'Model Size' : 'Disk Usage']}
+                      formatter={(value: number | undefined, name: string | undefined) => {
+                        if (value === undefined) return '';
+                        const label = name === 'modelSize' ? 'Model Size' : 'Disk Usage';
+                        return [`${value} GB`, label];
+                      }}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
                     <Bar dataKey="modelSize" fill="#f97316" name="Model Size" radius={[6, 6, 0, 0]} />

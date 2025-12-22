@@ -61,5 +61,50 @@ router.get(
   asyncHandler(stitchController.checkNLLBStatus.bind(stitchController))
 );
 
+/**
+ * GET /api/stitch/sessions/:userId
+ * Get all Stitch sessions for a user
+ */
+router.get(
+  "/sessions/:userId",
+  asyncHandler(stitchController.getAllSessions.bind(stitchController))
+);
+
+/**
+ * GET /api/stitch/sessions/:userId/:sessionId
+ * Get a specific Stitch session
+ */
+router.get(
+  "/sessions/:userId/:sessionId",
+  asyncHandler(stitchController.getSession.bind(stitchController))
+);
+
+/**
+ * POST /api/stitch/sessions/:userId/:sessionId
+ * Save or update a Stitch session
+ */
+router.post(
+  "/sessions/:userId/:sessionId",
+  asyncHandler(stitchController.saveSession.bind(stitchController))
+);
+
+/**
+ * DELETE /api/stitch/sessions/:userId/:sessionId
+ * Delete a Stitch session
+ */
+router.delete(
+  "/sessions/:userId/:sessionId",
+  asyncHandler(stitchController.deleteSession.bind(stitchController))
+);
+
+/**
+ * PATCH /api/stitch/sessions/:userId/:sessionId/name
+ * Update session name
+ */
+router.patch(
+  "/sessions/:userId/:sessionId/name",
+  asyncHandler(stitchController.updateSessionName.bind(stitchController))
+);
+
 export default router;
 
