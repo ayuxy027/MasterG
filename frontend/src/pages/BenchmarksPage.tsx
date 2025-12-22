@@ -52,11 +52,11 @@ const BenchmarksPage: React.FC = () => {
 
   // Performance Evolution Data
   const performanceEvolutionData = [
-    { phase: 'Phase 1\nIndicTrans2', time: 300, timeLabel: '5:00', speedup: 1, fill: '#fed7aa' },
-    { phase: 'Phase 2\nNLLB Initial', time: 240, timeLabel: '4:00', speedup: 1.25, fill: '#fdba74' },
-    { phase: 'Phase 3\nBatch Processing', time: 120, timeLabel: '2:00', speedup: 2.5, fill: '#fb923c' },
-    { phase: 'Phase 4\nCPU Threading', time: 90, timeLabel: '1:30', speedup: 3.3, fill: '#fa8c16' },
-    { phase: 'Phase 5\nFull Optimization', time: 30, timeLabel: '0:30', speedup: 10, fill: '#f97316' },
+    { phase: 'Phase 1', phaseFull: 'Phase 1\nIndicTrans2', time: 300, timeLabel: '5:00', speedup: 1, fill: '#fed7aa' },
+    { phase: 'Phase 2', phaseFull: 'Phase 2\nNLLB Initial', time: 240, timeLabel: '4:00', speedup: 1.25, fill: '#fdba74' },
+    { phase: 'Phase 3', phaseFull: 'Phase 3\nBatch Processing', time: 120, timeLabel: '2:00', speedup: 2.5, fill: '#fb923c' },
+    { phase: 'Phase 4', phaseFull: 'Phase 4\nCPU Threading', time: 90, timeLabel: '1:30', speedup: 3.3, fill: '#fa8c16' },
+    { phase: 'Phase 5', phaseFull: 'Phase 5\nFull Optimization', time: 30, timeLabel: '0:30', speedup: 10, fill: '#f97316' },
   ];
 
   const translationSizeData = [
@@ -105,8 +105,8 @@ const BenchmarksPage: React.FC = () => {
               <button
                 onClick={() => setActiveSection('llm')}
                 className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeSection === 'llm'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 Language Models
@@ -114,8 +114,8 @@ const BenchmarksPage: React.FC = () => {
               <button
                 onClick={() => setActiveSection('translation')}
                 className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeSection === 'translation'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 Translation Models
@@ -653,18 +653,22 @@ const BenchmarksPage: React.FC = () => {
                         tick={{ fontSize: 11, fill: '#64748b' }}
                         axisLine={false}
                         tickLine={false}
-                        tickFormatter={(value) => `${value} sec`}
-                        label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#64748b' } }}
+                        tickFormatter={(value) => {
+                          const minutes = Math.floor(value / 60);
+                          const seconds = value % 60;
+                          return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        }}
+                        label={{ value: 'Time (minutes)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#64748b' } }}
                       />
                       <Tooltip
                         contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}
-                        formatter={(value: number, name: string) => {
-                          if (name === 'time') {
-                            const minutes = Math.floor(value / 60);
-                            const seconds = value % 60;
-                            return [`${minutes}:${seconds.toString().padStart(2, '0')}`, 'Translation Time'];
-                          }
-                          return [value, name];
+                        formatter={(value: number | undefined) => {
+                          if (value === undefined) return '';
+                          return `${value} sec`;
+                        }}
+                        labelFormatter={(label) => {
+                          const dataPoint = performanceEvolutionData.find(d => d.phase === label);
+                          return dataPoint ? dataPoint.phaseFull : label;
                         }}
                         cursor={{ stroke: '#f97316', strokeWidth: 2 }}
                       />
