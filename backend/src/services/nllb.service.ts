@@ -6,7 +6,7 @@ import { env } from "../config/env";
 export interface NLLBTranslateOptions {
   srcLang: string; // e.g. eng_Latn
   tgtLang: string; // e.g. hin_Deva
-  batchSize?: number; // Batch size for translation (default: 8)
+  batchSize?: number; // Batch size for translation (auto-detected based on CPU/GPU)
   useCache?: boolean; // Whether to use cache (default: true)
 }
 
@@ -199,7 +199,7 @@ export class NLLBService {
         src_lang: options.srcLang,
         tgt_lang: options.tgtLang,
         stream: true,
-        batch_size: options.batchSize || 8, // Default batch size of 8
+        batch_size: options.batchSize || undefined, // Auto-detect if not specified
       }) + "\n";
 
       let stdoutBuffer = "";
@@ -292,7 +292,7 @@ export class NLLBService {
       text,
       src_lang: options.srcLang,
       tgt_lang: options.tgtLang,
-      batch_size: options.batchSize || 8, // Default batch size of 8
+      batch_size: options.batchSize || undefined, // Auto-detect if not specified
     }) + "\n";
 
     let stdoutBuffer = "";

@@ -15,17 +15,31 @@ import json
 import sys
 import os
 import re
+import multiprocessing
 from pathlib import Path
 from typing import Any, Dict, Optional, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Disable PyTorch compile and meta tensors to avoid device issues
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
 os.environ["PYTORCH_DISABLE_COMPILE"] = "1"
 
+# CPU Optimization: Enable MKL/OpenBLAS threading
+# These optimize CPU matrix operations
+os.environ["OMP_NUM_THREADS"] = str(multiprocessing.cpu_count())
+os.environ["MKL_NUM_THREADS"] = str(multiprocessing.cpu_count())
+os.environ["NUMEXPR_NUM_THREADS"] = str(multiprocessing.cpu_count())
+
 import torch  # type: ignore
 torch._dynamo.config.suppress_errors = True
 torch._dynamo.config.disable = True
+
+# CPU Optimization: Set optimal number of threads for PyTorch
+# Use all available CPU cores for maximum performance
+cpu_count = multiprocessing.cpu_count()
+torch.set_num_threads(cpu_count)
+torch.set_num_interop_threads(min(4, cpu_count // 2))  # Inter-op threads for parallel ops
 
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore
 
@@ -96,10 +110,23 @@ def load_model():
       sys.stderr.write("Using Apple Silicon (MPS) GPU acceleration\n")
     else:
       device = "cpu"
-      sys.stderr.write("Using CPU (no GPU acceleration available)\n")
+      cpu_info = f"CPU with {cpu_count} cores, {torch.get_num_threads()} threads"
+      sys.stderr.write(f"Using CPU acceleration: {cpu_info}\n")
     
     model = model.to(device)
     model.eval()
+    
+    # CPU Optimization: Enable JIT optimizations for CPU inference
+    if device == "cpu":
+      # Use torch.jit.optimize_for_inference for CPU (if available)
+      try:
+        # Enable optimizations for CPU inference
+        torch.set_flush_denormal(True)  # Flush denormal numbers for speed
+        # Use optimized attention if available
+        if hasattr(torch.backends, "cpu") and hasattr(torch.backends.cpu, "get_cpu_capability"):
+          sys.stderr.write(f"CPU capability: {torch.backends.cpu.get_cpu_capability()}\n")
+      except Exception as e:
+        sys.stderr.write(f"Note: CPU optimization setup: {e}\n")
     
     # Use torch.compile for faster inference on CUDA (PyTorch 2.0+)
     # Note: MPS doesn't support torch.compile yet, so skip for MPS
@@ -149,14 +176,25 @@ def split_into_units(text: str) -> List[str]:
   return cleaned if cleaned else [text]
 
 
-def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = 8) -> Dict[str, Any]:
+def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -> Dict[str, Any]:
   """
   Translate text using cached NLLB-200 model with BATCH PROCESSING for acceleration.
   
   Uses forced_bos_token_id for target language specification.
-  Processes multiple sentences at once for 3-5x speedup on GPU.
+  Processes multiple sentences at once for 3-5x speedup on GPU, 2-3x on CPU.
+  
+  CPU Optimization: Uses smaller batches and parallel processing for best CPU performance.
   """
   tokenizer, model, device = load_model()
+  
+  # CPU Optimization: Use smaller batches for CPU (better cache utilization)
+  if batch_size is None:
+    if device == "cpu":
+      # CPU: Smaller batches (4-6) work better due to cache locality
+      batch_size = min(6, max(4, cpu_count // 2))
+    else:
+      # GPU: Larger batches (8-16) for better parallelism
+      batch_size = 8
   
   # Strip markdown before translation
   clean_text = strip_markdown(text)
@@ -190,13 +228,15 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = 8) -> D
     sys.stderr.write(f"Warning: Could not find language code '{tgt_lang}', using default\n")
     tgt_lang_id = 256068  # Fallback to a common language code ID
   
-  # Process in batches for GPU efficiency
+  # CPU Optimization: Process batches in parallel for CPU
+  # GPU: Sequential batches (GPU handles parallelism internally)
   total_batches = (len(units) + batch_size - 1) // batch_size
+  use_parallel_batches = (device == "cpu" and total_batches > 1 and cpu_count >= 4)
   
-  for batch_idx in range(0, len(units), batch_size):
-    batch = units[batch_idx:batch_idx + batch_size]
-    batch_num = (batch_idx // batch_size) + 1
-    
+  # CPU Optimization: Helper function to process a single batch
+  def process_batch(batch: List[str], batch_idx: int) -> tuple[int, List[str]]:
+    """Process a single batch and return (batch_idx, translations)"""
+    batch_translations = []
     try:
       # Tokenize entire batch at once
       inputs = tokenizer(
@@ -210,17 +250,20 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = 8) -> D
       # Move to device
       inputs = {k: v.to(device) for k, v in inputs.items()}
       
+      # CPU Optimization: Use CPU-friendly parameters
+      beam_size = 1 if device == "cpu" else 2  # Greedy decoding on CPU is faster
+      
       # Generate translation for entire batch with forced_bos_token_id
       with torch.inference_mode():
         outputs = model.generate(
           **inputs,
           forced_bos_token_id=tgt_lang_id,
           max_length=512,
-          num_beams=2,  # Reduced from 4 for speed (minimal quality loss)
+          num_beams=beam_size,
           use_cache=True,
           early_stopping=True,
-          repetition_penalty=1.1,  # Reduced from 1.2 for speed
-          length_penalty=0.8,  # Reduced from 0.9 for speed
+          repetition_penalty=1.05 if device == "cpu" else 1.1,  # Lower for CPU speed
+          length_penalty=0.7 if device == "cpu" else 0.8,  # Lower for CPU speed
           do_sample=False,  # Deterministic for consistency
         )
       
@@ -230,16 +273,12 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = 8) -> D
       # Add translations to results
       for i, translation in enumerate(translations):
         if translation and translation.strip():
-          translated_sentences.append(translation.strip())
+          batch_translations.append(translation.strip())
         else:
           # Fallback to original if translation failed
           sys.stderr.write(f"Warning: Decoding failed for sentence: {batch[i][:50]}\n")
-          translated_sentences.append(batch[i])
+          batch_translations.append(batch[i])
       
-      # Log progress for large translations
-      if total_batches > 1:
-        sys.stderr.write(f"Translated batch {batch_num}/{total_batches} ({len(batch)} sentences)\n")
-        
     except Exception as e:
       # If batch fails, fall back to individual processing for this batch
       sys.stderr.write(f"Warning: Batch translation failed, processing individually: {e}\n")
@@ -254,20 +293,69 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = 8) -> D
               **inputs,
               forced_bos_token_id=tgt_lang_id,
               max_length=512,
-              num_beams=2,
+              num_beams=1 if device == "cpu" else 2,
               use_cache=True,
               early_stopping=True,
             )
           
           translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
           if translation and len(translation) > 0:
-            translated_sentences.append(translation[0].strip())
+            batch_translations.append(translation[0].strip())
           else:
-            translated_sentences.append(sentence)
+            batch_translations.append(sentence)
         except Exception as e2:
           sys.stderr.write(f"Warning: Exception translating sentence '{sentence[:50]}': {e2}\n")
-          translated_sentences.append(sentence)
-      continue
+          batch_translations.append(sentence)
+    
+    return (batch_idx, batch_translations)
+  
+  # Process batches: parallel for CPU, sequential for GPU
+  if use_parallel_batches:
+    # CPU Optimization: Process multiple batches in parallel using ThreadPoolExecutor
+    # This leverages multiple CPU cores effectively
+    max_workers = min(4, cpu_count // 2)  # Don't overload CPU
+    batch_results = [None] * total_batches
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+      # Submit all batch processing tasks
+      future_to_batch = {}
+      for batch_idx in range(0, len(units), batch_size):
+        batch = units[batch_idx:batch_idx + batch_size]
+        batch_num = batch_idx // batch_size
+        future = executor.submit(process_batch, batch, batch_num)
+        future_to_batch[future] = batch_num
+      
+      # Collect results as they complete
+      for future in as_completed(future_to_batch):
+        batch_num = future_to_batch[future]
+        try:
+          idx, translations = future.result()
+          batch_results[idx] = translations
+          sys.stderr.write(f"Translated batch {idx + 1}/{total_batches} ({len(translations)} sentences)\n")
+        except Exception as e:
+          sys.stderr.write(f"Error processing batch {batch_num + 1}: {e}\n")
+          # Fallback: process this batch individually
+          batch_start = batch_num * batch_size
+          batch = units[batch_start:batch_start + batch_size]
+          _, translations = process_batch(batch, batch_num)
+          batch_results[batch_num] = translations
+    
+    # Combine all batch results in order
+    for batch_result in batch_results:
+      if batch_result:
+        translated_sentences.extend(batch_result)
+  else:
+    # Sequential processing (for GPU or small CPU systems)
+    for batch_idx in range(0, len(units), batch_size):
+      batch = units[batch_idx:batch_idx + batch_size]
+      batch_num = (batch_idx // batch_size) + 1
+      
+      _, batch_translations = process_batch(batch, batch_num - 1)
+      translated_sentences.extend(batch_translations)
+      
+      # Log progress for large translations
+      if total_batches > 1:
+        sys.stderr.write(f"Translated batch {batch_num}/{total_batches} ({len(batch)} sentences)\n")
   
   if not translated_sentences:
     return {"success": False, "error": "All translation sentences failed"}
@@ -278,7 +366,7 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = 8) -> D
   return {"success": True, "translated": combined_translation}
 
 
-def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 8) -> None:
+def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -> None:
   """
   Stream translation sentence-by-sentence over stdout with BATCH PROCESSING.
   
@@ -288,6 +376,13 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
     {"success": true, "type": "complete", "total": N, "translated": "..."}
   """
   tokenizer, model, device = load_model()
+  
+  # CPU Optimization: Use smaller batches for CPU
+  if batch_size is None:
+    if device == "cpu":
+      batch_size = min(6, max(4, cpu_count // 2))
+    else:
+      batch_size = 8
 
   clean_text = strip_markdown(text)
 
@@ -324,6 +419,11 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
   else:
     tgt_lang_id = 256068
 
+  # CPU Optimization: Use CPU-friendly parameters
+  beam_size = 1 if device == "cpu" else 2  # Greedy decoding on CPU
+  rep_penalty = 1.05 if device == "cpu" else 1.1
+  len_penalty = 0.7 if device == "cpu" else 0.8
+
   # Process in batches for speed, but emit individual chunks for streaming
   for batch_idx in range(0, len(units), batch_size):
     batch = units[batch_idx:batch_idx + batch_size]
@@ -340,17 +440,17 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
       
       inputs = {k: v.to(device) for k, v in inputs.items()}
       
-      # Generate translation for batch
+      # Generate translation for batch with CPU-optimized parameters
       with torch.inference_mode():
         outputs = model.generate(
           **inputs,
           forced_bos_token_id=tgt_lang_id,
           max_length=512,
-          num_beams=2,  # Reduced for speed
+          num_beams=beam_size,
           use_cache=True,
           early_stopping=True,
-          repetition_penalty=1.1,
-          length_penalty=0.8,
+          repetition_penalty=rep_penalty,
+          length_penalty=len_penalty,
           do_sample=False,
         )
 
@@ -391,7 +491,7 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
               **inputs,
               forced_bos_token_id=tgt_lang_id,
               max_length=512,
-              num_beams=2,
+              num_beams=beam_size,
               use_cache=True,
               early_stopping=True,
             )

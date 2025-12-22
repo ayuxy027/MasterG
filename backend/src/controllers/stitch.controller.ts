@@ -235,7 +235,7 @@ export class StitchController {
             {
               srcLang: srcLang,
               tgtLang: tgtLang,
-              batchSize: batchSize || 8, // Use provided batch size or default to 8
+              batchSize: batchSize, // Auto-detected if not provided (CPU vs GPU optimized)
             },
             (chunk) => {
               // Forward chunk as SSE event
@@ -266,7 +266,7 @@ export class StitchController {
       const translated = await nllbService.translate(text, {
         srcLang: srcLang,
         tgtLang: tgtLang,
-        batchSize: batchSize || 8, // Use provided batch size or default to 8
+        batchSize: batchSize, // Auto-detected if not provided (CPU vs GPU optimized)
         useCache: true, // Enable caching for repeated translations
       });
 
