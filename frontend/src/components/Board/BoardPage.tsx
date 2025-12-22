@@ -71,6 +71,7 @@ const BoardPage: React.FC = () => {
   const [cards, setCards] = useState<CardState[]>([]);
   const [stickyNotes, setStickyNotes] = useState<StickyNoteState[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+  const [selectedStickyNoteIds, setSelectedStickyNoteIds] = useState<Set<string>>(new Set());
 
   // AI state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -510,9 +511,11 @@ const BoardPage: React.FC = () => {
   // ============================================================================
 
   const handleCardAction = useCallback(async (action: CardAction) => {
-    if (selectedCardIds.size === 0 || isPerformingAction) return;
-    if (selectedCardIds.size > 4) {
-      alert('Maximum 4 cards can be selected for AI actions');
+    // Use sticky notes if selected, otherwise fall back to cards
+    const selectedIds = selectedStickyNoteIds.size > 0 ? selectedStickyNoteIds : selectedCardIds;
+    if (selectedIds.size === 0 || isPerformingAction) return;
+    if (selectedIds.size > 4) {
+      alert('Maximum 4 items can be selected for AI actions');
       return;
     }
 
@@ -524,90 +527,106 @@ const BoardPage: React.FC = () => {
     const screenCenterY = window.innerHeight / 2;
     const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
     const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
-    const cardWidth = 280;
-    const cardHeight = 180;
+    const noteWidth = 250;
+    const noteHeight = 200;
     const spacing = 30;
 
-
-    const updateActionCardsPosition = (cardsToUpdate: CardData[]) => {
-      const totalWidth = cardsToUpdate.length * cardWidth + (cardsToUpdate.length - 1) * spacing;
+    // Convert action cards to sticky notes
+    const updateActionStickyNotes = (cardsToUpdate: CardData[]) => {
+      const totalWidth = cardsToUpdate.length * noteWidth + (cardsToUpdate.length - 1) * spacing;
       const startX = canvasCenterX - totalWidth / 2;
 
-      setCards(prev => {
-        // Remove old streaming action cards
-        const filtered = prev.filter(card => !streamingActionCardIdsRef.current.has(card.id));
+      setStickyNotes(prev => {
+        // Remove old streaming action sticky notes
+        const filtered = prev.filter(note => !note.id.startsWith(`ai-action-${action}-`));
 
-        // Add/update streaming cards
-        const updatedCards = cardsToUpdate.map((card, index) => {
-          const existingCard = filtered.find(c => c.id === card.id);
-          if (existingCard) {
+        // Create/update sticky notes from cards
+        const updatedNotes = cardsToUpdate.map((card, index) => {
+          const noteId = `ai-action-${action}-${card.id}`;
+          const existingNote = filtered.find(n => n.id === noteId);
+          const noteText = `${card.title}\n\n${card.content}`;
+
+          if (existingNote) {
             return {
-              ...existingCard,
-              title: card.title,
-              content: card.content,
-              x: startX + index * (cardWidth + spacing),
+              ...existingNote,
+              text: noteText,
+              x: startX + index * (noteWidth + spacing),
               y: canvasCenterY + 200,
             };
           } else {
             streamingActionCardIdsRef.current.add(card.id);
             return {
-              ...card,
-              x: startX + index * (cardWidth + spacing),
+              id: noteId,
+              x: startX + index * (noteWidth + spacing),
               y: canvasCenterY + 200,
-              width: cardWidth,
-              height: cardHeight,
-              isSelected: false,
+              text: noteText,
+              color: '#FFE4B5',
+              width: noteWidth,
+              height: noteHeight,
+              enableMarkdown: false,
+              ruled: false,
+              fontSize: 14,
+              fontFamily: 'Inter',
+              isBold: false,
+              isItalic: false,
+              isUnderline: false,
             };
           }
         });
 
-        return [...filtered, ...updatedCards];
+        return [...filtered, ...updatedNotes];
       });
     };
 
+    // Convert text results to sticky notes
     const updateActionResult = (content: string) => {
-      const resultCardId = resultCardIdRef.current || `result-${Date.now()}`;
-      resultCardIdRef.current = resultCardId;
+      const resultNoteId = resultCardIdRef.current || `ai-action-result-${action}-${Date.now()}`;
+      resultCardIdRef.current = resultNoteId;
 
-      setCards(prev => {
-        const existing = prev.find(c => c.id === resultCardId);
+      setStickyNotes(prev => {
+        const existing = prev.find(n => n.id === resultNoteId);
         if (existing) {
-          // Update existing result card
-          return prev.map(c =>
-            c.id === resultCardId
-              ? { ...c, content }
-              : c
+          return prev.map(n =>
+            n.id === resultNoteId
+              ? { ...n, text: content }
+              : n
           );
         } else {
-          // Create new result card
-          const actionTitles: Record<CardAction, string> = {
-            summarize: 'Summary',
-            actionPoints: 'Action Points',
-            mindMap: 'Mind Map',
-            flashcards: 'Flashcards',
-          };
           return [...prev, {
-            id: resultCardId,
-            title: actionTitles[action] || 'Result',
-            content,
+            id: resultNoteId,
             x: canvasCenterX - 160,
             y: canvasCenterY + 150,
+            text: content,
+            color: '#FFE4B5',
             width: 320,
             height: action === 'actionPoints' ? 280 : 220,
-            isSelected: false,
+            enableMarkdown: false,
+            ruled: false,
+            fontSize: 14,
+            fontFamily: 'Inter',
+            isBold: false,
+            isItalic: false,
+            isUnderline: false,
           }];
         }
       });
     };
 
     try {
-      const selectedCards = cards.filter(c => selectedCardIds.has(c.id));
-      const contents = selectedCards.map(c => c.content);
+      // Get content from sticky notes or cards
+      let contents: string[] = [];
+      if (selectedStickyNoteIds.size > 0) {
+        const selectedNotes = stickyNotes.filter(n => selectedStickyNoteIds.has(n.id));
+        contents = selectedNotes.map(n => n.text);
+      } else {
+        const selectedCards = cards.filter(c => selectedCardIds.has(c.id));
+        contents = selectedCards.map(c => c.content);
+      }
 
       const result = await performCardAction(action, contents, (partialData) => {
         if (partialData.type === "card" && partialData.cards) {
-          // Real-time card updates for mindMap/flashcards
-          updateActionCardsPosition(partialData.cards);
+          // Real-time sticky note updates for mindMap/flashcards
+          updateActionStickyNotes(partialData.cards);
         } else if (partialData.type === "partial" && partialData.content) {
           // Real-time text updates for summarize/actionPoints
           updateActionResult(partialData.content);
@@ -621,11 +640,12 @@ const BoardPage: React.FC = () => {
 
       // Final update with complete results
       if (result.cards && result.cards.length > 0) {
-        updateActionCardsPosition(result.cards);
+        updateActionStickyNotes(result.cards);
       } else if (result.result) {
         updateActionResult(result.result);
       }
 
+      setSelectedStickyNoteIds(new Set());
       setSelectedCardIds(new Set());
     } catch (error) {
       console.error('Failed to perform card action:', error);
@@ -639,7 +659,7 @@ const BoardPage: React.FC = () => {
         setThinkingText("");
       }, 2000);
     }
-  }, [selectedCardIds, cards, isPerformingAction, viewOffset, zoom]);
+  }, [selectedStickyNoteIds, selectedCardIds, stickyNotes, cards, isPerformingAction, viewOffset, zoom]);
 
   // ============================================================================
   // CARD SELECTION
@@ -693,6 +713,32 @@ const BoardPage: React.FC = () => {
 
   const handleStickyNoteDelete = useCallback((id: string) => {
     setStickyNotes(prev => prev.filter(note => note.id !== id));
+    setSelectedStickyNoteIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
+  }, []);
+
+  const handleStickyNoteSelect = useCallback((noteId: string, isMultiSelect: boolean) => {
+    setSelectedStickyNoteIds(prev => {
+      const newSet = new Set(prev);
+      if (isMultiSelect) {
+        if (newSet.has(noteId)) {
+          newSet.delete(noteId);
+        } else if (newSet.size < 4) {
+          newSet.add(noteId);
+        }
+      } else {
+        if (newSet.has(noteId) && newSet.size === 1) {
+          newSet.clear();
+        } else {
+          newSet.clear();
+          newSet.add(noteId);
+        }
+      }
+      return newSet;
+    });
   }, []);
 
   // ============================================================================
@@ -901,6 +947,8 @@ const BoardPage: React.FC = () => {
               isUnderline={note.isUnderline}
               zoom={zoom}
               selectionMode={currentTool === 'select'}
+              isSelected={selectedStickyNoteIds.has(note.id)}
+              onSelect={handleStickyNoteSelect}
               onUpdate={handleStickyNoteUpdate}
               onDelete={handleStickyNoteDelete}
             />
@@ -908,8 +956,8 @@ const BoardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* AI Actions Panel (when cards selected) */}
-      {selectedCardIds.size > 0 && (
+      {/* AI Actions Panel (when sticky notes or cards selected) */}
+      {(selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-orange-200 p-4 flex items-center gap-3">
           {isPerformingAction ? (
             <div className="flex items-center gap-3 px-3 py-2">
@@ -921,7 +969,7 @@ const BoardPage: React.FC = () => {
               <div className="flex flex-col gap-1 pr-3 border-r border-gray-200">
                 <span className="text-xs text-gray-400 uppercase tracking-wide">Selected</span>
                 <span className="text-lg font-bold text-orange-600">
-                  {selectedCardIds.size} / 4
+                  {selectedStickyNoteIds.size + selectedCardIds.size} / 4
                 </span>
               </div>
 
@@ -964,7 +1012,10 @@ const BoardPage: React.FC = () => {
               </div>
 
               <button
-                onClick={() => setSelectedCardIds(new Set())}
+                onClick={() => {
+                  setSelectedStickyNoteIds(new Set());
+                  setSelectedCardIds(new Set());
+                }}
                 className="ml-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium transition-colors"
                 title="Clear selection"
               >
@@ -987,6 +1038,8 @@ const BoardPage: React.FC = () => {
         onClear={handleClear}
         sidebarOpen={!isNavbarExpanded}
         zoom={zoom}
+        onCardAction={handleCardAction}
+        hasSelection={selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0}
         onZoomChange={setZoom}
         onZoomReset={() => { setZoom(1); setViewOffset({ x: 0, y: 0 }); }}
         onGenerateCards={handleGenerateCards}
