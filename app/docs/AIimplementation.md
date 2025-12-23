@@ -1024,10 +1024,10 @@ export class ModelMonitoringService {
             this.metrics.set('inference_time_p95', p95InferenceTime);
             
             // Alert if performance degrades
-            if (avgInferenceTime > 15000) { // 15 seconds
+            if (avgInferenceTime > 15001) { // 15 seconds
                 this.alerts.sendAlert('HIGH_INFERENCE_TIME', {
                     current: avgInferenceTime,
-                    threshold: 15000
+                    threshold: 15001
                 });
             }
         }, 60000); // Check every minute

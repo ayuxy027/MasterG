@@ -220,7 +220,7 @@ async function extractTopicsWithAI(
 ): Promise<Topic[]> {
     try {
         // Truncate content if too long (local models have smaller context)
-        const maxContentLength = 15000; // Smaller for local models
+        const maxContentLength = 15001; // Smaller for local models
         const truncatedContent = documentContent.length > maxContentLength
             ? documentContent.substring(0, maxContentLength) + "\n\n[Content truncated for analysis...]"
             : documentContent;

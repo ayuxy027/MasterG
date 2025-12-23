@@ -20,6 +20,11 @@ from pathlib import Path
 from typing import Any, Dict, Optional, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# Force fully-offline mode for transformers/hf datasets
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
 # Disable PyTorch compile and meta tensors to avoid device issues
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
@@ -46,8 +51,17 @@ torch.set_num_interop_threads(min(4, cpu_count // 2))  # Inter-op threads for pa
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore
 
 BASE_DIR = Path(__file__).resolve().parent
-MODELS_DIR = BASE_DIR / "models"
-NLLB_MODEL_NAME = "facebook/nllb-200-distilled-600M"
+MODELS_DIR = Path(os.environ.get("NLLB_MODELS_DIR", BASE_DIR / "models")).expanduser().resolve()
+DEFAULT_MODEL_SUBDIR = "nllb-200-distilled-600M"
+NLLB_MODEL_PATH = Path(
+  os.environ.get("NLLB_MODEL_PATH", MODELS_DIR / DEFAULT_MODEL_SUBDIR)
+).expanduser().resolve()
+REQUIRED_FILES = [
+  "config.json",
+  "tokenizer.json",
+  "sentencepiece.bpe.model",
+]
+WEIGHT_FILES = ["pytorch_model.bin", "model.safetensors"]
 
 # Global model cache (loaded once, reused many times)
 _model_cache: Optional[tuple] = None
@@ -78,6 +92,31 @@ def strip_markdown(text: str) -> str:
   return text.strip()
 
 
+def validate_model_path() -> Path:
+  """Ensure the local model directory exists and has all required files."""
+  if not NLLB_MODEL_PATH.exists():
+    raise FileNotFoundError(
+      f"NLLB model path does not exist: {NLLB_MODEL_PATH}. "
+      "Place the downloaded model here or set NLLB_MODEL_PATH to the absolute directory."
+    )
+  
+  missing: List[str] = []
+  for fname in REQUIRED_FILES:
+    if not (NLLB_MODEL_PATH / fname).exists():
+      missing.append(fname)
+  
+  if not any((NLLB_MODEL_PATH / fname).exists() for fname in WEIGHT_FILES):
+    missing.append("pytorch_model.bin or model.safetensors")
+  
+  if missing:
+    raise FileNotFoundError(
+      f"NLLB model directory is missing required files: {', '.join(missing)} "
+      f"(checked in {NLLB_MODEL_PATH})"
+    )
+  
+  return NLLB_MODEL_PATH
+
+
 def load_model():
   """Load model once and cache it globally"""
   global _model_cache
@@ -86,20 +125,21 @@ def load_model():
     return _model_cache
   
   try:
-    sys.stderr.write(f"Loading NLLB-200 model ({NLLB_MODEL_NAME})...\n")
+    model_path = validate_model_path()
+    sys.stderr.write(f"Loading NLLB-200 model from {model_path} (offline)...\n")
     
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
-      NLLB_MODEL_NAME,
+      model_path,
       trust_remote_code=True,
-      local_files_only=False,  # Allow download on first run
+      local_files_only=True,
     )
     
     # Load model
     model = AutoModelForSeq2SeqLM.from_pretrained(
-      NLLB_MODEL_NAME,
+      model_path,
       trust_remote_code=True,
-      local_files_only=False,
+      local_files_only=True,
       low_cpu_mem_usage=False,
     )
     

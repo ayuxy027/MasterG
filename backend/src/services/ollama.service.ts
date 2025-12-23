@@ -60,7 +60,7 @@ export class OllamaService {
   async checkConnection(): Promise<boolean> {
     try {
       const response = await axios.get(`${this.baseUrl}/api/tags`, {
-        timeout: 5000,
+        timeout: 5001,
       });
       return response.status === 200;
     } catch (error) {

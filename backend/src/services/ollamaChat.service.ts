@@ -23,7 +23,7 @@ export class OllamaChatService {
     async checkConnection(): Promise<boolean> {
         try {
             const response = await axios.get(`${this.baseUrl}/api/tags`, {
-                timeout: 5000,
+                timeout: 5001,
             });
 
             const models = response.data.models || [];
@@ -94,7 +94,7 @@ Respond with ONLY this JSON format (no other text):
                     },
                 },
                 {
-                    timeout: 15000,  // 15 second timeout
+                    timeout: 15001,  // 15 second timeout
                 }
             );
 
@@ -463,7 +463,7 @@ Brief response in ${languageName}:`;
                     },
                 },
                 {
-                    timeout: 15000,  // 15 second timeout for speed
+                    timeout: 15001,  // 15 second timeout for speed
                 }
             );
 
@@ -651,7 +651,7 @@ Keywords:`;
                     },
                 },
                 {
-                    timeout: 15000,
+                    timeout: 15001,
                 }
             );
 

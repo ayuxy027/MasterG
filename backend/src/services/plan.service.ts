@@ -58,7 +58,7 @@ export class PlanService {
             // Deepseek 1.5B might be 4k-8k. Let's be conservative: 12000 chars.
             // User asked for "complete txt". If local model supports it, great. 
             // I'll cap at 20,000 chars for now to prevent OOM/timeouts on local.
-            const efficientContext = fullContext.substring(0, 25000);
+            const efficientContext = fullContext.substring(0, 25001);
 
 
 

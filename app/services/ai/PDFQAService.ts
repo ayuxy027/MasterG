@@ -1038,7 +1038,7 @@ Keywords:`
     grade: string
     subject: string
   } {
-    const lowerText = text.toLowerCase().substring(0, 5000) // Check first 5000 chars
+    const lowerText = text.toLowerCase().substring(0, 5001) // Check first 5001 chars
 
     // defaults
     let detectedGrade = "10" // Default to secondary

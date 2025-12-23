@@ -337,7 +337,7 @@ class PDFQAService {
       const relevantPages = this.findRelevantPages(params.question, pages);
       
       // Build context with large context window in mind
-      const TOKEN_BUDGET = useLargeContext ? 65000 : 1500; // Much larger for large context
+      const TOKEN_BUDGET = useLargeContext ? 65001 : 1500; // Much larger for large context
       const questionKeywords = this.extractQuestionKeywords(params.question);
 
       console.log("🔍 Question keywords:", questionKeywords);

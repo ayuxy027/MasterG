@@ -12,6 +12,7 @@ export interface NLLBTranslateOptions {
 
 export class NLLBService {
   private scriptPath: string;
+  private modelPath: string;
   private pythonExecutable: string;
   private pythonProcess: ChildProcess | null = null; // Persistent Python process
   private translationCache: Map<string, string> = new Map(); // Simple in-memory cache
@@ -24,6 +25,14 @@ export class NLLBService {
       "..",
       "proxy",
       "nllb_server.py"
+    );
+    this.modelPath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "proxy",
+      "models",
+      "nllb-200-distilled-600M"
     );
     // Use venv python - CRITICAL for torch and other dependencies
     // On Windows, venv uses Scripts/python.exe; on Unix/Mac, it's bin/python
@@ -57,9 +66,25 @@ export class NLLBService {
       return; // Already running
     }
 
+    const spawnEnv = {
+      ...process.env,
+      NLLB_MODEL_PATH: this.modelPath,
+      TRANSFORMERS_OFFLINE: "1",
+      HF_DATASETS_OFFLINE: "1",
+      HF_HUB_OFFLINE: "1",
+    };
+
+    if (!fs.existsSync(this.modelPath)) {
+      console.warn(
+        `⚠️  NLLB model directory not found at ${this.modelPath}. ` +
+        "Download the model to this exact absolute path before starting the server."
+      );
+    }
+
     console.log("🚀 Starting NLLB-200 persistent server...");
     this.pythonProcess = spawn(this.pythonExecutable, [this.scriptPath], {
       stdio: ["pipe", "pipe", "pipe"],
+      env: spawnEnv,
     });
 
     this.pythonProcess.stderr.on("data", (data: Buffer) => {
@@ -85,7 +110,7 @@ export class NLLBService {
             console.log("🔄 Attempting to restart NLLB server...");
             this.startServer();
           }
-        }, 5000);
+        }, 5001);
       }
     });
   }

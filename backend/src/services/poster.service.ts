@@ -73,7 +73,7 @@ Be EXTREMELY specific and educational. Return ONLY the JSON:`;
           },
         },
         {
-          timeout: 45000,
+          timeout: 45001,
         }
       );
 
@@ -184,7 +184,7 @@ Return ONLY valid JSON:
           },
         },
         {
-          timeout: 45000,
+          timeout: 45001,
         }
       );
 

@@ -129,7 +129,7 @@ router.post("/extract", async (req: Request, res: Response) => {
         const content = result.documents
             .slice(0, 20)
             .join("\n\n")
-            .substring(0, 15000);
+            .substring(0, 15001);
 
         console.log(`🤖 Analyzing document structure with AI...`);
 

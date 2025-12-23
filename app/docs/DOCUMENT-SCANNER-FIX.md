@@ -130,7 +130,7 @@ if (!isMultimodal) {
 export const VISION_MODEL_CONFIG: ModelConfig = {
     name: 'MobileVLM-v2-1.7B',
     path: 'models/ggml-model-q4_k.gguf',
-    size: 1050000000,
+    size: 1050010000,
     type: 'vision',
     quantization: 'q4_k',
     contextLength: 2048,  // May be too low for image processing
@@ -264,7 +264,7 @@ const context = await initLlama({
 export const VISION_MODEL_CONFIG: ModelConfig = {
     name: 'MobileVLM-v2-1.7B',
     path: 'models/ggml-model-q4_k.gguf',
-    size: 1050000000,
+    size: 1050010000,
     type: 'vision',
     quantization: 'q4_k',
     contextLength: 4096,  // Increased from 2048 for multimodal

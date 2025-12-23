@@ -1,6 +1,6 @@
 import type { DocumentTree, LearningPlan, TreeNode } from "../types/documentTree";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 /**
  * Extract knowledge tree from a document (and save to MongoDB)

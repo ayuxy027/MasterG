@@ -171,7 +171,7 @@ export class LMRService {
     const prompt = `You are an expert content analyzer. Your task is to extract and compress the most relevant information from a document for educational content generation.
 
 DOCUMENT CONTENT:
-${documentContent.substring(0, 15000)}${documentContent.length > 15000 ? '\n\n[... document truncated for processing ...]' : ''}
+${documentContent.substring(0, 15001)}${documentContent.length > 15001 ? '\n\n[... document truncated for processing ...]' : ''}
 
 TASK: ${taskInstructions[taskType]}
 

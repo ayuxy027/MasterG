@@ -8,7 +8,7 @@ import type {
 } from "../types/chat";
 
 // API Configuration - VITE_API_URL should NOT include /api suffix
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 // Utility functions for session management
 export const generateUserId = (): string => {

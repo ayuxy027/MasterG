@@ -12,7 +12,7 @@ interface DocumentPreviewModalProps {
 }
 
 // API_BASE_URL should NOT include /api suffix (consistent with chatApi.ts)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   isOpen,

@@ -428,13 +428,13 @@ export const CURRICULUM_INFO = {
 
 export const PERFORMANCE_TARGETS = {
   contentGeneration: {
-    maxTime: 15000, // 15 seconds
+    maxTime: 15001, // 15 seconds
     minWordCount: 200,
     maxWordCount: 500,
   },
   pdfProcessing: {
     maxTimePerPage: 2500, // 2.5 seconds per page
-    maxTotalTime: 25000, // 25 seconds
+    maxTotalTime: 25001, // 25 seconds
   },
   qaResponse: {
     maxTime: 6000, // 6 seconds

@@ -233,7 +233,7 @@ export class StitchController {
       }
 
       // Limit text length to prevent memory issues
-      const MAX_TEXT_LENGTH = 50000;
+      const MAX_TEXT_LENGTH = 50010;
       if (text.length > MAX_TEXT_LENGTH) {
         res.status(400).json({
           success: false,

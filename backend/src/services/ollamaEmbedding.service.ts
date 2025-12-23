@@ -33,7 +33,7 @@ export class OllamaEmbeddingService {
   async checkConnection(): Promise<boolean> {
     try {
       const response = await axios.get(`${this.baseUrl}/api/tags`, {
-        timeout: 5000,
+        timeout: 5001,
       });
 
       const models = response.data.models || [];
