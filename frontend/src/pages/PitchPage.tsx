@@ -238,34 +238,34 @@ const PitchPage = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mb-12">
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-8 shadow-xl">
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-8 shadow-xl border border-orange-200 hover:shadow-2xl transition-shadow duration-300">
               <div className="text-6xl mb-4">⚡</div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Astonishing Performance
               </h3>
-              <p className="text-gray-700 text-lg mb-4">
+              <p className="text-gray-700 text-lg mb-4 leading-relaxed">
                 Works on a <strong className="text-orange-600">1.3 GB RAM</strong> memory and <strong className="text-orange-600">4 GB</strong> of disc space
               </p>
-              <p className="text-gray-700 text-lg">
+              <p className="text-gray-700 text-lg leading-relaxed">
                 Works <strong className="text-orange-600">completely offline!</strong>
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 shadow-xl">
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-8 shadow-xl border border-orange-200 hover:shadow-2xl transition-shadow duration-300">
               <div className="text-6xl mb-4">🔧</div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Built with Open Source
               </h3>
-              <p className="text-gray-700 text-lg mb-4">
-                Built using <strong className="text-blue-600">open source</strong> and <strong className="text-blue-600">minimal external tooling</strong>
+              <p className="text-gray-700 text-lg mb-4 leading-relaxed">
+                Built using <strong className="text-orange-600">open source</strong> and <strong className="text-orange-600">minimal external tooling</strong>
               </p>
-              <p className="text-gray-700 text-lg">
-                We leveraged <strong className="text-blue-600">open weight models</strong> from proprietary providers like <strong className="text-blue-600">DeepSeek</strong> and <strong className="text-blue-600">Meta</strong>
+              <p className="text-gray-700 text-lg leading-relaxed">
+                We leveraged <strong className="text-orange-600">open weight models</strong> from proprietary providers like <strong className="text-orange-600">DeepSeek</strong> and <strong className="text-orange-600">Meta</strong>
               </p>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-8 shadow-2xl text-center">
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-8 shadow-2xl text-center border-4 border-orange-400">
             <h3 className="text-3xl font-bold text-white mb-6">
               DeepSeek R1 1.5B and NLLB 600M
             </h3>
@@ -292,21 +292,66 @@ const PitchPage = () => {
           <div className={`grid grid-cols-2 md:grid-cols-4 gap-6 mb-16 transform transition-all duration-1000 ${
             showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}>
-            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-orange-500">
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-orange-500 hover:shadow-xl transition-shadow duration-300">
               <div className="text-4xl font-bold text-orange-600 mb-2">5</div>
               <div className="text-gray-700 font-semibold">Features</div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-blue-500">
-              <div className="text-4xl font-bold text-blue-600 mb-2">200+</div>
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-orange-400 hover:shadow-xl transition-shadow duration-300">
+              <div className="text-4xl font-bold text-orange-500 mb-2">200+</div>
               <div className="text-gray-700 font-semibold">Commits</div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-green-500">
-              <div className="text-4xl font-bold text-green-600 mb-2">11</div>
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-orange-600 hover:shadow-xl transition-shadow duration-300">
+              <div className="text-4xl font-bold text-orange-700 mb-2">11</div>
               <div className="text-gray-700 font-semibold">Days of R&D</div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-purple-500">
-              <div className="text-4xl font-bold text-purple-600 mb-2">18</div>
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-orange-500 hover:shadow-xl transition-shadow duration-300">
+              <div className="text-4xl font-bold text-orange-600 mb-2">18</div>
               <div className="text-gray-700 font-semibold">Branches</div>
+            </div>
+          </div>
+
+          {/* Progress Timeline Graph */}
+          <div className={`mb-16 transform transition-all duration-1000 delay-200 ${
+            showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}>
+            <div className="bg-white rounded-2xl p-8 shadow-xl border border-orange-100">
+              <h3 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+                Development Progress
+              </h3>
+              <div className="relative">
+                {/* Timeline Line */}
+                <div className="absolute left-8 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-300 via-orange-400 to-orange-500"></div>
+                
+                {/* Timeline Items */}
+                <div className="space-y-12 relative z-10">
+                  {[
+                    { day: 'Day 1-2', milestone: 'Research & Architecture Design', progress: 20 },
+                    { day: 'Day 3-4', milestone: 'Model Selection & Testing', progress: 40 },
+                    { day: 'Day 5-7', milestone: 'Core Features Development', progress: 65 },
+                    { day: 'Day 8-9', milestone: 'Integration & Optimization', progress: 85 },
+                    { day: 'Day 10-11', milestone: 'Testing & Refinement', progress: 100 }
+                  ].map((item, index) => (
+                    <div key={index} className="flex items-center gap-6">
+                      <div className="flex-shrink-0 w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg flex items-center justify-center border-4 border-white">
+                        <div className="w-3 h-3 rounded-full bg-white"></div>
+                      </div>
+                      <div className="flex-1 bg-gradient-to-r from-orange-50 to-white rounded-xl p-6 shadow-md border border-orange-100">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-orange-700 font-bold text-lg">{item.day}</span>
+                          <span className="text-orange-600 font-semibold">{item.progress}%</span>
+                        </div>
+                        <p className="text-gray-800 text-base mb-3">{item.milestone}</p>
+                        <div className="w-full bg-orange-100 rounded-full h-3 overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-1000"
+                            style={{ width: `${item.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -319,11 +364,11 @@ const PitchPage = () => {
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="ml-4 text-gray-400 text-sm font-mono">github.com/MasterG</span>
+                <span className="ml-4 text-gray-400 text-sm font-mono">github.com/ayuxy027/MasterG</span>
               </div>
               <div className="p-4">
                 <img 
-                  src="/pitch/pitch.png" 
+                  src="/pitch/github.png" 
                   alt="GitHub Repository Snapshot" 
                   className="w-full h-auto rounded-lg"
                 />
@@ -335,18 +380,18 @@ const PitchPage = () => {
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-500 ${
             showJourney ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
           }`}>
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 border-l-4 border-blue-500">
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-8 border-l-4 border-orange-500 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Extensive Research
               </h3>
               <p className="text-gray-700 text-lg mb-2">
-                We read over <strong className="text-blue-600">200+ references</strong> including Stack Overflow, Medium articles, and web surfing using our agents
+                We read over <strong className="text-orange-600">200+ references</strong> including Stack Overflow, Medium articles, and web surfing using our agents
               </p>
               <p className="text-gray-700 text-lg mb-2">
-                Spending <strong className="text-blue-600">16 hours</strong> in total R&D!
+                Spending <strong className="text-orange-600">16 hours</strong> in total R&D!
               </p>
-              <p className="text-xl font-bold text-blue-600 mt-4">
-                But all this costed us <span className="text-green-600">zero</span> xD
+              <p className="text-xl font-bold text-orange-600 mt-4">
+                But all this costed us <span className="text-orange-500">zero</span> xD
               </p>
             </div>
           </div>
@@ -355,7 +400,7 @@ const PitchPage = () => {
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-700 ${
             showJourney ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'
           }`}>
-            <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-8 border-l-4 border-orange-500">
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-8 border-l-4 border-orange-500 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 The True Engineering Opportunity
               </h3>
@@ -368,11 +413,32 @@ const PitchPage = () => {
             </div>
           </div>
 
+          {/* Did We Just Orchestrate Models Section */}
+          <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-800 ${
+            showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}>
+            <div className="bg-white rounded-2xl p-10 shadow-2xl border-2 border-orange-200">
+              <h3 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-8 text-center">
+                So, Did We Just Simply Bring Some Models Together and Orchestrated Them?
+              </h3>
+              <div className="flex flex-col items-center justify-center">
+                <img 
+                  src="/pitch/meme.webp" 
+                  alt="Definitely Not" 
+                  className="max-w-md w-full h-auto rounded-xl shadow-xl mb-6"
+                />
+                <p className="text-3xl sm:text-4xl font-bold text-orange-600 text-center">
+                  Definitely Not!
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Push Harder Section */}
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-900 ${
             showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}>
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-8 border-l-4 border-purple-500">
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-8 border-l-4 border-orange-500 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 We Pushed Harder
               </h3>
@@ -380,12 +446,12 @@ const PitchPage = () => {
                 So we pushed harder and spent nights to stress test our approach.
               </p>
               <p className="text-gray-700 text-lg leading-relaxed mb-4">
-                We tested <strong className="text-purple-600">open weight models</strong> which had <strong className="text-purple-600">RL or CoT approach</strong> to get rid of API dependency.
+                We tested <strong className="text-orange-600">open weight models</strong> which had <strong className="text-orange-600">RL or CoT approach</strong> to get rid of API dependency.
               </p>
-              <p className="text-2xl font-bold text-purple-600 text-center mt-6">
+              <p className="text-2xl font-bold text-orange-600 text-center mt-6">
                 And it worked like magic!!
               </p>
-              <p className="text-xl font-bold text-orange-600 text-center mt-4">
+              <p className="text-xl font-bold text-orange-700 text-center mt-4">
                 Wait for the benchmarks :D
               </p>
             </div>
@@ -395,7 +461,7 @@ const PitchPage = () => {
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-1100 ${
             showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}>
-            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-8 border-l-4 border-yellow-500">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-8 border-l-4 border-orange-500 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Testing Amazing Open Source Models
               </h3>
@@ -403,7 +469,7 @@ const PitchPage = () => {
                 Soon we found ourselves testing some amazing open source models across nights.
               </p>
               <p className="text-gray-700 text-lg leading-relaxed mt-4">
-                Many of them <strong className="text-red-600">crashed</strong> as we wanted to <strong className="text-orange-600">exceed the requirements</strong>.
+                Many of them <strong className="text-orange-700">crashed</strong> as we wanted to <strong className="text-orange-600">exceed the requirements</strong>.
               </p>
             </div>
           </div>
@@ -412,7 +478,7 @@ const PitchPage = () => {
           <div className={`transform transition-all duration-1000 delay-1300 ${
             showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}>
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-10 shadow-2xl text-center text-white">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-10 shadow-2xl text-center text-white border-4 border-orange-400">
               <p className="text-xl sm:text-2xl mb-6 leading-relaxed">
                 After many <strong>hopes and failures</strong>, we went ahead with
               </p>
