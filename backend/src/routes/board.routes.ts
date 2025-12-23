@@ -1,9 +1,11 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, Router } from "express";
 import axios from "axios";
 import env from "../config/env";
 import { ollamaService } from "../services/ollama.service";
+import { boardController } from "../controllers/board.controller";
+import { asyncHandler } from "../middleware/error.middleware";
 
-const router = express.Router();
+const router = Router();
 
 // Ollama config
 const OLLAMA_URL = env.OLLAMA_URL || "http://localhost:11434";
@@ -603,6 +605,51 @@ Generate exactly 6 cards as JSON array:`,
     });
   }
 });
+
+/**
+ * GET /api/board/sessions/:userId
+ * Get all Board sessions for a user
+ */
+router.get(
+  "/sessions/:userId",
+  asyncHandler(boardController.getAllSessions.bind(boardController))
+);
+
+/**
+ * GET /api/board/sessions/:userId/:sessionId
+ * Get a specific Board session
+ */
+router.get(
+  "/sessions/:userId/:sessionId",
+  asyncHandler(boardController.getSession.bind(boardController))
+);
+
+/**
+ * POST /api/board/sessions/:userId/:sessionId
+ * Save Board session
+ */
+router.post(
+  "/sessions/:userId/:sessionId",
+  asyncHandler(boardController.saveSession.bind(boardController))
+);
+
+/**
+ * DELETE /api/board/sessions/:userId/:sessionId
+ * Delete Board session
+ */
+router.delete(
+  "/sessions/:userId/:sessionId",
+  asyncHandler(boardController.deleteSession.bind(boardController))
+);
+
+/**
+ * PATCH /api/board/sessions/:userId/:sessionId/name
+ * Update session name
+ */
+router.patch(
+  "/sessions/:userId/:sessionId/name",
+  asyncHandler(boardController.updateSessionName.bind(boardController))
+);
 
 export default router;
 

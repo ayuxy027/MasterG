@@ -4,7 +4,7 @@ import { DottedBackground, CanvasDock, StickyNote } from './index';
 import { getToolById, Point, DrawingPath } from './tools';
 import Card from './Card';
 import MinimizedNavbar from './MinimizedNavbar';
-import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus } from '../../services/boardApi';
+import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus, boardSessionApi, BoardSessionData } from '../../services/boardApi';
 import { stitchAPI } from '../../services/stitchApi';
 
 // ============================================================================
@@ -90,6 +90,20 @@ const BoardPage: React.FC = () => {
   // Track streaming action card IDs for real-time updates
   const streamingActionCardIdsRef = useRef<Set<string>>(new Set());
   const resultCardIdRef = useRef<string | null>(null);
+
+  // Board session management
+  const [userId] = useState(() => {
+    // Generate or get user ID from localStorage
+    const stored = localStorage.getItem('board_userId');
+    if (stored) return stored;
+    const newId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('board_userId', newId);
+    return newId;
+  });
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ============================================================================
   // OLLAMA STATUS CHECK
@@ -751,6 +765,132 @@ const BoardPage: React.FC = () => {
   }, []);
 
   // ============================================================================
+  // BOARD SESSION MANAGEMENT
+  // ============================================================================
+
+  const handleSaveBoard = useCallback(async () => {
+    if (!currentSessionId) {
+      // Create new session ID
+      const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentSessionId(newSessionId);
+      await handleSaveBoardWithId(newSessionId);
+    } else {
+      await handleSaveBoardWithId(currentSessionId);
+    }
+  }, [currentSessionId]);
+
+  const handleSaveBoardWithId = useCallback(async (sessionId: string) => {
+    setIsSaving(true);
+    try {
+      await boardSessionApi.saveSession(userId, sessionId, {
+        drawingPaths: drawingPaths.map(path => ({
+          points: path.points,
+          color: path.color,
+          strokeWidth: path.strokeWidth,
+          tool: path.tool,
+        })),
+        cards: cards.map(card => ({
+          id: card.id,
+          title: card.title,
+          content: card.content,
+          x: card.x,
+          y: card.y,
+          width: card.width,
+          height: card.height,
+        })),
+        stickyNotes: stickyNotes.map(note => ({
+          id: note.id,
+          x: note.x,
+          y: note.y,
+          text: note.text,
+          color: note.color,
+          width: note.width,
+          height: note.height,
+          enableMarkdown: note.enableMarkdown,
+          ruled: note.ruled,
+          fontSize: note.fontSize,
+          fontFamily: note.fontFamily,
+          isBold: note.isBold,
+          isItalic: note.isItalic,
+          isUnderline: note.isUnderline,
+        })),
+        viewOffset,
+        zoom,
+      });
+      setLastSaved(new Date());
+      setCurrentSessionId(sessionId);
+    } catch (error) {
+      console.error('Failed to save board:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [userId, drawingPaths, cards, stickyNotes, viewOffset, zoom]);
+
+  const handleLoadBoard = useCallback(async (sessionId: string) => {
+    try {
+      const session = await boardSessionApi.getSession(userId, sessionId);
+      if (session) {
+        // Restore drawing paths
+        setDrawingPaths(session.drawingPaths.map(path => ({
+          points: path.points,
+          color: path.color,
+          strokeWidth: path.strokeWidth,
+          tool: path.tool,
+        })));
+
+        // Restore cards
+        setCards(session.cards.map(card => ({
+          ...card,
+          isSelected: false,
+        })));
+
+        // Restore sticky notes
+        setStickyNotes(session.stickyNotes);
+
+        // Restore view state
+        setViewOffset(session.viewOffset);
+        setZoom(session.zoom);
+
+        setCurrentSessionId(sessionId);
+      }
+    } catch (error) {
+      console.error('Failed to load board:', error);
+    }
+  }, [userId]);
+
+  const handleNewBoard = useCallback(() => {
+    setDrawingPaths([]);
+    setCards([]);
+    setStickyNotes([]);
+    setSelectedCardIds(new Set());
+    setSelectedStickyNoteIds(new Set());
+    setViewOffset({ x: 0, y: 0 });
+    setZoom(1);
+    setCurrentSessionId(null);
+    setLastSaved(null);
+  }, []);
+
+  // Auto-save functionality (debounced)
+  useEffect(() => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Auto-save after 3 seconds of inactivity
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      if (currentSessionId && (drawingPaths.length > 0 || cards.length > 0 || stickyNotes.length > 0)) {
+        handleSaveBoardWithId(currentSessionId);
+      }
+    }, 3000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [drawingPaths, cards, stickyNotes, viewOffset, zoom, currentSessionId, handleSaveBoardWithId]);
+
+  // ============================================================================
   // TRANSLATION HANDLER
   // ============================================================================
 
@@ -1087,8 +1227,12 @@ const BoardPage: React.FC = () => {
         onZoomReset={() => { setZoom(1); setViewOffset({ x: 0, y: 0 }); }}
         onGenerateCards={handleGenerateCards}
         onTranslate={handleTranslate}
+        onSaveBoard={handleSaveBoard}
+        onNewBoard={handleNewBoard}
         isGenerating={isGenerating}
         hasSelection={selectedStickyNoteIds.size > 0}
+        isSaving={isSaving}
+        lastSaved={lastSaved}
       />
     </div>
   );

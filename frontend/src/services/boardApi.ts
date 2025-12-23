@@ -32,6 +32,63 @@ export interface ActionResponse {
   message?: string;
 }
 
+export interface BoardSession {
+  sessionId: string;
+  sessionName?: string;
+  updatedAt: string;
+  cardCount: number;
+  stickyNoteCount: number;
+  drawingPathCount: number;
+}
+
+export interface BoardSessionData {
+  userId: string;
+  sessionId: string;
+  sessionName?: string;
+  drawingPaths: Array<{
+    points: Array<{ x: number; y: number }>;
+    color: string;
+    strokeWidth: number;
+    tool: string;
+  }>;
+  cards: Array<{
+    id: string;
+    title: string;
+    content: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
+  stickyNotes: Array<{
+    id: string;
+    x: number;
+    y: number;
+    text: string;
+    color: string;
+    width: number;
+    height: number;
+    enableMarkdown?: boolean;
+    ruled?: boolean;
+    fontSize?: number;
+    fontFamily?: string;
+    isBold?: boolean;
+    isItalic?: boolean;
+    isUnderline?: boolean;
+  }>;
+  viewOffset: { x: number; y: number };
+  zoom: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+class BoardApiError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BoardApiError";
+  }
+}
+
 /**
  * Check Ollama connection status
  */
@@ -270,3 +327,208 @@ export async function performCardAction(
   }
 }
 
+/**
+ * Board Session Management
+ */
+export class BoardSessionApi {
+  /**
+   * Get all Board sessions for a user
+   */
+  async getAllSessions(userId: string): Promise<BoardSession[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/board/sessions/${userId}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data.sessions || [];
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to get Board sessions"
+      );
+    }
+  }
+
+  /**
+   * Get a specific Board session
+   */
+  async getSession(userId: string, sessionId: string): Promise<BoardSessionData> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          throw new BoardApiError("Session not found");
+        }
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data.session;
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to get Board session"
+      );
+    }
+  }
+
+  /**
+   * Save Board session
+   */
+  async saveSession(
+    userId: string,
+    sessionId: string,
+    data: {
+      sessionName?: string;
+      drawingPaths?: Array<{
+        points: Array<{ x: number; y: number }>;
+        color: string;
+        strokeWidth: number;
+        tool: string;
+      }>;
+      cards?: Array<{
+        id: string;
+        title: string;
+        content: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }>;
+      stickyNotes?: Array<{
+        id: string;
+        x: number;
+        y: number;
+        text: string;
+        color: string;
+        width: number;
+        height: number;
+        enableMarkdown?: boolean;
+        ruled?: boolean;
+        fontSize?: number;
+        fontFamily?: string;
+        isBold?: boolean;
+        isItalic?: boolean;
+        isUnderline?: boolean;
+      }>;
+      viewOffset?: { x: number; y: number };
+      zoom?: number;
+    }
+  ): Promise<BoardSessionData> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const result = await response.json();
+      return result.session;
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to save Board session"
+      );
+    }
+  }
+
+  /**
+   * Delete Board session
+   */
+  async deleteSession(userId: string, sessionId: string): Promise<void> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to delete Board session"
+      );
+    }
+  }
+
+  /**
+   * Update session name
+   */
+  async updateSessionName(
+    userId: string,
+    sessionId: string,
+    sessionName: string
+  ): Promise<void> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}/name`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionName }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to update session name"
+      );
+    }
+  }
+}
+
+export const boardSessionApi = new BoardSessionApi();

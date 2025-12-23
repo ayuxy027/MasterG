@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { HiOutlineCursorClick } from 'react-icons/hi';
-import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuWrench, LuLanguages } from 'react-icons/lu';
+import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuWrench, LuLanguages, LuSave, LuFolderOpen } from 'react-icons/lu';
 import { MdOutlineEventNote } from 'react-icons/md';
 import { Bot, X, ZoomIn, ZoomOut, Maximize2, Search } from 'lucide-react';
 
@@ -19,8 +19,12 @@ interface CanvasDockProps {
   onZoomReset?: () => void;
   onGenerateCards?: (prompt: string, count: number) => void;
   onTranslate?: (languageCode: string) => void;
+  onSaveBoard?: () => void;
+  onNewBoard?: () => void;
   isGenerating?: boolean;
   hasSelection?: boolean;
+  isSaving?: boolean;
+  lastSaved?: Date | null;
 }
 
 const CanvasDock: React.FC<CanvasDockProps> = ({
@@ -38,8 +42,12 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
   onZoomReset,
   onGenerateCards,
   onTranslate,
+  onSaveBoard,
+  onNewBoard,
   isGenerating = false,
   hasSelection = false,
+  isSaving = false,
+  lastSaved = null,
 }) => {
   const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
   const [isTranslatePanelOpen, setIsTranslatePanelOpen] = useState(false);
