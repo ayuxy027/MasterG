@@ -1,11 +1,9 @@
 import mongoose from 'mongoose';
+import env from './env';
 
 export async function connectDatabase(): Promise<void> {
   try {
-    // Hardcode localhost MongoDB
-    const mongoUri = "mongodb://localhost:27017/masterg";
-
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(env.MONGODB_URI);
     console.log('MongoDB connected');
   } catch (error) {
     // Don't throw - allow app to run without MongoDB for basic RAG functionality

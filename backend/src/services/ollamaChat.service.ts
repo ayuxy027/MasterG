@@ -1,6 +1,7 @@
 import axios from "axios";
 import { SUPPORTED_LANGUAGES, LanguageCode } from "../config/constants";
 import { ChatMessage, SourceCitation } from "../types";
+import env from "../config/env";
 
 /**
  * Ollama Chat Service
@@ -12,8 +13,8 @@ export class OllamaChatService {
     private model: string;
 
     constructor() {
-        this.baseUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-        this.model = process.env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
+        this.baseUrl = env.OLLAMA_URL;
+        this.model = env.OLLAMA_CHAT_MODEL;
     }
 
     /**

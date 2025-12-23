@@ -40,8 +40,8 @@ export class PosterService {
   ): Promise<QueryAnalysis> {
     try {
       // Use Ollama/Deepseek
-      const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-      const ollamaModel = process.env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
+      const ollamaUrl = env.OLLAMA_URL;
+      const ollamaModel = env.OLLAMA_CHAT_MODEL;
 
       const prompt = `You are an educational content analyst. Analyze this poster request for Indian students:
 
@@ -130,8 +130,8 @@ Be EXTREMELY specific and educational. Return ONLY the JSON:`;
       const analysis = await this.analyzeQuery(query, category, language);
       const educationalContext = this.getEducationalContext(category, language);
 
-      const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-      const ollamaModel = process.env.OLLAMA_CHAT_MODEL || "deepseek-r1:1.5b";
+      const ollamaUrl = env.OLLAMA_URL;
+      const ollamaModel = env.OLLAMA_CHAT_MODEL;
 
       const enhancementPrompt = `You are an expert prompt engineer for Stable Diffusion/ComfyUI, specializing in educational visual content.
 

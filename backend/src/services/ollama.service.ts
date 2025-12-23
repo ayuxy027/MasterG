@@ -49,9 +49,9 @@ export class OllamaService {
   private defaultModel: string;
 
   constructor() {
-    // Ollama runs locally, default port is 11434
-    this.baseUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-    this.defaultModel = process.env.OLLAMA_MODEL || "deepseek-r1:1.5b";
+    // Ollama runs locally - config from env.ts
+    this.baseUrl = env.OLLAMA_URL;
+    this.defaultModel = env.OLLAMA_CHAT_MODEL;
   }
 
   /**
@@ -174,7 +174,7 @@ export class OllamaService {
         for (const line of lines) {
           try {
             const data = JSON.parse(line);
-            
+
             // DeepSeek R1 has separate thinking and response fields
             if (data.thinking) {
               yield { type: "thinking", content: data.thinking };
@@ -182,7 +182,7 @@ export class OllamaService {
             if (data.response) {
               yield { type: "response", content: data.response };
             }
-            
+
             if (data.done) {
               return;
             }

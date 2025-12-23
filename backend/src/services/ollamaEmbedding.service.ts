@@ -1,5 +1,6 @@
 import axios from "axios";
 import { EmbeddingResult } from "../types";
+import env from "../config/env";
 
 /**
  * Ollama Embedding Service
@@ -15,8 +16,8 @@ export class OllamaEmbeddingService {
   private readonly RETRY_DELAY = 1000; // 1 second
 
   constructor() {
-    this.baseUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-    this.model = process.env.OLLAMA_EMBED_MODEL || "embeddinggemma:latest";
+    this.baseUrl = env.OLLAMA_URL;
+    this.model = env.OLLAMA_EMBED_MODEL;
   }
 
   /**
