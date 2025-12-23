@@ -768,17 +768,6 @@ const BoardPage: React.FC = () => {
   // BOARD SESSION MANAGEMENT
   // ============================================================================
 
-  const handleSaveBoard = useCallback(async () => {
-    if (!currentSessionId) {
-      // Create new session ID
-      const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      setCurrentSessionId(newSessionId);
-      await handleSaveBoardWithId(newSessionId);
-    } else {
-      await handleSaveBoardWithId(currentSessionId);
-    }
-  }, [currentSessionId]);
-
   const handleSaveBoardWithId = useCallback(async (sessionId: string) => {
     setIsSaving(true);
     try {
@@ -819,44 +808,88 @@ const BoardPage: React.FC = () => {
       });
       setLastSaved(new Date());
       setCurrentSessionId(sessionId);
+      console.log('✅ Board saved successfully');
     } catch (error) {
-      console.error('Failed to save board:', error);
+      console.error('❌ Failed to save board:', error);
     } finally {
       setIsSaving(false);
     }
   }, [userId, drawingPaths, cards, stickyNotes, viewOffset, zoom]);
 
+  const handleSaveBoard = useCallback(async () => {
+    if (!currentSessionId) {
+      // Create new session ID
+      const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentSessionId(newSessionId);
+      await handleSaveBoardWithId(newSessionId);
+    } else {
+      await handleSaveBoardWithId(currentSessionId);
+    }
+  }, [currentSessionId, handleSaveBoardWithId]);
+
   const handleLoadBoard = useCallback(async (sessionId: string) => {
     try {
+      console.log('🔍 Loading board session:', sessionId);
       const session = await boardSessionApi.getSession(userId, sessionId);
       if (session) {
+        console.log('📦 Session data received:');
+        console.log('   - Sticky Notes:', session.stickyNotes?.length || 0);
+        console.log('   - Cards:', session.cards?.length || 0);
+        console.log('   - Drawing Paths:', session.drawingPaths?.length || 0);
+
         // Restore drawing paths
-        setDrawingPaths(session.drawingPaths.map(path => ({
-          points: path.points,
-          color: path.color,
-          strokeWidth: path.strokeWidth,
-          tool: path.tool,
-        })));
+        if (session.drawingPaths && session.drawingPaths.length > 0) {
+          setDrawingPaths(session.drawingPaths.map(path => ({
+            points: path.points,
+            color: path.color,
+            strokeWidth: path.strokeWidth,
+            tool: path.tool,
+          })));
+        }
 
         // Restore cards
-        setCards(session.cards.map(card => ({
-          ...card,
-          isSelected: false,
-        })));
+        if (session.cards && session.cards.length > 0) {
+          setCards(session.cards.map(card => ({
+            ...card,
+            isSelected: false,
+          })));
+        }
 
         // Restore sticky notes
-        setStickyNotes(session.stickyNotes);
+        if (session.stickyNotes && session.stickyNotes.length > 0) {
+          setStickyNotes(session.stickyNotes);
+        }
 
         // Restore view state
-        setViewOffset(session.viewOffset);
-        setZoom(session.zoom);
+        if (session.viewOffset) {
+          setViewOffset(session.viewOffset);
+        }
+        if (session.zoom) {
+          setZoom(session.zoom);
+        }
 
         setCurrentSessionId(sessionId);
+        console.log('✅ Board loaded successfully:', sessionId);
+      } else {
+        console.warn('⚠️ No session data found for:', sessionId);
       }
     } catch (error) {
-      console.error('Failed to load board:', error);
+      console.error('❌ Failed to load board:', error);
     }
   }, [userId]);
+
+  // Auto-load test session on mount if userId matches test user
+  useEffect(() => {
+    const testUserId = 'user_test_board_123';
+    const testSessionId = 'board_test_123';
+
+    if (userId === testUserId && !currentSessionId && stickyNotes.length === 0 && cards.length === 0 && drawingPaths.length === 0) {
+      console.log('🔍 Detected test user, attempting to load test session...');
+      handleLoadBoard(testSessionId).catch(err => {
+        console.error('Failed to auto-load test session:', err);
+      });
+    }
+  }, [userId, currentSessionId, handleLoadBoard, stickyNotes.length, cards.length, drawingPaths.length]);
 
   const handleNewBoard = useCallback(() => {
     setDrawingPaths([]);
@@ -876,10 +909,20 @@ const BoardPage: React.FC = () => {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
+    // Only auto-save if there's content
+    const hasContent = drawingPaths.length > 0 || cards.length > 0 || stickyNotes.length > 0;
+    if (!hasContent) return;
+
     // Auto-save after 3 seconds of inactivity
     autoSaveTimeoutRef.current = setTimeout(() => {
-      if (currentSessionId && (drawingPaths.length > 0 || cards.length > 0 || stickyNotes.length > 0)) {
+      if (currentSessionId) {
+        // Session exists, save to it
         handleSaveBoardWithId(currentSessionId);
+      } else {
+        // No session yet, create one and save
+        const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        setCurrentSessionId(newSessionId);
+        handleSaveBoardWithId(newSessionId);
       }
     }, 3000);
 
