@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, Component, ErrorInfo, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
 import { stitchAPI, StitchApiError, StitchSessionListItem } from "../../services/stitchApi";
 import StitchSessionSidebar from "./StitchSessionSidebar";
 
@@ -157,7 +154,7 @@ class MarkdownErrorBoundary extends React.Component<
   }
 }
 
-// Safe markdown renderer component with minimal, professional styling
+// Safe markdown renderer component - SIMPLIFIED (no KaTeX, plain text formulas)
 const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
   // Validate and sanitize content
   if (!content || typeof content !== 'string') {
@@ -173,26 +170,8 @@ const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
   try {
     return (
       <div className="markdown-content prose prose-lg max-w-none">
-        <style>{`
-          .markdown-content .katex {
-            font-size: 1.1em;
-          }
-          .markdown-content .katex-display {
-            margin: 1.5em 0;
-            overflow-x: auto;
-            overflow-y: hidden;
-          }
-          .markdown-content .katex-display > .katex {
-            display: inline-block;
-            white-space: nowrap;
-          }
-          .markdown-content code {
-            font-family: 'KaTeX_Math', 'KaTeX_Main', 'Courier New', monospace;
-          }
-        `}</style>
         <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeKatex]}
+          remarkPlugins={[remarkGfm]}
           components={{
             // Minimal, professional heading styles
             h1: ({ children, ...props }) => (
@@ -248,15 +227,9 @@ const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
                 {children}
               </em>
             ),
-            // Code blocks and inline code
+            // Code blocks and inline code - SIMPLIFIED
             code: ({ children, className: codeClassName, ...props }: any) => {
               const isInline = !codeClassName;
-              const isMath = codeClassName?.includes("math");
-              
-              // Math rendering (handled by rehype-katex)
-              if (isMath) {
-                return <code {...props} className={codeClassName}>{children}</code>;
-              }
               
               if (isInline) {
                 return (

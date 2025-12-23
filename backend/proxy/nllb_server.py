@@ -107,9 +107,33 @@ def strip_markdown(text: str) -> str:
   # Extract display math first ($$...$$) - must handle multiline
   text = re.sub(r'\$\$[\s\S]*?\$\$', replace_display_math, text)
   
+  # Also handle LaTeX-style display math \[...\] (convert to $$...$$ format)
+  def replace_latex_display_math(match):
+    nonlocal placeholder_counter
+    placeholder = f"__LATEX_DISPLAY_{placeholder_counter}__"
+    placeholder_counter += 1
+    # Convert \[...\] to $$...$$ format
+    math_content = match.group(1)
+    math_placeholders[placeholder] = f"$${math_content}$$"
+    return placeholder
+  
+  text = re.sub(r'\\\[([\s\S]*?)\\\]', replace_latex_display_math, text)
+  
   # Extract inline math ($...$) - but avoid matching $$ as start of display math
   # Use negative lookbehind/lookahead to ensure we don't match $$ as two $...$
   text = re.sub(r'(?<!\$)\$(?!\$)([^$\n]+?)\$(?!\$)', replace_inline_math, text)
+  
+  # Also handle LaTeX-style inline math \(...\) (convert to $...$ format)
+  def replace_latex_inline_math(match):
+    nonlocal placeholder_counter
+    placeholder = f"__LATEX_INLINE_{placeholder_counter}__"
+    placeholder_counter += 1
+    # Convert \(...\) to $...$ format
+    math_content = match.group(1)
+    math_placeholders[placeholder] = f"${math_content}$"
+    return placeholder
+  
+  text = re.sub(r'\\\(([^)]+?)\\\)', replace_latex_inline_math, text)
   
   # Now remove markdown formatting (LaTeX is safely stored in placeholders)
   # Remove markdown headers

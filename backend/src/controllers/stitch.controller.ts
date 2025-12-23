@@ -408,53 +408,42 @@ export class StitchController {
                           params.subject.toLowerCase() === "mathematics";
     
     const mathSpecificInstructions = isMathematics ? `
-CRITICAL MATHEMATICAL REQUIREMENTS (BATTLE-TESTED):
-- ALWAYS use proper mathematical notation: Use LaTeX-style math syntax for ALL formulas
-  * Inline math: Use $formula$ syntax (e.g., $x^2 + y^2 = z^2$, $\\frac{a}{b}$, $\\sqrt{x}$)
-  * Display math: Use $$formula$$ for centered equations (e.g., $$E = mc^2$$, $$\\int_{a}^{b} f(x)dx$$)
-- Preserve ALL mathematical symbols EXACTLY:
-  * Powers: Use ^ for superscripts ($x^2$, $a^{n+1}$)
-  * Subscripts: Use _ for subscripts ($H_2O$, $x_i$, $a_{n-1}$)
-  * Fractions: Use \\frac{numerator}{denominator} ($\\frac{a}{b}$, $\\frac{x+1}{x-1}$)
-  * Roots: Use \\sqrt{} or \\sqrt[n]{} ($\\sqrt{x}$, $\\sqrt[3]{8}$)
-  * Summation: Use \\sum_{i=1}^{n} ($\\sum_{i=1}^{n} x_i$)
-  * Integrals: Use \\int, \\int_{a}^{b} ($\\int f(x)dx$, $\\int_{0}^{\\infty} e^{-x}dx$)
-  * Greek letters: Use \\alpha, \\beta, \\gamma, \\pi, \\theta, \\lambda, etc.
-  * Operators: Use \\times, \\div, \\pm, \\leq, \\geq, \\neq, \\approx
-  * Sets: Use \\in, \\notin, \\subset, \\cup, \\cap, \\emptyset
-  * Logic: Use \\forall, \\exists, \\implies, \\iff
-- For complex equations, break down step-by-step:
-  * Show each algebraic manipulation clearly
-  * Explain WHY each step is valid (e.g., "Using the distributive property...")
-  * Include intermediate steps, don't skip calculations
-- Always provide WORKED EXAMPLES with complete solutions:
-  * Show the problem statement
-  * Show ALL steps of the solution
-  * Explain each step's reasoning
-  * Provide the final answer clearly
-- Handle multi-line equations properly:
-  * Use $$...$$ for display equations that span multiple lines
-  * Use align environment syntax: $$\\begin{align} ... \\end{align}$$
-- Preserve units and measurements exactly:
-  * Use proper unit notation (m/s, kg·m², °C, etc.)
-  * Don't convert units unless explicitly requested
-- For word problems:
-  * Translate word problems into mathematical expressions accurately
-  * Identify all given information and what needs to be found
-  * Set up equations correctly before solving
-- Common mathematical concepts to handle perfectly:
-  * Quadratic equations: $ax^2 + bx + c = 0$ with discriminant $\\Delta = b^2 - 4ac$
-  * Trigonometry: $\\sin$, $\\cos$, $\\tan$, identities, unit circle
-  * Calculus: derivatives $\\frac{d}{dx}$, integrals $\\int$, limits $\\lim_{x \\to a}$
-  * Linear algebra: matrices, vectors, determinants
-  * Geometry: area formulas, volume formulas, theorems
-  * Statistics: mean $\\bar{x}$, standard deviation $\\sigma$, probability $P(A)$
+CRITICAL MATHEMATICAL REQUIREMENTS (OPTIMIZED FOR SMALL MODEL):
+- KEEP MATH SIMPLE AND STRAIGHTFORWARD - Use plain text notation for formulas
+  * Write formulas directly in text: Use x^2 for powers, H2O for subscripts, a/b for fractions
+  * Examples: "x^2 + y^2 = z^2", "H2O", "C6H12O6", "a/b", "sqrt(x)", "pi = 3.14"
+  * NO LaTeX syntax needed - just write formulas naturally in plain text
+  * For simple equations: Write "x + 5 = 10" or "area = length × width"
+  * For fractions: Write "a/b" or "numerator/denominator" (e.g., "1/2", "3/4")
+  * For powers: Write "x^2" or "x squared" (e.g., "2^3 = 8", "5^2 = 25")
+  * For subscripts: Write "H2O" or "CO2" directly (e.g., "H2SO4", "NaCl")
+  * For roots: Write "sqrt(16) = 4" or "square root of 16 equals 4"
+- SIMPLE EXAMPLES ONLY - Do NOT go deep into complex mathematics
+  * Use basic arithmetic: addition, subtraction, multiplication, division
+  * Use simple algebra: solving for x in "x + 5 = 10"
+  * Use basic geometry: area of rectangle = length × width
+  * Use simple formulas: speed = distance/time, area of circle = pi × r^2
+  * AVOID: Complex calculus, advanced algebra, multi-step proofs, abstract concepts
+  * AVOID: Deep mathematical theory, complex derivations, advanced theorems
+- Provide 1-2 SIMPLE worked examples maximum:
+  * Show problem: "If x + 5 = 10, find x"
+  * Show solution: "x + 5 = 10, so x = 10 - 5 = 5"
+  * Keep examples SHORT and CLEAR - maximum 3-4 steps
+  * Do NOT create lengthy proofs or complex derivations
+- Write chemical formulas directly: C6H12O6, H2O, CO2, NaCl, H2SO4
+  * NO special formatting needed - just write them as plain text
+  * Subscripts are written as regular numbers: H2O (not H₂O)
+- Write mathematical expressions naturally:
+  * "The area of a rectangle is length times width"
+  * "If we have x + 5 = 10, then x = 5"
+  * "The speed is distance divided by time"
+  * "Pi is approximately 3.14"
 - NEVER:
-  * Simplify or approximate mathematical constants (use exact values: $\\pi$, $e$, $\\sqrt{2}$)
-  * Round numbers unnecessarily in mathematical derivations
-  * Skip steps in proofs or solutions
-  * Use ambiguous notation (always be explicit)
-  * Mix up mathematical concepts or formulas
+  * Use complex LaTeX syntax or special math formatting
+  * Create deep mathematical proofs or advanced examples
+  * Write multi-line complex equations
+  * Use abstract mathematical notation
+  * Go beyond basic Class ${params.grade} level mathematics
 
 ` : '';
 
@@ -529,17 +518,149 @@ Content Requirements:
 - Provide explanations suitable for Class ${params.grade} level
 - Use clear, simple sentences that are easy to translate
 - Maintain high factual accuracy aligned with NCERT, CBSE, and State Board curricula
-- Structure content with clear sections and logical flow
+- Structure content with clear sections and logical flow following the EXACT markdown template above
 - STRICTLY adhere to the specified length requirement above
+- ALWAYS follow the markdown formatting rules - this is CRITICAL for professional presentation
 
-Formatting Rules:
-- Output MUST use proper markdown formatting for readability
-- Use markdown syntax for structure: # for headings, - or * for lists, **bold** for emphasis
-- For mathematics: Use LaTeX-style math notation ($...$ for inline, $$...$$ for display)
-- CRITICAL FOR TRANSLATION: LaTeX math formulas ($...$ and $$...$$) will be preserved exactly during translation
-- Use proper formatting: headings, bullet points, numbered lists, code blocks for formulas
-- Separate major sections clearly with headings
-- IMPORTANT: Keep LaTeX formulas separate from surrounding text for better translation quality
+CRITICAL MARKDOWN FORMATTING RULES (BEST-IN-CLASS, NEVER FAIL):
+- ALWAYS follow this EXACT structure for perfect markdown:
+  
+  STRUCTURE TEMPLATE:
+  # Main Title (use ONE # for main title)
+  
+  ## Introduction (use ## for major sections)
+  [2-3 sentences introducing the topic]
+  
+  ## Core Concepts (use ## for major sections)
+  [Main explanation with clear paragraphs]
+  
+  ### Sub-concept 1 (use ### for sub-sections)
+  [Detailed explanation]
+  
+  ### Sub-concept 2
+  [Detailed explanation]
+  
+  ## Examples (use ## for major sections)
+  [Examples section]
+  
+  ### Example 1: [Title]
+  [Example explanation]
+  
+  ## Applications (use ## for major sections)
+  [Applications section]
+  
+  ## Summary (use ## for major sections)
+  [Summary paragraph]
+  
+- HEADING HIERARCHY (CRITICAL - NEVER BREAK THIS):
+  * Level 1 (#): ONLY for the main title at the very top
+  * Level 2 (##): For major sections (Introduction, Core Concepts, Examples, Applications, Summary)
+  * Level 3 (###): For sub-sections within major sections
+  * NEVER skip heading levels (don't go from ## to ####)
+  * ALWAYS have exactly ONE space after # symbols: "# Title" not "#Title"
+  
+- PARAGRAPH FORMATTING:
+  * Separate paragraphs with ONE blank line (double newline)
+  * Each paragraph should be 2-4 sentences
+  * Start each paragraph with a clear topic sentence
+  * Use proper spacing - never have two paragraphs without a blank line between
+  
+- LISTS (BULLET POINTS AND NUMBERED):
+  * Use "- " (dash + space) for bullet points
+  * Use "1. " (number + period + space) for numbered lists
+  * Indent nested lists with 2 spaces: "  - " for sub-items
+  * Leave ONE blank line before lists
+  * Leave ONE blank line after lists
+  * Keep list items concise (one line each, or maximum 2 lines)
+  
+- EMPHASIS AND FORMATTING:
+  * Use **bold** for important terms: **key concept**
+  * Use *italic* for emphasis: *important note*
+  * Use code formatting for formulas or technical terms: code formatting for H2O, x^2
+  * Don't overuse formatting - keep it clean and professional
+  
+- SECTION SEPARATION:
+  * ALWAYS use horizontal rules (---) between major sections
+  * Place horizontal rule on its own line with blank lines above and below
+  * Example:
+  
+  ## Section 1
+  [Content]
+  
+  ---
+  
+  ## Section 2
+  [Content]
+  
+- MATHEMATICAL AND CHEMICAL FORMULAS:
+  * Write formulas in plain text: H2O, C6H12O6, x^2 + y^2 = z^2
+  * Use code formatting for formulas: code formatting for H2O, C6H12O6, x^2 + 5 = 10
+  * Keep formulas simple and readable
+  * For equations, write: "The formula is: x + 5 = 10"
+  
+- CONSISTENCY RULES (NEVER BREAK):
+  * Use consistent heading capitalization (Title Case for All Words)
+  * Use consistent list formatting throughout
+  * Use consistent spacing (one blank line between sections)
+  * Use consistent paragraph length (2-4 sentences)
+  * Use consistent example formatting
+  
+- VALIDATION CHECKLIST (YOUR OUTPUT MUST PASS ALL):
+  * Every section starts with ## heading
+  * Main title uses # (only one)
+  * Blank lines separate all sections
+  * Lists have proper indentation
+  * No orphaned text (everything belongs to a section)
+  * Consistent formatting throughout
+  * Proper heading hierarchy (# to ## to ###)
+  * All paragraphs properly separated
+  * Horizontal rules between major sections
+  
+- COMMON MISTAKES TO AVOID:
+  * Don't use # for section headings (use ##)
+  * Don't skip blank lines between sections
+  * Don't mix list formats (- and *)
+  * Don't use inconsistent spacing
+  * Don't create orphaned paragraphs
+  * Don't skip heading levels
+  * Don't forget horizontal rules between major sections
+  * Don't use excessive formatting
+  
+- PERFECT EXAMPLE STRUCTURE:
+  
+  # Photosynthesis
+  
+  ## Introduction
+  
+  Photosynthesis is the process by which plants convert light energy into chemical energy. This process is essential for life on Earth as it produces oxygen and glucose.
+  
+  ---
+  
+  ## Core Concepts
+  
+  ### What is Photosynthesis?
+  
+  Photosynthesis occurs in the chloroplasts of plant cells. The process involves two main stages: light-dependent reactions and light-independent reactions.
+  
+  ### The Process
+  
+  During photosynthesis, plants use carbon dioxide (CO2) and water (H2O) to produce glucose (C6H12O6) and oxygen (O2). The chemical equation is: 6CO2 + 6H2O → C6H12O6 + 6O2.
+  
+  ---
+  
+  ## Examples
+  
+  ### Example 1: Leaf Photosynthesis
+  
+  When sunlight hits a leaf, chlorophyll absorbs the light energy. This energy is used to split water molecules and produce oxygen.
+  
+  ---
+  
+  ## Summary
+  
+  Photosynthesis is a vital process that converts light energy into chemical energy, producing oxygen and glucose essential for life.
+  
+- REMEMBER: Your markdown will be displayed to judges - make it PERFECT, CLEAN, and PROFESSIONAL
 
 Pedagogical Approach:
 - Adjust depth and complexity appropriately for Class ${params.grade}
@@ -572,13 +693,25 @@ Educational Guardrails:
 
 Output Style:
 - Write in clear, professional English
-- Use proper markdown formatting for structure
-- Include mathematical formulas using LaTeX syntax
+- Follow the EXACT markdown structure template provided above
+- Write mathematical formulas and chemical formulas in plain text (H2O, C6H12O6, x^2 + 5 = 10)
+- Keep examples SIMPLE and STRAIGHTFORWARD - avoid complex mathematics
 - Avoid emojis, slang, or overly casual expressions
 - Do not include meta-commentary about the generation process
 - Ensure content is ready for direct use in educational contexts
+- DOUBLE-CHECK your markdown formatting before outputting - it must be PERFECT
 
-Begin generating the comprehensive educational content now.
+FINAL VALIDATION BEFORE OUTPUT:
+1. Check that main title uses # (only one)
+2. Check that all major sections use ##
+3. Check that all sections have blank lines before and after
+4. Check that horizontal rules (---) separate major sections
+5. Check that lists are properly formatted
+6. Check that heading hierarchy is correct (# → ## → ###)
+7. Check that paragraphs are properly separated
+8. Check that formatting is consistent throughout
+
+Begin generating the comprehensive educational content now. Remember: PERFECT markdown formatting is CRITICAL for professional presentation.
 `;
 
     return prompt.trim();
