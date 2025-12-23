@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { HiOutlineCursorClick } from 'react-icons/hi';
-import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuWrench } from 'react-icons/lu';
+import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuWrench, LuLanguages } from 'react-icons/lu';
 import { MdOutlineEventNote } from 'react-icons/md';
-import { Bot, X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Bot, X, ZoomIn, ZoomOut, Maximize2, Search } from 'lucide-react';
 
 interface CanvasDockProps {
   currentTool: string;
@@ -18,7 +18,9 @@ interface CanvasDockProps {
   onZoomChange?: (zoom: number) => void;
   onZoomReset?: () => void;
   onGenerateCards?: (prompt: string, count: number) => void;
+  onTranslate?: (languageCode: string) => void;
   isGenerating?: boolean;
+  hasSelection?: boolean;
 }
 
 const CanvasDock: React.FC<CanvasDockProps> = ({
@@ -35,19 +37,76 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
   onZoomChange,
   onZoomReset,
   onGenerateCards,
+  onTranslate,
   isGenerating = false,
+  hasSelection = false,
 }) => {
   const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
+  const [isTranslatePanelOpen, setIsTranslatePanelOpen] = useState(false);
+  const [translateSearchQuery, setTranslateSearchQuery] = useState('');
   const [generatePrompt, setGeneratePrompt] = useState('');
   const [cardCount, setCardCount] = useState(3);
   const generatePanelRef = useRef<HTMLDivElement | null>(null);
+  const translatePanelRef = useRef<HTMLDivElement | null>(null);
   const colorInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Top 5 Indian languages + More option
+  const TOP_LANGUAGES = [
+    { code: 'hi', name: 'Hindi', native: 'हिंदी' },
+    { code: 'mr', name: 'Marathi', native: 'मराठी' },
+    { code: 'bn', name: 'Bengali', native: 'বাংলা' },
+    { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+    { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+  ];
+
+  // All 23 languages (22 Indian + English)
+  const ALL_LANGUAGES = [
+    { code: 'as', name: 'Assamese', native: 'অসমীয়া' },
+    { code: 'bn', name: 'Bengali', native: 'বাংলা' },
+    { code: 'bho', name: 'Bhojpuri', native: 'भोजपुरी' },
+    { code: 'brx', name: 'Bodo', native: 'बर\'' },
+    { code: 'en', name: 'English', native: 'English' },
+    { code: 'doi', name: 'Dogri', native: 'डोगरी' },
+    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
+    { code: 'hi', name: 'Hindi', native: 'हिंदी' },
+    { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
+    { code: 'ks', name: 'Kashmiri', native: 'कॉशुर' },
+    { code: 'kok', name: 'Konkani', native: 'कोंकणी' },
+    { code: 'mai', name: 'Maithili', native: 'मैथिली' },
+    { code: 'ml', name: 'Malayalam', native: 'മലയാളം' },
+    { code: 'mni', name: 'Manipuri', native: 'ꯃꯅꯤꯄꯨꯔꯤ' },
+    { code: 'mr', name: 'Marathi', native: 'मराठी' },
+    { code: 'ne', name: 'Nepali', native: 'नेपाली' },
+    { code: 'or', name: 'Odia', native: 'ଓଡ଼ିଆ' },
+    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+    { code: 'sa', name: 'Sanskrit', native: 'संस्कृत' },
+    { code: 'sat', name: 'Santali', native: 'ᱥᱟᱱᱛᱟᱲᱤ' },
+    { code: 'sd', name: 'Sindhi', native: 'سنڌي' },
+    { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+    { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+    { code: 'ur', name: 'Urdu', native: 'اردو' },
+  ];
+
+  const filteredLanguages = useMemo(() => {
+    if (!translateSearchQuery.trim()) return ALL_LANGUAGES;
+    const query = translateSearchQuery.toLowerCase();
+    return ALL_LANGUAGES.filter(
+      lang =>
+        lang.name.toLowerCase().includes(query) ||
+        lang.native.toLowerCase().includes(query) ||
+        lang.code.toLowerCase().includes(query)
+    );
+  }, [translateSearchQuery]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
       if (generatePanelRef.current && !generatePanelRef.current.contains(target)) {
         setIsGeneratePanelOpen(false);
+      }
+      if (translatePanelRef.current && !translatePanelRef.current.contains(target)) {
+        setIsTranslatePanelOpen(false);
+        setTranslateSearchQuery('');
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -205,6 +264,110 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
               />
               <span className="text-sm text-orange-600 font-medium w-5">{strokeWidth}</span>
             </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-8 bg-orange-200" />
+
+          {/* Translate */}
+          <div className="relative" ref={translatePanelRef}>
+            <button
+              onClick={() => setIsTranslatePanelOpen(!isTranslatePanelOpen)}
+              disabled={!hasSelection}
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                isTranslatePanelOpen
+                  ? 'bg-blue-500 text-white shadow-lg'
+                  : hasSelection
+                    ? 'text-blue-600 hover:bg-blue-50'
+                    : 'text-gray-400 hover:bg-gray-50 cursor-not-allowed'
+              }`}
+              title={hasSelection ? 'Translate selected notes' : 'Select notes to translate'}
+            >
+              <LuLanguages size={18} />
+              <span className="text-xs font-medium">Translate</span>
+            </button>
+
+            {/* Translate Panel */}
+            {isTranslatePanelOpen && hasSelection && (
+              <div className="absolute bottom-14 left-0 w-80 bg-white rounded-xl shadow-xl border border-blue-200 p-4 z-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <LuLanguages size={20} className="text-blue-500" />
+                    <h3 className="font-semibold text-gray-800">Translate</h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsTranslatePanelOpen(false);
+                      setTranslateSearchQuery('');
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded-lg"
+                  >
+                    <X size={16} className="text-gray-500" />
+                  </button>
+                </div>
+
+                {/* Top 5 Languages */}
+                <div className="space-y-2 mb-3">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Quick Select</p>
+                  <div className="grid grid-cols-1 gap-1">
+                    {TOP_LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          onTranslate?.(lang.code);
+                          setIsTranslatePanelOpen(false);
+                          setTranslateSearchQuery('');
+                        }}
+                        className="flex items-center justify-between px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-all hover:scale-[1.02]"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{lang.name}</span>
+                          <span className="text-xs text-blue-600">{lang.native}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* More Languages - Searchable */}
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">More Languages</p>
+                  <div className="relative mb-2">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={translateSearchQuery}
+                      onChange={(e) => setTranslateSearchQuery(e.target.value)}
+                      placeholder="Search languages..."
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-blue-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {filteredLanguages.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">No languages found</p>
+                    ) : (
+                      filteredLanguages.map((lang) => (
+                        <button
+                          key={lang.code}
+                          onClick={() => {
+                            onTranslate?.(lang.code);
+                            setIsTranslatePanelOpen(false);
+                            setTranslateSearchQuery('');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-all hover:scale-[1.01]"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{lang.name}</span>
+                            <span className="text-xs text-gray-500">{lang.native}</span>
+                          </div>
+                          <span className="text-xs text-gray-400">{lang.code}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Divider */}

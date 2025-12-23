@@ -5,6 +5,7 @@ import { getToolById, Point, DrawingPath } from './tools';
 import Card from './Card';
 import MinimizedNavbar from './MinimizedNavbar';
 import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus } from '../../services/boardApi';
+import { stitchAPI } from '../../services/stitchApi';
 
 // ============================================================================
 // TYPES
@@ -742,6 +743,42 @@ const BoardPage: React.FC = () => {
   }, []);
 
   // ============================================================================
+  // TRANSLATION HANDLER
+  // ============================================================================
+
+  const handleTranslate = useCallback(async (targetLanguageCode: string) => {
+    if (selectedStickyNoteIds.size === 0) return;
+
+    const selectedNotes = stickyNotes.filter(note => selectedStickyNoteIds.has(note.id));
+    if (selectedNotes.length === 0) return;
+
+    // Translate each selected note
+    for (const note of selectedNotes) {
+      try {
+        const result = await stitchAPI.translateContent({
+          text: note.text,
+          sourceLanguage: 'en', // Assuming English as source
+          targetLanguage: targetLanguageCode,
+        });
+
+        if (result.success && result.translated) {
+          // Update the sticky note with translated text
+          setStickyNotes(prev => prev.map(n =>
+            n.id === note.id
+              ? { ...n, text: result.translated! }
+              : n
+          ));
+        }
+      } catch (error) {
+        console.error(`Failed to translate note ${note.id}:`, error);
+      }
+    }
+
+    // Clear selection after translation
+    setSelectedStickyNoteIds(new Set());
+  }, [selectedStickyNoteIds, stickyNotes]);
+
+  // ============================================================================
   // TOOLBAR HANDLERS
   // ============================================================================
 
@@ -1041,7 +1078,9 @@ const BoardPage: React.FC = () => {
         onZoomChange={setZoom}
         onZoomReset={() => { setZoom(1); setViewOffset({ x: 0, y: 0 }); }}
         onGenerateCards={handleGenerateCards}
+        onTranslate={handleTranslate}
         isGenerating={isGenerating}
+        hasSelection={selectedStickyNoteIds.size > 0}
       />
     </div>
   );
