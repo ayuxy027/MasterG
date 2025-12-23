@@ -7,6 +7,8 @@ interface ChatHistoryDocument extends Document {
   sessionId: string;
   chromaCollectionName: string;
   messages: ChatMessage[];
+  language?: string;
+  grade?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +36,14 @@ const chatMessageSchema = new Schema(
         snippet: String,
       },
     ],
+    translatedContent: {
+      type: String,
+      default: null,
+    },
+    translatedLanguage: {
+      type: String,
+      default: null,
+    },
   },
   { _id: false }
 );
@@ -58,6 +68,14 @@ const chatHistorySchema: any = new Schema(
     chatName: {
       type: String,
       default: null,
+    },
+    language: {
+      type: String,
+      default: "hi",
+    },
+    grade: {
+      type: String,
+      default: "12",
     },
     messages: [chatMessageSchema],
   },
@@ -115,11 +133,11 @@ export class ChatService {
           ...msg,
           timestamp: msg.timestamp || new Date(),
         })),
+        language: chatHistory.language || "hi",
+        grade: chatHistory.grade || "12",
       } as any;
 
-      console.log(
-        `📝 Retrieved session with ${result.messages.length} messages`
-      );
+
       return result;
     } catch (error) {
       console.error("Error getting/creating chat session:", error);
@@ -218,7 +236,7 @@ export class ChatService {
         { upsert: true, new: true }
       );
 
-      console.log(`💬 Message added to chat history (${userId}/${sessionId})`);
+      // Message added to chat history
     } catch (error) {
       console.error("Error adding message to chat history:", error);
       // Don't throw - allow RAG to work without chat history
@@ -439,6 +457,91 @@ export class ChatService {
     } catch (error) {
       console.error("Error clearing chat session:", error);
       throw new Error("Failed to clear chat session");
+    }
+  }
+
+  /**
+   * Save translation for a specific message
+   * Identifies message by content since we don't expose stable IDs to frontend yet
+   */
+  async saveMessageTranslation(
+    userId: string,
+    sessionId: string,
+    originalContent: string,
+    translatedContent: string,
+    translatedLanguage: string
+  ): Promise<void> {
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        return;
+      }
+
+      // We need to find the specific message in the array and update it.
+      // Since we don't have a unique ID for the message available here easily (frontend uses generated IDs),
+      // we'll match by content. For robustness, we check the last 20 messages.
+
+      const chatHistory = await ChatHistoryModel.findOne({ userId, sessionId });
+      if (!chatHistory || !chatHistory.messages) return;
+
+      // Find the message index (searching backwards)
+      let messageIndex = -1;
+      for (let i = chatHistory.messages.length - 1; i >= 0; i--) {
+        if (chatHistory.messages[i].content === originalContent) {
+          messageIndex = i;
+          break;
+        }
+      }
+
+      if (messageIndex !== -1) {
+        // Update using the positional operator logic, but since we have the index, we can target it directly
+        const updatePath = `messages.${messageIndex}.translatedContent`;
+        const langUpdatePath = `messages.${messageIndex}.translatedLanguage`;
+
+        const updateQuery: any = { $set: {} };
+        updateQuery.$set[updatePath] = translatedContent;
+        updateQuery.$set[langUpdatePath] = translatedLanguage;
+
+        await ChatHistoryModel.updateOne(
+          { userId, sessionId },
+          updateQuery
+        );
+
+
+      } else {
+        console.warn(`⚠️ Message not found for translation update (${userId}/${sessionId})`);
+      }
+    } catch (error) {
+      console.error("Error saving translation:", error);
+      // Don't throw to avoid breaking the UI flow
+    }
+  }
+
+  /**
+   * Update session settings (language, grade)
+   */
+  async updateSessionSettings(
+    userId: string,
+    sessionId: string,
+    settings: { language?: string; grade?: string }
+  ): Promise<void> {
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        return;
+      }
+
+      const update: any = { updatedAt: new Date() };
+      if (settings.language) update.language = settings.language;
+      if (settings.grade) update.grade = settings.grade;
+
+      await ChatHistoryModel.findOneAndUpdate(
+        { userId, sessionId },
+        { $set: update }
+      );
+
+
+    } catch (error) {
+      console.error("Error updating session settings:", error);
+      throw new Error("Failed to update session settings");
     }
   }
 }

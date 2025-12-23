@@ -31,34 +31,34 @@ export class UploadController {
       const userId = req.body.userId || "default-user";
       const sessionId = req.body.sessionId || "default-session";
 
-      console.log(
-        `Processing file: ${file.originalname} (${file.mimetype}) for user: ${userId}, session: ${sessionId}`
-      );
+      // console.log(
+      //   `Processing file: ${file.originalname} (${file.mimetype}) for user: ${userId}, session: ${sessionId}`
+      // );
 
       // Get chat-specific ChromaDB collection name
       const chromaCollectionName = await chatService.getChromaCollectionName(
         userId,
         sessionId
       );
-      console.log(`📚 Storing in ChromaDB collection: ${chromaCollectionName}`);
+      // console.log(`📚 Storing in ChromaDB collection: ${chromaCollectionName}`);
 
       let allChunks: any[] = [];
 
       // Step 1: Extract text using universal text extractor (handles ALL file types)
       try {
         const extractionResult = await textExtractorService.extract(file.path, file.mimetype);
-        console.log(
-          `📄 Extracted ${extractionResult.pageCount || 1} page(s) from ${file.originalname}`
-        );
+        // console.log(
+        //   `📄 Extracted ${extractionResult.pageCount || 1} page(s) from ${file.originalname}`
+        // );
 
         // Get full document content for language detection
         const fullDocumentContent = extractionResult.text;
 
         // Detect document language from full content
         const documentLanguageDetection = languageService.detectLanguage(fullDocumentContent);
-        console.log(
-          `🌐 Detected document language: ${documentLanguageDetection.language} (${documentLanguageDetection.languageCode})`
-        );
+        // console.log(
+        //   `🌐 Detected document language: ${documentLanguageDetection.language} (${documentLanguageDetection.languageCode})`
+        // );
 
         // Store in MongoDB based on whether we have page-wise data
         if (extractionResult.pages && extractionResult.pages.length > 0) {
@@ -68,7 +68,7 @@ export class UploadController {
             content: page.text,
           }));
 
-          console.log(`💾 Storing ${pageData.length} pages in MongoDB...`);
+          // console.log(`💾 Storing ${pageData.length} pages in MongoDB...`);
           await documentService.storePages(
             fileId,
             file.originalname,
@@ -78,7 +78,7 @@ export class UploadController {
             documentLanguageDetection.languageCode,
             file.mimetype  // Pass mimeType
           );
-          console.log(`✅ Page-wise storage complete for ${file.originalname}`);
+          // console.log(`✅ Page-wise storage complete for ${file.originalname}`);
 
           // Create chunks for each page
           for (const page of extractionResult.pages) {
@@ -95,7 +95,7 @@ export class UploadController {
           }
         } else {
           // Single document storage (TXT, DOC, single-page images, etc.)
-          console.log(`💾 Storing document content in MongoDB...`);
+          // console.log(`💾 Storing document content in MongoDB...`);
           await documentService.storeDocument(
             fileId,
             file.originalname,
@@ -131,36 +131,25 @@ export class UploadController {
         return;
       }
 
-      console.log(
-        `✅ Created ${allChunks.length} chunks total`
+      // console.log(
+      //   `✅ Created ${allChunks.length} chunks total`
+      // );
+
+      // Step 3: Generate embeddings using Ollama (completely local)
+      // console.log(
+      //   `🔄 Generating embeddings for ${allChunks.length} chunks using Ollama embeddinggemma...`
+      // );
+
+      const embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
+        allChunks.map((chunk) => chunk.content)
       );
 
-      // Step 3: Generate embeddings page-wise (prefer Ollama if configured)
-      const useOllama = !!env.OLLAMA_URL;
-      console.log(`🔧 Mode: ${useOllama ? 'OFFLINE (Ollama)' : 'ONLINE (Google)'}`);
-      console.log(
-        `🔄 Generating embeddings for ${allChunks.length} chunks...`
-      );
-
-      let embeddingResults;
-      if (useOllama) {
-        // Use Ollama for embeddings (offline)
-        embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
-          allChunks.map((chunk) => chunk.content)
-        );
-      } else {
-        // Use Google API for embeddings (online)
-        embeddingResults = await ollamaEmbeddingService.generateEmbeddings(
-          allChunks.map((chunk) => chunk.content)
-        );
-      }
-
-      console.log(
-        `✅ Generated ${embeddingResults.length} embeddings`
-      );
+      // console.log(
+      //   `✅ Generated ${embeddingResults.length} embeddings`
+      // );
 
       // Step 4: Store in chat-specific ChromaDB collection
-      console.log("💾 Storing in vector database...");
+      // console.log("💾 Storing in vector database...");
       await vectorDBService.storeChunks(
         allChunks,
         embeddingResults.map((result) => result.embedding),
@@ -168,7 +157,7 @@ export class UploadController {
       );
 
       // Step 5: Store file permanently for preview (instead of deleting)
-      console.log("📁 Storing file for preview...");
+      // console.log("📁 Storing file for preview...");
       const storedFile = await fileStorageService.storeFile(
         fileId,  // Pass the same fileId used for MongoDB
         file.path,
@@ -177,7 +166,7 @@ export class UploadController {
         file.originalname,
         file.mimetype
       );
-      console.log(`✅ File stored: ${storedFile.filePath}`);
+      // console.log(`✅ File stored: ${storedFile.filePath}`);
 
       // Step 6: Convert PPT/PPTX to PDF for preview (if LibreOffice available)
       let previewPdfPath: string | null = null;
@@ -234,7 +223,7 @@ export class UploadController {
       };
 
       console.log(
-        `\n✅ Upload complete: ${file.originalname} - ${allChunks.length} chunks created${previewPdfPath ? ' + PDF preview' : ''}\n`
+        `✅ Upload complete: ${file.originalname} - ${allChunks.length} chunks created`
       );
 
       res.status(200).json(response);

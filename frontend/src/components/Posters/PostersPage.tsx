@@ -14,6 +14,50 @@ import type {
   GeneratedPoster,
 } from "../../types/poster";
 
+// LocalStorage key for storing posters
+const POSTERS_STORAGE_KEY = "masterji_generated_posters";
+
+// Extended poster type with metadata for storage
+interface StoredPoster extends GeneratedPoster {
+  id: string;
+  query: string;
+  category: string;
+  language: string;
+  aspectRatio: string;
+  createdAt: string;
+}
+
+// Helper functions for localStorage
+const savePostersToStorage = (posters: StoredPoster[]): void => {
+  try {
+    // Limit to last 20 posters to avoid localStorage quota issues
+    const postersToSave = posters.slice(-20);
+    localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(postersToSave));
+  } catch (error) {
+    console.warn("Failed to save posters to localStorage:", error);
+  }
+};
+
+const loadPostersFromStorage = (): StoredPoster[] => {
+  try {
+    const stored = localStorage.getItem(POSTERS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.warn("Failed to load posters from localStorage:", error);
+  }
+  return [];
+};
+
+const clearPostersFromStorage = (): void => {
+  try {
+    localStorage.removeItem(POSTERS_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Failed to clear posters from localStorage:", error);
+  }
+};
+
 const PostersPage: React.FC = () => {
   // State
   const [categories, setCategories] = useState<PosterCategory[]>([]);
@@ -31,12 +75,26 @@ const PostersPage: React.FC = () => {
   const [generatedPosters, setGeneratedPosters] = useState<GeneratedPoster[]>(
     []
   );
+  const [storedPosters, setStoredPosters] = useState<StoredPoster[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [enhancedPrompt, setEnhancedPrompt] = useState<string>("");
 
-  // Load categories and languages on mount
+  // Load categories, languages, and stored posters on mount
   useEffect(() => {
     loadInitialData();
+    // Load stored posters from localStorage
+    const stored = loadPostersFromStorage();
+    setStoredPosters(stored);
+    // Also set the most recent generation as current if available
+    if (stored.length > 0) {
+      // Get the most recent batch (same createdAt timestamp)
+      const latestTimestamp = stored[stored.length - 1].createdAt;
+      const latestBatch = stored.filter(p => p.createdAt === latestTimestamp);
+      setGeneratedPosters(latestBatch);
+      if (latestBatch.length > 0) {
+        setEnhancedPrompt(latestBatch[0].enhancedPrompt);
+      }
+    }
   }, []);
 
   const loadInitialData = async () => {
@@ -97,6 +155,22 @@ const PostersPage: React.FC = () => {
       if (response.posters.length > 0) {
         setEnhancedPrompt(response.posters[0].enhancedPrompt);
       }
+
+      // Save to localStorage with metadata
+      const timestamp = new Date().toISOString();
+      const newStoredPosters: StoredPoster[] = response.posters.map((poster, index) => ({
+        ...poster,
+        id: `${Date.now()}-${index}`,
+        query: prompt.trim(),
+        category: selectedCategory,
+        language: selectedLanguage,
+        aspectRatio,
+        createdAt: timestamp,
+      }));
+
+      const updatedStoredPosters = [...storedPosters, ...newStoredPosters];
+      setStoredPosters(updatedStoredPosters);
+      savePostersToStorage(updatedStoredPosters);
     } catch (err) {
       if (err instanceof PosterApiError) {
         setError(err.message);
@@ -107,6 +181,14 @@ const PostersPage: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Clear poster history
+  const handleClearHistory = () => {
+    clearPostersFromStorage();
+    setStoredPosters([]);
+    setGeneratedPosters([]);
+    setEnhancedPrompt("");
   };
 
   const handleDownload = (poster: GeneratedPoster, index: number) => {

@@ -2,11 +2,7 @@ import { ollamaChatService } from "./ollamaChat.service";
 import { ChatMessage } from "../types";
 
 /**
- * Smart Classifier with DeepSeek
- * 
- * Does TWO jobs in one LLM call:
- * 1. If query is simple (greeting, basic question) → Provides direct answer
- * 2. If query needs RAG → Suggests tool usage and optimized retrieval prompt
+ * Smart Classifier
  */
 
 export interface ClassificationResult {
@@ -26,7 +22,7 @@ export class SmartClassifierService {
     ): Promise<ClassificationResult> {
         const startTime = Date.now();
 
-        console.log(`🧠 Smart Classifier analyzing: "${query.substring(0, 50)}..."`);
+        // Smart Classifier analyzing
 
         const systemPrompt = `You are a smart query classifier for an educational RAG chatbot.
 
@@ -99,7 +95,7 @@ Now analyze this query:`;
                 "json_object"
             );
 
-            console.log(`🔍 Raw classifier response: ${response.substring(0, 200)}...`);
+            // Raw classifier response received
 
             // Parse JSON response
             const result = this.parseClassifierResponse(response);

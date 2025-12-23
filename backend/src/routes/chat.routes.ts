@@ -24,4 +24,11 @@ router.delete("/:sessionId", chatController.deleteSession.bind(chatController));
 // Update chat name/title
 router.patch("/:sessionId/name", chatController.updateChatName.bind(chatController));
 
+// Update session settings
+router.patch("/:sessionId/settings", chatController.updateSettings.bind(chatController));
+
+// Translate a message
+router.post("/:sessionId/translate", chatController.translateMessage.bind(chatController));
+
 export default router;
+

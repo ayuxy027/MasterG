@@ -7,12 +7,14 @@ interface PlanDashboardProps {
     userId: string;
     sessionId: string;
     onSwitchToStudy: (prompt: string) => void;
+    selectedGrade: string;
 }
 
 const PlanDashboard: React.FC<PlanDashboardProps> = ({
     userId,
     sessionId,
     onSwitchToStudy,
+    selectedGrade,
 }) => {
     const [documents, setDocuments] = useState<DocumentInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -49,15 +51,20 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
     return (
         <div className="h-full overflow-y-auto p-6 bg-gradient-to-b from-white to-orange-50/30">
             {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">
-                            Knowledge Tree
-                        </h2>
-                        <p className="text-gray-600 mt-1">
-                            Build hierarchical learning paths from your documents
-                        </p>
+            <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        Knowledge Tree
+                    </h2>
+                    <p className="text-gray-600 mt-1">
+                        Build hierarchical learning paths from your documents
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {/* Grade indicator (read-only) */}
+                    <div className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-lg border border-orange-200 text-sm font-medium">
+                        Target: {selectedGrade === 'Undergrad' || selectedGrade === 'Grad' ? selectedGrade : `Class ${selectedGrade}`}
                     </div>
 
                     {documents.length > 0 && (
@@ -118,6 +125,7 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
                             userId={userId}
                             sessionId={sessionId}
                             onSwitchToStudy={onSwitchToStudy}
+                            grade={selectedGrade}
                         />
                     ))}
                 </div>

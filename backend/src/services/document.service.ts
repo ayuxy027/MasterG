@@ -78,7 +78,7 @@ export class DocumentService {
 
       // Delete existing document for this fileId (in case of re-upload)
       await PageDocument.deleteOne({ fileId });
-      console.log(`🗑️  Cleared existing document for fileId: ${fileId}`);
+      // console.log(`🗑️  Cleared existing document for fileId: ${fileId}`);
 
       // Create ONE document with pages array
       const pageDocument = {
@@ -95,12 +95,12 @@ export class DocumentService {
       };
 
       const result = await PageDocument.create(pageDocument);
-      console.log(
-        `✅ Successfully stored 1 document with ${result.pages.length} pages for ${fileName}`
-      );
-      console.log(
-        `📊 Pages: ${result.pages.map((p) => p.pageNumber).join(", ")}`
-      );
+      // console.log(
+      //   `✅ Successfully stored 1 document with ${result.pages.length} pages for ${fileName}`
+      // );
+      // console.log(
+      //   `📊 Pages: ${result.pages.map((p) => p.pageNumber).join(", ")}`
+      // );
     } catch (error: any) {
       console.error("❌ Page storage error:", error);
       console.error("Error details:", {

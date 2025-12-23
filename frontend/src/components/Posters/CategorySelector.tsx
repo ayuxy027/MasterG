@@ -7,9 +7,9 @@ interface CategorySelectorProps {
   onSelectCategory: (category: string) => void;
 }
 
-const CategorySelector: React.FC<CategorySelectorProps> = ({ 
+const CategorySelector: React.FC<CategorySelectorProps> = ({
   categories,
-  selectedCategory, 
+  selectedCategory,
   onSelectCategory
 }) => {
   const [customCategories, setCustomCategories] = useState<PosterCategory[]>([]);
@@ -57,23 +57,20 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
           <button
             key={category.id}
             onClick={() => onSelectCategory(category.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-              selectedCategory === category.id
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${selectedCategory === category.id
                 ? 'bg-orange-500 text-white shadow-md'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+              }`}
           >
-            <span className="text-xl">{category.icon}</span>
             <span className="text-sm font-medium">{category.name}</span>
           </button>
         ))}
         <button
           onClick={() => setShowInput(!showInput)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-            selectedCategory === 'custom'
+          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${selectedCategory === 'custom'
               ? 'bg-orange-500 text-white shadow-md'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
+            }`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />

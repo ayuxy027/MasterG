@@ -112,9 +112,9 @@ export class OllamaEmbeddingService {
    */
   async generateEmbeddings(texts: string[]): Promise<EmbeddingResult[]> {
     try {
-      console.log(
-        `🔄 Generating Ollama embeddings for ${texts.length} chunks in batches of ${this.BATCH_SIZE}...`
-      );
+      // console.log(
+      //   `🔄 Generating Ollama embeddings for ${texts.length} chunks in batches of ${this.BATCH_SIZE}...`
+      // );
 
       const results: EmbeddingResult[] = [];
       const totalBatches = Math.ceil(texts.length / this.BATCH_SIZE);
@@ -123,9 +123,9 @@ export class OllamaEmbeddingService {
         const batch = texts.slice(i, i + this.BATCH_SIZE);
         const batchNumber = Math.floor(i / this.BATCH_SIZE) + 1;
 
-        console.log(
-          `  📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} chunks)...`
-        );
+        // console.log(
+        //   `  📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} chunks)...`
+        // );
 
         // Process batch sequentially for local Ollama (to avoid overwhelming it)
         for (const text of batch) {
@@ -140,7 +140,7 @@ export class OllamaEmbeddingService {
           }
         }
 
-        console.log(`  ✅ Batch ${batchNumber}/${totalBatches} complete`);
+        // console.log(`  ✅ Batch ${batchNumber}/${totalBatches} complete`);
 
         // Add delay between batches
         if (i + this.BATCH_SIZE < texts.length) {
@@ -148,7 +148,7 @@ export class OllamaEmbeddingService {
         }
       }
 
-      console.log(`✅ All ${results.length} Ollama embeddings generated successfully`);
+      // console.log(`✅ All ${results.length} Ollama embeddings generated successfully`);
       return results;
     } catch (error) {
       console.error("Batch Ollama embedding error:", error);

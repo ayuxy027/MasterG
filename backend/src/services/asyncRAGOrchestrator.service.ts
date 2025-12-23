@@ -18,17 +18,7 @@ export interface RAGResponse {
 }
 
 /**
- * OPTIMIZED RAG Orchestrator Service
- * 
- * New Architecture (Faster for Simple Queries):
- * 1. Query → Smart Classifier (DeepSeek) → Either:
- *    a) Direct Answer (for greetings, simple queries) ← FAST PATH
- *    b) Optimized Retrieval Prompt + RAG → Precise retrieval ← SMART PATH
- * 
- * Removed:
- * - Cache service (simplified)
- * - Logger service (using console)
- * - Online APIs (fully offline with Ollama)
+ * RAG Orchestrator Service
  */
 export class AsyncRAGOrchestratorService {
   /**
@@ -42,82 +32,53 @@ export class AsyncRAGOrchestratorService {
     const correlationId = uuidv4();
     const startTime = Date.now();
 
-    console.log(
-      `🎬 [${correlationId}] Processing query: "${query.substring(0, 50)}..."`
-    );
+    // Processing query
 
     try {
-      // ═══════════════════════════════════════════════════════════════
-      // OPTIMIZATION: Smart Classification with DeepSeek (Single LLM Call)
-      // Does TWO jobs:
-      // 1. Provides direct answer for simple queries (FAST)
-      // 2. Optimizes retrieval prompt for RAG queries (SMART)
-      // ═══════════════════════════════════════════════════════════════
+      // SIMPLIFIED FLOW: Check documents first, then search
+      // This removes the dependency on the smart classifier (saving 1 LLM call)
 
-      console.log(`🧠 [${correlationId}] Smart classification in progress...`);
-      const classification = await smartClassifierService.classifyAndRoute(
-        query,
-        chatHistory
-      );
-
-      console.log(
-        `🎯 [${correlationId}] Classification: ${classification.needsRAG ? "RAG" : "DIRECT"
-        }`
-      );
-
-      // FAST PATH: Direct answer (no RAG needed)
-      if (!classification.needsRAG && classification.directAnswer) {
-        console.log(`⚡ [${correlationId}] Fast path: Direct answer`);
-
-        return {
-          answer: classification.directAnswer,
-          sources: [],
-          metadata: {
-            correlationId,
-            strategy: "DIRECT",
-            language: "en",
-            queryType: "SIMPLE",
-            duration: Date.now() - startTime,
-            reasoning: classification.reasoning,
-          },
-        };
-      }
-
-      // SMART PATH: RAG with optimized retrieval
-      console.log(
-        `🔍 [${correlationId}] Smart path: RAG with optimized prompt`
-      );
-
-      // Check if documents exist
       const hasDocuments = await this.checkDocumentsExist(chromaCollectionName);
 
       if (!hasDocuments) {
+        // Fallback to simple chat if no docs
+        const { ollamaChatService } = await import("./ollamaChat.service");
+        const simpleAnswer = await ollamaChatService.handleSimpleQuery(query, "en", chatHistory);
+
         return {
-          answer:
-            "Please upload some documents first, then ask me questions about them.",
+          answer: simpleAnswer,
           sources: [],
           metadata: {
             correlationId,
-            strategy: "NO_DOCUMENTS",
+            strategy: "SIMPLE_CHAT_NO_DOCS",
             language: "en",
-            queryType: "RAG",
+            queryType: "SIMPLE",
             duration: Date.now() - startTime,
           },
         };
       }
 
-      // Use optimized retrieval prompt if classifier provided one
-      const retrievalQuery = classification.retrievalPrompt || query;
-      console.log(
-        `📝 [${correlationId}] Using retrieval prompt: "${retrievalQuery.substring(0, 50)}..."`
-      );
+      // Execute RAG directly
 
-      // Execute RAG with optimized prompt
+      // OPTIMIZATION: Expand query for better retrieval with local models
+      // User queries like "how does it work" need context ("photosynthesis process")
+      const { ollamaChatService } = await import("./ollamaChat.service");
+      const keywords = await ollamaChatService.extractKeywords(query);
+
+      const retrievalQuery = keywords.length > 0
+        ? `${query} ${keywords.join(" ")}`
+        : query;
+
+      if (keywords.length > 0) {
+        console.log(`🔍 Expanded query: "${retrievalQuery}"`);
+      }
+
+      // Use the expanded query for retrieval, original for generation
       const result = await decisionEngineService.handleRAGQuery(
-        retrievalQuery,
+        retrievalQuery, // Expanded query
         chatHistory,
         chromaCollectionName,
-        query // Pass original query for answer generation
+        query // Original query
       );
 
       const response: RAGResponse = {
@@ -125,20 +86,16 @@ export class AsyncRAGOrchestratorService {
         sources: result.sources,
         metadata: {
           correlationId,
-          strategy: "RAG",
+          strategy: "RAG_DIRECT",
           language: "en",
           queryType: "RAG",
           duration: Date.now() - startTime,
-          retrievalPrompt: retrievalQuery,
           originalQuery: query,
-          reasoning: classification.reasoning,
           ...result.metadata,
         },
       };
 
-      console.log(
-        `✅ [${correlationId}] Pipeline completed in ${response.metadata.duration}ms`
-      );
+      // Pipeline completed
 
       return response;
     } catch (error: any) {

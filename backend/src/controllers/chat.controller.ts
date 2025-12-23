@@ -66,6 +66,8 @@ export class ChatController {
           chromaCollectionName: session.chromaCollectionName,
           createdAt: session.createdAt,
           updatedAt: session.updatedAt,
+          language: session.language,
+          grade: session.grade,
         },
         files,
         documentCount: files.length,
@@ -151,7 +153,7 @@ export class ChatController {
   }
 
   /**
-   * Query chat with simplified RAG pipeline (Ollama only)
+   * Process chat query with RAG
    */
   async queryChat(req: Request, res: Response): Promise<void> {
     const startTime = Date.now();
@@ -180,7 +182,6 @@ export class ChatController {
 
 
 
-      // Process query through simplified RAG pipeline
       const result = await asyncRAGOrchestratorService.processQuery(
         query,
         chatHistory,
@@ -234,6 +235,113 @@ export class ChatController {
       res.status(500).json({
         success: false,
         error: error.message || "Health check failed",
+      });
+    }
+  }
+  /**
+   * Update session settings (language, grade)
+   */
+  async updateSettings(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.query.userId as string;
+      const sessionId = req.params.sessionId;
+      const { language, grade } = req.body;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      await chatService.updateSessionSettings(userId, sessionId, {
+        language,
+        grade,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Session settings updated successfully",
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to update session settings",
+      });
+    }
+  }
+
+  /**
+   * Translate a message using NLLB and persist to MongoDB
+   */
+  async translateMessage(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.query.userId as string;
+      const sessionId = req.params.sessionId;
+      const { text, sourceLanguage, targetLanguage } = req.body;
+
+      if (!userId || !sessionId) {
+        res.status(400).json({
+          success: false,
+          error: "userId and sessionId are required",
+        });
+        return;
+      }
+
+      if (!text || !text.trim()) {
+        res.status(400).json({
+          success: false,
+          error: "text is required for translation",
+        });
+        return;
+      }
+
+      // Import NLLB and language services
+      const { nllbService } = await import("../services/nllb.service");
+      const { languageService } = await import("../services/language.service");
+      const { env } = await import("../config/env");
+
+      // Check if NLLB is enabled
+      if (!env.NLLB_ENABLED) {
+        res.status(503).json({
+          success: false,
+          error: "Translation service is not enabled",
+        });
+        return;
+      }
+
+      const srcCode = (sourceLanguage as keyof typeof languageService) || "en";
+      const tgtCode = (targetLanguage as keyof typeof languageService) || "hi";
+
+      // Convert to NLLB language codes
+      const srcLang = languageService.toNLLBCode(srcCode as any);
+      const tgtLang = languageService.toNLLBCode(tgtCode as any);
+
+      // Translate using NLLB
+      const translated = await nllbService.translate(text, {
+        srcLang: srcLang,
+        tgtLang: tgtLang,
+      });
+
+      // Persist translation to MongoDB in background
+      chatService.saveMessageTranslation(
+        userId,
+        sessionId,
+        text,
+        translated,
+        targetLanguage || "hi"
+      ).catch(err => console.error("Background save translation error:", err));
+
+      res.json({
+        success: true,
+        translated,
+      });
+    } catch (error: any) {
+      console.error("Translation error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Translation failed",
       });
     }
   }

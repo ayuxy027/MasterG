@@ -15,6 +15,7 @@ import speechRoutes from "./routes/speech.routes";
 import analyzeRoutes from "./routes/analyze.routes";
 import boardRoutes from "./routes/board.routes";
 import documentTreeRoutes from "./routes/documentTree.routes";
+import planRoutes from "./routes/plan.routes";
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use("/api/speech", speechRoutes);
 app.use("/api/analyze", analyzeRoutes);
 app.use("/api/board", boardRoutes);
 app.use("/api/document-tree", documentTreeRoutes);
+app.use("/api/plan", planRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
