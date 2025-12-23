@@ -106,10 +106,10 @@ const PitchPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-orange-50/40 via-white to-orange-50/40">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50/40 via-white to-orange-50/40">
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-20">
-        <div className="absolute inset-0 bg-linear-to-b from-transparent via-white/50 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-transparent"></div>
         <div className="relative z-10 max-w-6xl mx-auto text-center space-y-8">
           <div className="mb-8">
             <img
@@ -130,10 +130,10 @@ const PitchPage = () => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
           </svg>
         </div>
-      </section >
+      </section>
 
       {/* Problem Statement Section */}
-      < section ref={problemRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-white" >
+      <section ref={problemRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-white" >
         <div className="max-w-4xl mx-auto">
           <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-12 text-center">
             The Challenge
@@ -165,10 +165,10 @@ const PitchPage = () => {
             </div>
           </div>
         </div>
-      </section >
+      </section>
 
       {/* Requirements Were Tough Section */}
-      < section ref={requirementsRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-linear-to-b from-white to-orange-50/40" >
+      <section ref={requirementsRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-orange-50/40" >
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-8 text-center">
             You Know That...
@@ -206,10 +206,10 @@ const PitchPage = () => {
             ))}
           </div>
         </div>
-      </section >
+      </section>
 
       {/* Results Section */}
-      < section ref={resultsRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-linear-to-b from-orange-50/40 to-white" >
+      <section ref={resultsRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-orange-50/40 to-white" >
         <div className="max-w-6xl mx-auto text-center">
           <div className={`transform transition-all duration-1000 ${showResults ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
             }`}>
@@ -221,10 +221,10 @@ const PitchPage = () => {
             </h2>
           </div>
         </div>
-      </section >
+      </section>
 
       {/* Solution Introduction */}
-      < section ref={solutionRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-white" >
+      <section ref={solutionRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-white" >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-8">
@@ -236,7 +236,7 @@ const PitchPage = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mb-12">
-            <div className="bg-linear-to-br from-orange-50/60 to-orange-100/60 rounded-2xl p-8 shadow-xl border border-orange-200/50 hover:shadow-2xl transition-shadow duration-300">
+            <div className="bg-gradient-to-br from-orange-50/60 to-orange-100/60 rounded-2xl p-8 shadow-xl border border-orange-200/50 hover:shadow-2xl transition-shadow duration-300">
               <div className="text-6xl mb-4">⚡</div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Astonishing Performance
@@ -249,7 +249,7 @@ const PitchPage = () => {
               </p>
             </div>
 
-            <div className="bg-linear-to-br from-orange-50/60 to-amber-50/60 rounded-2xl p-8 shadow-xl border border-orange-200/50 hover:shadow-2xl transition-shadow duration-300">
+            <div className="bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-2xl p-8 shadow-xl border border-orange-200/50 hover:shadow-2xl transition-shadow duration-300">
               <div className="text-6xl mb-4">🔧</div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Built with Open Source
@@ -263,7 +263,7 @@ const PitchPage = () => {
             </div>
           </div>
 
-          <div className="bg-linear-to-r from-orange-400/80 to-orange-500/80 rounded-2xl p-8 shadow-2xl text-center border-4 border-orange-300/60">
+          <div className="bg-gradient-to-r from-orange-400/80 to-orange-500/80 rounded-2xl p-8 shadow-2xl text-center border-4 border-orange-300/60">
             <h3 className="text-3xl font-bold text-white mb-6">
               DeepSeek R1 1.5B and NLLB 600M
             </h3>
@@ -272,10 +272,10 @@ const PitchPage = () => {
             </p>
           </div>
         </div>
-      </section >
+      </section>
 
       {/* Journey Section */}
-      < section ref={journeyRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-linear-to-b from-white to-orange-50/40" >
+      <section ref={journeyRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-orange-50/40" >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-8">
@@ -319,7 +319,7 @@ const PitchPage = () => {
               </p>
               <div className="relative">
                 {/* Timeline Line */}
-                <div className="absolute left-8 top-0 bottom-0 w-1 bg-linear-to-b from-orange-200/60 via-orange-300/70 to-orange-400/80"></div>
+                <div className="absolute left-8 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-200/60 via-orange-300/70 to-orange-400/80"></div>
 
                 {/* Timeline Items */}
                 <div className="space-y-12 relative z-10">
@@ -330,10 +330,10 @@ const PitchPage = () => {
                     { phase: 'Phase 4', milestone: 'Aggressive optimization - saw state of art changes and responses from our architectures', progress: 100 }
                   ].map((item, index) => (
                     <div key={index} className="flex items-center gap-6">
-                      <div className="shrink-0 w-16 h-16 rounded-full bg-linear-to-br from-orange-300/70 to-orange-400/80 shadow-lg flex items-center justify-center border-4 border-white">
+                      <div className="shrink-0 w-16 h-16 rounded-full bg-gradient-to-br from-orange-300/70 to-orange-400/80 shadow-lg flex items-center justify-center border-4 border-white">
                         <div className="w-3 h-3 rounded-full bg-white"></div>
                       </div>
-                      <div className="flex-1 bg-linear-to-r from-orange-50/60 to-white rounded-xl p-6 shadow-md border border-orange-100/50">
+                      <div className="flex-1 bg-gradient-to-r from-orange-50/60 to-white rounded-xl p-6 shadow-md border border-orange-100/50">
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-orange-600/80 font-bold text-lg">{item.phase}</span>
                           <span className="text-orange-600/80 font-semibold">{item.progress}%</span>
@@ -341,7 +341,7 @@ const PitchPage = () => {
                         <p className="text-gray-800 text-base mb-3 leading-relaxed">{item.milestone}</p>
                         <div className="w-full bg-orange-100/50 rounded-full h-3 overflow-hidden">
                           <div
-                            className="h-full bg-linear-to-r from-orange-300/70 to-orange-400/80 rounded-full transition-all duration-1000"
+                            className="h-full bg-gradient-to-r from-orange-300/70 to-orange-400/80 rounded-full transition-all duration-1000"
                             style={{ width: `${item.progress}%` }}
                           ></div>
                         </div>
@@ -376,7 +376,7 @@ const PitchPage = () => {
           {/* Research Section */}
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-500 ${showJourney ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
             }`}>
-            <div className="bg-linear-to-r from-orange-50/60 to-amber-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
+            <div className="bg-gradient-to-r from-orange-50/60 to-amber-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Extensive Research
               </h3>
@@ -395,7 +395,7 @@ const PitchPage = () => {
           {/* Engineering Opportunity */}
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-700 ${showJourney ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'
             }`}>
-            <div className="bg-linear-to-r from-orange-50/60 to-amber-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
+            <div className="bg-gradient-to-r from-orange-50/60 to-amber-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 The True Engineering Opportunity
               </h3>
@@ -428,7 +428,7 @@ const PitchPage = () => {
           {/* Push Harder Section */}
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-900 ${showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
             }`}>
-            <div className="bg-linear-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
+            <div className="bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 We Pushed Harder
               </h3>
@@ -450,7 +450,7 @@ const PitchPage = () => {
           {/* Testing Models Section */}
           <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-1100 ${showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}>
-            <div className="bg-linear-to-br from-amber-50/60 to-orange-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
+            <div className="bg-gradient-to-br from-amber-50/60 to-orange-50/60 rounded-xl p-8 border-l-4 border-orange-400/60 shadow-lg">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Testing Amazing Open Source Models
               </h3>
@@ -468,7 +468,7 @@ const PitchPage = () => {
             className={`transform transition-all duration-1000 delay-1300 ${showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
               }`}
           >
-            <div className="bg-linear-to-r from-orange-400/80 to-orange-500/80 rounded-2xl p-10 shadow-2xl text-center text-white border-4 border-orange-300/60">
+            <div className="bg-gradient-to-r from-orange-400/80 to-orange-500/80 rounded-2xl p-10 shadow-2xl text-center text-white border-4 border-orange-300/60">
               <p className="text-xl sm:text-2xl mb-6 leading-relaxed">
                 After many <strong>hopes and failures</strong>, we went ahead with
               </p>
@@ -520,8 +520,8 @@ const PitchPage = () => {
             </div>
           </div>
         </div>
-      </section >
-    </div >
+      </section>
+    </div>
   );
 };
 
