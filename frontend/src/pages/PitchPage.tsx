@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 
 interface Benchmark {
   name: string;
@@ -485,36 +486,135 @@ const PitchPage = () => {
               }`}
           >
             <div className="bg-white/90 rounded-2xl p-8 shadow-xl border border-orange-200/60">
-              <h3 className="text-3xl font-bold text-gray-900 mb-4 text-center">Manual Breakthroughs</h3>
-              <p className="text-gray-700 text-lg leading-relaxed text-center mb-6">
+              <h3 className="text-3xl font-bold text-gray-900 mb-2 text-center">Manual Breakthroughs</h3>
+              <p className="text-gray-600 text-lg text-center mb-8">
                 Beyond stacking models, we engineered critical optimizations ourselves.
               </p>
+
+              {/* Translation Pipeline with Chart */}
+              <div className="mb-8 bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="text-3xl">⚡</div>
+                  <h4 className="text-2xl font-bold text-gray-900">Translation Pipeline</h4>
+                  <span className="ml-auto px-4 py-1 bg-orange-500/20 text-orange-700 font-bold rounded-full text-sm">
+                    10× Speedup
+                  </span>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6 items-center">
+                  <div>
+                    <ul className="space-y-2 text-gray-700">
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-600 font-bold mt-1">•</span>
+                        <span><strong>INT8 Quantization</strong> - Reduced model size & memory</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-600 font-bold mt-1">•</span>
+                        <span><strong>Batch Processing</strong> - Process 6-12 sentences together</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-600 font-bold mt-1">•</span>
+                        <span><strong>Parallel Processing</strong> - Multi-core CPU utilization</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-600 font-bold mt-1">•</span>
+                        <span><strong>Multi-threading</strong> - 4 workers for optimal throughput</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="bg-white rounded-lg p-4">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={[
+                        { phase: 'Baseline', time: 300 },
+                        { phase: 'Phase 2', time: 240 },
+                        { phase: 'Phase 3', time: 120 },
+                        { phase: 'Phase 4', time: 90 },
+                        { phase: 'Optimized', time: 30 }
+                      ]}>
+                        <XAxis dataKey="phase" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} label={{ value: 'Time (s)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip formatter={(value: number | undefined) => value !== undefined ? `${value}s` : ''} />
+                        <Bar dataKey="time" radius={[8, 8, 0, 0]}>
+                          {Array.from({ length: 5 }).map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={index === 4 ? '#f97316' : '#fb923c'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <p className="text-center text-xs text-gray-600 mt-2">300s → 30s (10× improvement)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Language Model */}
+              <div className="mb-8 bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="text-3xl">🧠</div>
+                  <h4 className="text-2xl font-bold text-gray-900">Language Model</h4>
+                </div>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="bg-white/80 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-orange-600">1.5B</div>
+                    <div className="text-sm text-gray-600">Parameters</div>
+                  </div>
+                  <div className="bg-white/80 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-orange-600">~2.2GB</div>
+                    <div className="text-sm text-gray-600">RAM Usage</div>
+                  </div>
+                  <div className="bg-white/80 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-orange-600">~78%</div>
+                    <div className="text-sm text-gray-600">Reasoning Score</div>
+                  </div>
+                </div>
+                <ul className="mt-4 space-y-2 text-gray-700">
+                  <li className="flex items-start gap-2">
+                    <span className="text-orange-600 font-bold mt-1">•</span>
+                    <span><strong>DeepSeek-R1 1.5B</strong> - Auditable reasoning with Chain-of-Thought</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-orange-600 font-bold mt-1">•</span>
+                    <span>Low RAM footprint for offline CPU inference</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Data Layer & System Design Side by Side */}
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-orange-50/60 rounded-xl p-4 border border-orange-100/60">
-                  <h4 className="text-xl font-bold text-gray-900 mb-2">Translation Pipeline</h4>
-                  <p className="text-gray-700 leading-relaxed">
-                    INT8 quantization, batch processing, parallel processing, and multi-threading to hit the
-                    10× speedup we report (see translation benchmarks).
-                  </p>
+                <div className="bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="text-3xl">💾</div>
+                    <h4 className="text-2xl font-bold text-gray-900">Data Layer</h4>
+                  </div>
+                  <ul className="space-y-2 text-gray-700">
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-1">•</span>
+                      <span><strong>Chroma DB</strong> - Local vector embeddings</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-1">•</span>
+                      <span><strong>MongoDB</strong> - Local state management (mongosh)</span>
+                    </li>
+                  </ul>
                 </div>
-                <div className="bg-orange-50/60 rounded-xl p-4 border border-orange-100/60">
-                  <h4 className="text-xl font-bold text-gray-900 mb-2">Language Model</h4>
-                  <p className="text-gray-700 leading-relaxed">
-                    DeepSeek-R1 1.5B chosen for auditable reasoning and low RAM footprint (see SLM benchmarks).
-                  </p>
-                </div>
-                <div className="bg-orange-50/60 rounded-xl p-4 border border-orange-100/60">
-                  <h4 className="text-xl font-bold text-gray-900 mb-2">Data Layer</h4>
-                  <p className="text-gray-700 leading-relaxed">
-                    Chroma DB running locally for vector embeddings + MongoDB hosted in mongosh locally for state.
-                  </p>
-                </div>
-                <div className="bg-orange-50/60 rounded-xl p-4 border border-orange-100/60">
-                  <h4 className="text-xl font-bold text-gray-900 mb-2">System Design</h4>
-                  <p className="text-gray-700 leading-relaxed">
-                    Tight offline-first flow with the architecture from README to keep latency low and fallbacks
-                    resilient.
-                  </p>
+
+                <div className="bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="text-3xl">🏗️</div>
+                    <h4 className="text-2xl font-bold text-gray-900">System Design</h4>
+                  </div>
+                  <ul className="space-y-2 text-gray-700">
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-1">•</span>
+                      <span><strong>Offline-first</strong> architecture</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-1">•</span>
+                      <span>Low latency with resilient fallbacks</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-600 font-bold mt-1">•</span>
+                      <span>See README for full architecture details</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>
