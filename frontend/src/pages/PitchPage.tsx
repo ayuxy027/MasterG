@@ -62,11 +62,13 @@ const benchmarks: Benchmark[] = [
 const PitchPage = () => {
   const [visibleBenchmarks, setVisibleBenchmarks] = useState<number[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [showJourney, setShowJourney] = useState(true);
   const problemRef = useRef<HTMLDivElement>(null);
   const requirementsRef = useRef<HTMLDivElement>(null);
   const benchmarksRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const solutionRef = useRef<HTMLDivElement>(null);
+  const journeyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -82,6 +84,8 @@ const PitchPage = () => {
               });
             } else if (entry.target === resultsRef.current) {
               setShowResults(true);
+            } else if (entry.target === journeyRef.current) {
+              setShowJourney(true);
             }
           }
         });
@@ -94,6 +98,7 @@ const PitchPage = () => {
     if (benchmarksRef.current) observer.observe(benchmarksRef.current);
     if (resultsRef.current) observer.observe(resultsRef.current);
     if (solutionRef.current) observer.observe(solutionRef.current);
+    if (journeyRef.current) observer.observe(journeyRef.current);
 
     return () => {
       observer.disconnect();
@@ -267,6 +272,161 @@ const PitchPage = () => {
             <p className="text-xl text-orange-50">
               To be precise ;)
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Journey Section */}
+      <section ref={journeyRef} className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-orange-50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-8">
+              The Journey
+            </h2>
+            <p className="text-xl sm:text-2xl text-gray-700 italic">
+              It was not easy...
+            </p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className={`grid grid-cols-2 md:grid-cols-4 gap-6 mb-16 transform transition-all duration-1000 ${
+            showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}>
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-orange-500">
+              <div className="text-4xl font-bold text-orange-600 mb-2">5</div>
+              <div className="text-gray-700 font-semibold">Features</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-blue-500">
+              <div className="text-4xl font-bold text-blue-600 mb-2">200+</div>
+              <div className="text-gray-700 font-semibold">Commits</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-green-500">
+              <div className="text-4xl font-bold text-green-600 mb-2">11</div>
+              <div className="text-gray-700 font-semibold">Days of R&D</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-lg text-center border-t-4 border-purple-500">
+              <div className="text-4xl font-bold text-purple-600 mb-2">18</div>
+              <div className="text-gray-700 font-semibold">Branches</div>
+            </div>
+          </div>
+
+          {/* GitHub Snapshot */}
+          <div className={`mb-16 transform transition-all duration-1000 delay-300 ${
+            showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}>
+            <div className="bg-gray-900 rounded-xl shadow-2xl overflow-hidden border-2 border-gray-800">
+              <div className="bg-gray-800 px-4 py-3 flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="ml-4 text-gray-400 text-sm font-mono">github.com/MasterG</span>
+              </div>
+              <div className="p-4">
+                <img 
+                  src="/pitch/pitch.png" 
+                  alt="GitHub Repository Snapshot" 
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Research Section */}
+          <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-500 ${
+            showJourney ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
+          }`}>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 border-l-4 border-blue-500">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Extensive Research
+              </h3>
+              <p className="text-gray-700 text-lg mb-2">
+                We read over <strong className="text-blue-600">200+ references</strong> including Stack Overflow, Medium articles, and web surfing using our agents
+              </p>
+              <p className="text-gray-700 text-lg mb-2">
+                Spending <strong className="text-blue-600">16 hours</strong> in total R&D!
+              </p>
+              <p className="text-xl font-bold text-blue-600 mt-4">
+                But all this costed us <span className="text-green-600">zero</span> xD
+              </p>
+            </div>
+          </div>
+
+          {/* Engineering Opportunity */}
+          <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-700 ${
+            showJourney ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'
+          }`}>
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-8 border-l-4 border-orange-500">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                The True Engineering Opportunity
+              </h3>
+              <p className="text-gray-700 text-lg leading-relaxed">
+                But we saw a true engineering opportunity and brought ourselves to test our limits beyond what we could do.
+              </p>
+              <p className="text-gray-700 text-lg leading-relaxed mt-4">
+                <strong className="text-orange-600">It would have been easy to inject a Gemini/Groq endpoint, but it would have been a wrapper than an innovation.</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Push Harder Section */}
+          <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-900 ${
+            showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}>
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-8 border-l-4 border-purple-500">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                We Pushed Harder
+              </h3>
+              <p className="text-gray-700 text-lg leading-relaxed mb-4">
+                So we pushed harder and spent nights to stress test our approach.
+              </p>
+              <p className="text-gray-700 text-lg leading-relaxed mb-4">
+                We tested <strong className="text-purple-600">open weight models</strong> which had <strong className="text-purple-600">RL or CoT approach</strong> to get rid of API dependency.
+              </p>
+              <p className="text-2xl font-bold text-purple-600 text-center mt-6">
+                And it worked like magic!!
+              </p>
+              <p className="text-xl font-bold text-orange-600 text-center mt-4">
+                Wait for the benchmarks :D
+              </p>
+            </div>
+          </div>
+
+          {/* Testing Models Section */}
+          <div className={`space-y-8 mb-16 transform transition-all duration-1000 delay-1100 ${
+            showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}>
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-8 border-l-4 border-yellow-500">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Testing Amazing Open Source Models
+              </h3>
+              <p className="text-gray-700 text-lg leading-relaxed">
+                Soon we found ourselves testing some amazing open source models across nights.
+              </p>
+              <p className="text-gray-700 text-lg leading-relaxed mt-4">
+                Many of them <strong className="text-red-600">crashed</strong> as we wanted to <strong className="text-orange-600">exceed the requirements</strong>.
+              </p>
+            </div>
+          </div>
+
+          {/* Final Choice */}
+          <div className={`transform transition-all duration-1000 delay-1300 ${
+            showJourney ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}>
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-10 shadow-2xl text-center text-white">
+              <p className="text-xl sm:text-2xl mb-6 leading-relaxed">
+                After many <strong>hopes and failures</strong>, we went ahead with
+              </p>
+              <h3 className="text-3xl sm:text-4xl font-bold mb-4">
+                DeepSeek R1 1GB Variant
+              </h3>
+              <p className="text-2xl mb-4">and</p>
+              <h3 className="text-3xl sm:text-4xl font-bold mb-6">
+                NLLB by Meta (600MB)
+              </h3>
+              <p className="text-4xl font-bold mt-8">
+                And this was a killer combination! 🔥
+              </p>
+            </div>
           </div>
         </div>
       </section>
