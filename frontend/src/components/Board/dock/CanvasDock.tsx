@@ -172,6 +172,7 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
                 </div>
               )}
             </div>
+          </div>
 
           {/* Divider */}
           <div className="w-px h-8 bg-orange-200" />

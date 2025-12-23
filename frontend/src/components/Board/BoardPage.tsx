@@ -1038,8 +1038,6 @@ const BoardPage: React.FC = () => {
         onClear={handleClear}
         sidebarOpen={!isNavbarExpanded}
         zoom={zoom}
-        onCardAction={handleCardAction}
-        hasSelection={selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0}
         onZoomChange={setZoom}
         onZoomReset={() => { setZoom(1); setViewOffset({ x: 0, y: 0 }); }}
         onGenerateCards={handleGenerateCards}
