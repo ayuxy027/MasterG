@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { FileText, ListChecks, Brain, BookOpen } from 'lucide-react';
+import { FileText, ListChecks, Brain, BookOpen, Languages, ChevronDown, X } from 'lucide-react';
 import { DottedBackground, CanvasDock, StickyNote } from './index';
 import { getToolById, Point, DrawingPath } from './tools';
 import Card from './Card';
@@ -90,6 +90,25 @@ const BoardPage: React.FC = () => {
   // Track streaming action card IDs for real-time updates
   const streamingActionCardIdsRef = useRef<Set<string>>(new Set());
   const resultCardIdRef = useRef<string | null>(null);
+
+  // Translate dropdown state
+  const [isTranslateDropdownOpen, setIsTranslateDropdownOpen] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const translateDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Language options for translation
+  const TOP_LANGUAGES = [
+    { code: 'hi', name: 'Hindi', native: 'हिंदी' },
+    { code: 'mr', name: 'Marathi', native: 'मराठी' },
+    { code: 'bn', name: 'Bengali', native: 'বাংলা' },
+    { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+    { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+    { code: 'en', name: 'English', native: 'English' },
+    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
+    { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
+    { code: 'ml', name: 'Malayalam', native: 'മലയാളം' },
+    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+  ];
 
   // Board session management
   const [userId] = useState(() => {
@@ -943,6 +962,9 @@ const BoardPage: React.FC = () => {
     const selectedNotes = stickyNotes.filter(note => selectedStickyNoteIds.has(note.id));
     if (selectedNotes.length === 0) return;
 
+    setIsTranslating(true);
+    setIsTranslateDropdownOpen(false);
+
     // Translate each selected note
     for (const note of selectedNotes) {
       try {
@@ -965,6 +987,7 @@ const BoardPage: React.FC = () => {
       }
     }
 
+    setIsTranslating(false);
     // Clear selection after translation
     setSelectedStickyNoteIds(new Set());
   }, [selectedStickyNoteIds, stickyNotes]);
@@ -1187,10 +1210,12 @@ const BoardPage: React.FC = () => {
       {/* AI Actions Panel (when operate tool is active and sticky notes selected) */}
       {currentTool === 'operate' && (selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-purple-200 p-4 flex items-center gap-3">
-          {isPerformingAction ? (
+          {isPerformingAction || isTranslating ? (
             <div className="flex items-center gap-3 px-3 py-2">
               <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-purple-600 font-medium">Generating AI response...</span>
+              <span className="text-sm text-purple-600 font-medium">
+                {isTranslating ? 'Translating...' : 'Generating AI response...'}
+              </span>
             </div>
           ) : (
             <>
@@ -1237,12 +1262,61 @@ const BoardPage: React.FC = () => {
                   <BookOpen className="w-5 h-5" />
                   <span>Flashcards</span>
                 </button>
+
+                {/* Divider */}
+                <div className="w-px h-10 bg-gray-200 mx-1" />
+
+                {/* Translate Button with Dropdown */}
+                <div className="relative" ref={translateDropdownRef}>
+                  <button
+                    onClick={() => setIsTranslateDropdownOpen(!isTranslateDropdownOpen)}
+                    className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:scale-105 ${isTranslateDropdownOpen
+                      ? 'bg-blue-500 text-white shadow-lg'
+                      : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                      }`}
+                    title="Translate selected notes"
+                  >
+                    <Languages className="w-5 h-5" />
+                    <span className="flex items-center gap-1">
+                      Translate
+                      <ChevronDown className={`w-3 h-3 transition-transform ${isTranslateDropdownOpen ? 'rotate-180' : ''}`} />
+                    </span>
+                  </button>
+
+                  {/* Language Dropdown */}
+                  {isTranslateDropdownOpen && (
+                    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-56 bg-white rounded-xl shadow-xl border border-blue-200 overflow-hidden z-50">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-blue-100/50">
+                        <span className="text-xs font-semibold text-gray-700">Select Language</span>
+                        <button
+                          onClick={() => setIsTranslateDropdownOpen(false)}
+                          className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {TOP_LANGUAGES.map((lang) => (
+                          <button
+                            key={lang.code}
+                            onClick={() => handleTranslate(lang.code)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 transition-colors"
+                          >
+                            <span className="font-medium text-gray-700">{lang.name}</span>
+                            <span className="text-xs text-gray-500">{lang.native}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button
                 onClick={() => {
                   setSelectedStickyNoteIds(new Set());
                   setSelectedCardIds(new Set());
+                  setIsTranslateDropdownOpen(false);
                 }}
                 className="ml-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium transition-colors"
                 title="Clear selection"
@@ -1269,7 +1343,6 @@ const BoardPage: React.FC = () => {
         onZoomChange={setZoom}
         onZoomReset={() => { setZoom(1); setViewOffset({ x: 0, y: 0 }); }}
         onGenerateCards={handleGenerateCards}
-        onTranslate={handleTranslate}
         onSaveBoard={handleSaveBoard}
         onNewBoard={handleNewBoard}
         onLoadBoard={handleLoadBoard}
@@ -1280,7 +1353,6 @@ const BoardPage: React.FC = () => {
           }
         }}
         isGenerating={isGenerating}
-        hasSelection={selectedStickyNoteIds.size > 0}
         isSaving={isSaving}
         lastSaved={lastSaved}
         userId={userId}
