@@ -8,6 +8,7 @@ import BoardPage from "./components/Board/BoardPage";
 import StitchPage from "./components/Stitch/StitchPage";
 import PlaygroundPage from "./pages/PlaygroundPage";
 import BenchmarksPage from "./pages/BenchmarksPage";
+import PitchPage from "./pages/PitchPage";
 
 const App = () => {
   return (
@@ -52,6 +53,7 @@ const App = () => {
           <BenchmarksPage />
         </Layout>
       } />
+      <Route path="/pitch" element={<PitchPage />} />
     </Routes>
   );
 };
