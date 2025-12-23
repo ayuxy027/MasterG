@@ -6,6 +6,7 @@ export interface StitchGenerateRequest {
   topic: string;
   grade: string;
   subject: string;
+  length?: "short" | "medium" | "long";
   culturalContext?: boolean;
 }
 

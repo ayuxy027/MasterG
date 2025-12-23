@@ -42,6 +42,7 @@ export class StitchController {
         topic,
         grade,
         subject,
+        length,
         stream,
       } = req.body;
 
@@ -82,11 +83,16 @@ export class StitchController {
         return;
       }
 
+      // Validate length
+      const validLengths = ["short", "medium", "long"];
+      const contentLength = length && validLengths.includes(length) ? length : "medium";
+
       // Build comprehensive prompt (content is always generated in English)
       const prompt = this.buildContentPrompt({
         topic: sanitizedTopic,
         grade: grade || "8",
         subject: subject || "mathematics",
+        length: contentLength as "short" | "medium" | "long",
       });
 
       // If streaming requested, use SSE
@@ -386,6 +392,7 @@ export class StitchController {
     topic: string;
     grade: string;
     subject: string;
+    length: "short" | "medium" | "long";
   }): string {
     const subjectNames: Record<string, string> = {
       mathematics: "Mathematics",
@@ -396,30 +403,143 @@ export class StitchController {
     // Use subject name if it's a known subject, otherwise use the custom value directly
     const subjectName = subjectNames[params.subject] || params.subject;
 
+    // Enhanced prompt for mathematics with battle-tested math handling
+    const isMathematics = params.subject.toLowerCase().includes("math") || 
+                          params.subject.toLowerCase() === "mathematics";
+    
+    const mathSpecificInstructions = isMathematics ? `
+CRITICAL MATHEMATICAL REQUIREMENTS (BATTLE-TESTED):
+- ALWAYS use proper mathematical notation: Use LaTeX-style math syntax for ALL formulas
+  * Inline math: Use $formula$ syntax (e.g., $x^2 + y^2 = z^2$, $\\frac{a}{b}$, $\\sqrt{x}$)
+  * Display math: Use $$formula$$ for centered equations (e.g., $$E = mc^2$$, $$\\int_{a}^{b} f(x)dx$$)
+- Preserve ALL mathematical symbols EXACTLY:
+  * Powers: Use ^ for superscripts ($x^2$, $a^{n+1}$)
+  * Subscripts: Use _ for subscripts ($H_2O$, $x_i$, $a_{n-1}$)
+  * Fractions: Use \\frac{numerator}{denominator} ($\\frac{a}{b}$, $\\frac{x+1}{x-1}$)
+  * Roots: Use \\sqrt{} or \\sqrt[n]{} ($\\sqrt{x}$, $\\sqrt[3]{8}$)
+  * Summation: Use \\sum_{i=1}^{n} ($\\sum_{i=1}^{n} x_i$)
+  * Integrals: Use \\int, \\int_{a}^{b} ($\\int f(x)dx$, $\\int_{0}^{\\infty} e^{-x}dx$)
+  * Greek letters: Use \\alpha, \\beta, \\gamma, \\pi, \\theta, \\lambda, etc.
+  * Operators: Use \\times, \\div, \\pm, \\leq, \\geq, \\neq, \\approx
+  * Sets: Use \\in, \\notin, \\subset, \\cup, \\cap, \\emptyset
+  * Logic: Use \\forall, \\exists, \\implies, \\iff
+- For complex equations, break down step-by-step:
+  * Show each algebraic manipulation clearly
+  * Explain WHY each step is valid (e.g., "Using the distributive property...")
+  * Include intermediate steps, don't skip calculations
+- Always provide WORKED EXAMPLES with complete solutions:
+  * Show the problem statement
+  * Show ALL steps of the solution
+  * Explain each step's reasoning
+  * Provide the final answer clearly
+- Handle multi-line equations properly:
+  * Use $$...$$ for display equations that span multiple lines
+  * Use align environment syntax: $$\\begin{align} ... \\end{align}$$
+- Preserve units and measurements exactly:
+  * Use proper unit notation (m/s, kg·m², °C, etc.)
+  * Don't convert units unless explicitly requested
+- For word problems:
+  * Translate word problems into mathematical expressions accurately
+  * Identify all given information and what needs to be found
+  * Set up equations correctly before solving
+- Common mathematical concepts to handle perfectly:
+  * Quadratic equations: $ax^2 + bx + c = 0$ with discriminant $\\Delta = b^2 - 4ac$
+  * Trigonometry: $\\sin$, $\\cos$, $\\tan$, identities, unit circle
+  * Calculus: derivatives $\\frac{d}{dx}$, integrals $\\int$, limits $\\lim_{x \\to a}$
+  * Linear algebra: matrices, vectors, determinants
+  * Geometry: area formulas, volume formulas, theorems
+  * Statistics: mean $\\bar{x}$, standard deviation $\\sigma$, probability $P(A)$
+- NEVER:
+  * Simplify or approximate mathematical constants (use exact values: $\\pi$, $e$, $\\sqrt{2}$)
+  * Round numbers unnecessarily in mathematical derivations
+  * Skip steps in proofs or solutions
+  * Use ambiguous notation (always be explicit)
+  * Mix up mathematical concepts or formulas
+
+` : '';
+
+    // Length-specific instructions (BATTLE-TESTED)
+    const lengthInstructions = params.length === "short" ? `
+CRITICAL LENGTH REQUIREMENT: SHORT CONTENT (200-400 words)
+- Generate a BRIEF, CONCISE overview of the topic
+- Focus on ESSENTIAL concepts only - no deep dives
+- Structure: Introduction → Key Points (3-5 main points) → Brief Summary
+- Keep explanations SHORT and DIRECT - maximum 2-3 sentences per concept
+- Include ONE simple example only (no complex worked examples)
+- NO extensive background or historical context
+- NO multiple examples or practice problems
+- Target word count: 200-400 words (STRICTLY enforce this limit)
+- Every sentence must be HIGH-VALUE - no filler or repetition
+- Use bullet points or numbered lists for key concepts to save space
+- Be PRECISE and CONCISE - quality over quantity
+
+` : params.length === "long" ? `
+CRITICAL LENGTH REQUIREMENT: LONG COMPREHENSIVE CONTENT (1000+ words)
+- Generate EXTENSIVE, THOROUGH coverage of the topic
+- Include COMPLETE explanations with full context and background
+- Structure: Introduction → Detailed Background → Core Concepts (with sub-concepts) → Multiple Examples → Applications → Practice Problems → Summary
+- Provide MULTIPLE worked examples (at least 3-4) with complete step-by-step solutions
+- Include historical context, real-world applications, and connections to other topics
+- Cover edge cases, common misconceptions, and advanced insights
+- Include practice problems with solutions
+- Use detailed explanations - 4-6 sentences per major concept
+- Target word count: 1000+ words (ensure comprehensive coverage)
+- Include visual descriptions, analogies, and multiple perspectives
+- Cover the topic from multiple angles: theoretical, practical, and applied
+- Provide extensive examples and counter-examples where relevant
+
+` : `
+CRITICAL LENGTH REQUIREMENT: MEDIUM CONTENT (500-800 words)
+- Generate BALANCED, STANDARD explanation of the topic
+- Structure: Introduction → Core Concepts → Examples → Applications → Summary
+- Include 2-3 worked examples with complete solutions
+- Provide sufficient detail for understanding without overwhelming
+- Include relevant context and real-world connections
+- Use 3-4 sentences per major concept
+- Target word count: 500-800 words (maintain this range)
+- Balance between brevity and completeness
+- Include practice problems (1-2) with solutions
+- Cover main aspects thoroughly with moderate depth
+
+`;
+
     let prompt = `
 You are an expert Indian educator and curriculum designer specializing in NCERT, CBSE, and State Board curricula.
 
-Generate comprehensive educational content with the following details:
+Generate educational content with the following details:
 
 Topic: ${params.topic}
 Subject: ${subjectName}
 Grade Level: Class ${params.grade}
+Content Length: ${params.length.toUpperCase()} (${params.length === "short" ? "200-400 words" : params.length === "long" ? "1000+ words" : "500-800 words"})
 Curriculum Alignment: Follow NCERT, CBSE, and State Board standards
 
-IMPORTANT: This content will be translated into multiple Indian languages. Write in clear, translation-friendly English.
+IMPORTANT: This content will be translated into multiple Indian languages using NLLB-200. Write in clear, translation-friendly English.
+
+TRANSLATION COMPATIBILITY REQUIREMENTS:
+- LaTeX math formulas ($...$ and $$...$$) will be preserved exactly during translation - format them correctly
+- Use simple sentence structures that translate well across languages
+- Avoid complex nested clauses - break into shorter sentences
+- Keep mathematical expressions separate from explanatory text when possible
+- Ensure formulas are self-contained and don't rely on surrounding text context
+
+${lengthInstructions}
 
 Content Requirements:
-- Provide comprehensive, detailed explanations suitable for Class ${params.grade} level
+- Provide explanations suitable for Class ${params.grade} level
 - Use clear, simple sentences that are easy to translate
-- Include sufficient context and detail - aim for thorough coverage of the topic
 - Maintain high factual accuracy aligned with NCERT, CBSE, and State Board curricula
 - Structure content with clear sections and logical flow
+- STRICTLY adhere to the specified length requirement above
 
 Formatting Rules:
-- Output MUST be plain text only - NO markdown, bullets, numbering, asterisks, or special formatting characters
-- Use simple line breaks to separate sentences and paragraphs
-- Do NOT use any markdown syntax (no #, *, -, [], (), etc.)
-- Write naturally but ensure each major idea is clearly separated
+- Output MUST use proper markdown formatting for readability
+- Use markdown syntax for structure: # for headings, - or * for lists, **bold** for emphasis
+- For mathematics: Use LaTeX-style math notation ($...$ for inline, $$...$$ for display)
+- CRITICAL FOR TRANSLATION: LaTeX math formulas ($...$ and $$...$$) will be preserved exactly during translation
+- Use proper formatting: headings, bullet points, numbered lists, code blocks for formulas
+- Separate major sections clearly with headings
+- IMPORTANT: Keep LaTeX formulas separate from surrounding text for better translation quality
 
 Pedagogical Approach:
 - Adjust depth and complexity appropriately for Class ${params.grade}
@@ -433,12 +553,16 @@ Scientific & Mathematical Accuracy:
 - Preserve all symbols, formulas, units, and notation exactly
 - Ensure all facts are accurate and curriculum-aligned
 - Do NOT simplify or modify established scientific facts
+- For science: Preserve chemical formulas, equations, and scientific notation exactly
 
-Content Scope:
-- Generate comprehensive content that thoroughly covers the topic
-- Include multiple aspects, examples, and explanations
-- Provide enough detail for students to understand the concept fully
-- Cover the topic from introduction through key concepts to applications
+${mathSpecificInstructions}
+
+Content Scope (Length-Adjusted):
+${params.length === "short" 
+  ? "- Focus on ESSENTIAL concepts only - no deep dives\n- Include ONE simple example\n- NO extensive background or multiple examples\n- Keep it BRIEF and CONCISE"
+  : params.length === "long"
+  ? "- Generate EXTENSIVE coverage with full context\n- Include MULTIPLE worked examples (3-4+)\n- Cover historical context, applications, and edge cases\n- Include practice problems with solutions\n- Provide comprehensive depth from multiple angles"
+  : "- Generate BALANCED coverage with sufficient detail\n- Include 2-3 worked examples\n- Cover main aspects thoroughly\n- Include 1-2 practice problems\n- Balance between brevity and completeness"}
 
 Educational Guardrails:
 - ONLY generate content related to educational topics
@@ -448,6 +572,8 @@ Educational Guardrails:
 
 Output Style:
 - Write in clear, professional English
+- Use proper markdown formatting for structure
+- Include mathematical formulas using LaTeX syntax
 - Avoid emojis, slang, or overly casual expressions
 - Do not include meta-commentary about the generation process
 - Ensure content is ready for direct use in educational contexts
