@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
+import { Zap, Wrench, Brain, Database, Building2, Flame } from 'lucide-react';
 
 interface Benchmark {
   name: string;
@@ -239,7 +240,9 @@ const PitchPage = () => {
 
           <div className="grid md:grid-cols-2 gap-8 mb-12">
             <div className="bg-gradient-to-br from-orange-50/60 to-orange-100/60 rounded-2xl p-8 shadow-xl border border-orange-200/50 hover:shadow-2xl transition-shadow duration-300">
-              <div className="text-6xl mb-4">⚡</div>
+              <div className="mb-4">
+                <Zap className="w-16 h-16 text-orange-600/80" strokeWidth={1.5} />
+              </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Astonishing Performance
               </h3>
@@ -252,7 +255,9 @@ const PitchPage = () => {
             </div>
 
             <div className="bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-2xl p-8 shadow-xl border border-orange-200/50 hover:shadow-2xl transition-shadow duration-300">
-              <div className="text-6xl mb-4">🔧</div>
+              <div className="mb-4">
+                <Wrench className="w-16 h-16 text-orange-600/80" strokeWidth={1.5} />
+              </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 Built with Open Source
               </h3>
@@ -477,7 +482,10 @@ const PitchPage = () => {
               <h3 className="text-3xl sm:text-4xl font-bold mb-4">DeepSeek R1 1GB Variant</h3>
               <p className="text-2xl mb-4">and</p>
               <h3 className="text-3xl sm:text-4xl font-bold mb-6">NLLB by Meta (600MB)</h3>
-              <p className="text-4xl font-bold mt-8">And this was a killer combination! 🔥</p>
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <p className="text-4xl font-bold">And this was a killer combination!</p>
+                <Flame className="w-10 h-10 text-orange-300" strokeWidth={2} />
+              </div>
             </div>
           </div>
 
@@ -495,7 +503,7 @@ const PitchPage = () => {
               {/* Translation Pipeline with Chart */}
               <div className="mb-8 bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="text-3xl">⚡</div>
+                  <Zap className="w-8 h-8 text-orange-600/80" strokeWidth={2} />
                   <h4 className="text-2xl font-bold text-gray-900">Translation Pipeline</h4>
                   <span className="ml-auto px-4 py-1 bg-orange-500/20 text-orange-700 font-bold rounded-full text-sm">
                     10× Speedup
@@ -549,7 +557,7 @@ const PitchPage = () => {
               {/* Language Model */}
               <div className="mb-8 bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="text-3xl">🧠</div>
+                  <Brain className="w-8 h-8 text-orange-600/80" strokeWidth={2} />
                   <h4 className="text-2xl font-bold text-gray-900">Language Model</h4>
                 </div>
                 <div className="grid md:grid-cols-3 gap-4">
@@ -582,7 +590,7 @@ const PitchPage = () => {
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="text-3xl">💾</div>
+                    <Database className="w-8 h-8 text-orange-600/80" strokeWidth={2} />
                     <h4 className="text-2xl font-bold text-gray-900">Data Layer</h4>
                   </div>
                   <ul className="space-y-2 text-gray-700">
@@ -599,7 +607,7 @@ const PitchPage = () => {
 
                 <div className="bg-gradient-to-br from-orange-50/60 to-amber-50/60 rounded-xl p-6 border border-orange-200/60">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="text-3xl">🏗️</div>
+                    <Building2 className="w-8 h-8 text-orange-600/80" strokeWidth={2} />
                     <h4 className="text-2xl font-bold text-gray-900">System Design</h4>
                   </div>
                   <ul className="space-y-2 text-gray-700">
