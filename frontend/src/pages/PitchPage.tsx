@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 
 interface Benchmark {
@@ -617,6 +618,25 @@ const PitchPage = () => {
                   </ul>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className={`mt-16 mb-8 transform transition-all duration-1000 delay-1700 ${showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            }`}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link
+                to="/"
+                className="bg-gradient-to-r from-orange-400/80 to-orange-500/80 text-white font-semibold px-8 py-4 rounded-full text-lg shadow-lg hover:shadow-xl hover:from-orange-500/90 hover:to-orange-600/90 transition-all duration-300 transform hover:scale-105"
+              >
+                Home
+              </Link>
+              <Link
+                to="/benchmarks"
+                className="bg-white text-orange-600 border-2 border-orange-400/80 font-semibold px-8 py-4 rounded-full text-lg shadow-lg hover:shadow-xl hover:bg-orange-50 hover:border-orange-500/90 transition-all duration-300 transform hover:scale-105"
+              >
+                Benchmarks
+              </Link>
             </div>
           </div>
         </div>
