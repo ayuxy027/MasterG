@@ -1272,10 +1272,19 @@ const BoardPage: React.FC = () => {
         onTranslate={handleTranslate}
         onSaveBoard={handleSaveBoard}
         onNewBoard={handleNewBoard}
+        onLoadBoard={handleLoadBoard}
+        onDeleteBoard={(sessionId) => {
+          // If deleted session was current, create new board
+          if (currentSessionId === sessionId) {
+            handleNewBoard();
+          }
+        }}
         isGenerating={isGenerating}
         hasSelection={selectedStickyNoteIds.size > 0}
         isSaving={isSaving}
         lastSaved={lastSaved}
+        userId={userId}
+        currentSessionId={currentSessionId}
       />
     </div>
   );
