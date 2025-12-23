@@ -249,6 +249,7 @@ export async function performCardAction(
     let result = "";
     let partialCards: CardData[] = [];
     let partialResult = "";
+    let accumulatedThinking = "";
 
     while (true) {
       const { done, value } = await reader.read();
@@ -265,9 +266,10 @@ export async function performCardAction(
             const parsed = JSON.parse(data);
 
             if (parsed.type === "thinking") {
-              // Thinking text updates
+              // Thinking text updates (accumulated, like generateCards)
+              accumulatedThinking += parsed.content || "";
               if (onThinkingUpdate) {
-                onThinkingUpdate(parsed.content || "");
+                onThinkingUpdate(accumulatedThinking);
               }
             } else if (parsed.type === "card" && parsed.cards) {
               // Partial card updates
