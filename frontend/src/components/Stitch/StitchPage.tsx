@@ -351,13 +351,18 @@ const ContentPreview: React.FC<ContentPreviewProps & { isMarkdown?: boolean }> =
 const StitchPage: React.FC = () => {
   // User & Session Management
   const [userId] = useState(() => getUserId());
+  // Always start with a fresh session on page load/hot reload
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => {
-    // Try to get sessionId from localStorage, or generate new one
-    const stored = localStorage.getItem("masterji_stitch_sessionId");
-    return stored || generateSessionId();
+    // Always generate a new session ID on mount (don't load last session)
+    const newSessionId = generateSessionId();
+    // Store the new session ID in localStorage so we can track it
+    localStorage.setItem("masterji_stitch_sessionId", newSessionId);
+    return newSessionId;
   });
   const [sessions, setSessions] = useState<StitchSessionListItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  // Track that initial mount always creates a fresh session (don't load from backend)
+  const initialMountRef = useRef(true);
 
   const [selectedGrade, setSelectedGrade] = useState("8");
   const [customGrade, setCustomGrade] = useState("");
@@ -760,15 +765,19 @@ const StitchPage: React.FC = () => {
   // Track if a session is newly created (don't try to load it from backend)
   const isNewSessionRef = useRef<boolean>(false);
 
-  // Load session data when sessionId changes (but not on initial mount if no sessionId)
-  // Skip loading if it's a newly created session
+  // Load session data when sessionId changes (but not on initial mount since we always start fresh)
+  // Skip loading if it's a newly created session or initial mount
   useEffect(() => {
     if (currentSessionId && currentSessionId !== previousSessionIdRef.current) {
       localStorage.setItem("masterji_stitch_sessionId", currentSessionId);
       previousSessionIdRef.current = currentSessionId;
 
-      // Only load if it's not a newly created session
-      if (!isNewSessionRef.current) {
+      // Skip loading on initial mount (always start fresh) or if it's a newly created session
+      if (initialMountRef.current) {
+        // Reset the initial mount flag after first render
+        initialMountRef.current = false;
+      } else if (!isNewSessionRef.current) {
+        // Only load if it's not a newly created session and not initial mount
         loadSessionData(currentSessionId);
       } else {
         // Reset the flag after skipping the load
