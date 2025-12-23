@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { X, GripVertical } from 'lucide-react';
+import { X, GripVertical, Check } from 'lucide-react';
 
 interface CardProps {
   id: string;
@@ -125,7 +125,7 @@ const Card: React.FC<CardProps> = ({
         {/* Selection indicator */}
         {isSelected && (
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">✓</span>
+            <Check className="w-3 h-3 text-white" strokeWidth={3} />
           </div>
         )}
       </div>

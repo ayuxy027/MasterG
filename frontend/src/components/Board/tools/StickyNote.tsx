@@ -12,6 +12,7 @@ interface StickyNoteProps {
   height: number;
   enableMarkdown?: boolean;
   selectionMode?: boolean;
+  isSelected?: boolean;
   ruled?: boolean;
   fontSize?: number;
   fontFamily?: string;
@@ -21,6 +22,7 @@ interface StickyNoteProps {
   zoom?: number;
   onUpdate: (id: string, updates: Partial<StickyNoteProps>) => void;
   onDelete: (id: string) => void;
+  onSelect?: (id: string, isMultiSelect: boolean) => void;
 }
 
 const StickyNote: React.FC<StickyNoteProps> = ({
@@ -33,6 +35,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
   height,
   enableMarkdown = false,
   selectionMode = false,
+  isSelected = false,
   ruled = false,
   fontSize = 14,
   fontFamily = 'Inter',
@@ -41,7 +44,8 @@ const StickyNote: React.FC<StickyNoteProps> = ({
   isUnderline = false,
   zoom = 1,
   onUpdate,
-  onDelete
+  onDelete,
+  onSelect
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -166,12 +170,21 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     }
   }, [showSettings]);
 
+  const handleNoteClick = (e: React.MouseEvent) => {
+    if (selectionMode && onSelect) {
+      e.stopPropagation();
+      const isMultiSelect = e.shiftKey || e.ctrlKey || e.metaKey;
+      onSelect(id, isMultiSelect);
+    }
+  };
+
   return (
     <div
       ref={noteRef}
-      className={`absolute select-none ${selectionMode ? 'cursor-move' : ''}`}
+      className={`absolute select-none ${selectionMode ? 'cursor-move' : ''} ${isSelected ? 'ring-2 ring-orange-500 ring-offset-2' : ''}`}
       style={{ left: x, top: y, width, height, zIndex: 20 }}
       onMouseDown={handleMouseDown}
+      onClick={handleNoteClick}
     >
       {/* Settings Button */}
       {selectionMode && (

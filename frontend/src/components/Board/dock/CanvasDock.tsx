@@ -1,8 +1,9 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { HiOutlineCursorClick } from 'react-icons/hi';
-import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser } from 'react-icons/lu';
+import { LuPencil, LuPalette, LuRotateCcw, LuTrash2, LuEraser, LuWrench, LuSave, LuFolderOpen, LuClock, LuFileText } from 'react-icons/lu';
 import { MdOutlineEventNote } from 'react-icons/md';
-import { Bot, X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Bot, X, ZoomIn, ZoomOut, Maximize2, Trash2, Clock } from 'lucide-react';
+import { BoardSession, boardSessionApi } from '../../../services/boardApi';
 
 interface CanvasDockProps {
   currentTool: string;
@@ -18,7 +19,15 @@ interface CanvasDockProps {
   onZoomChange?: (zoom: number) => void;
   onZoomReset?: () => void;
   onGenerateCards?: (prompt: string, count: number) => void;
+  onSaveBoard?: () => void;
+  onNewBoard?: () => void;
+  onLoadBoard?: (sessionId: string) => void;
+  onDeleteBoard?: (sessionId: string) => void;
   isGenerating?: boolean;
+  isSaving?: boolean;
+  lastSaved?: Date | null;
+  userId?: string;
+  currentSessionId?: string | null;
 }
 
 const CanvasDock: React.FC<CanvasDockProps> = ({
@@ -35,12 +44,24 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
   onZoomChange,
   onZoomReset,
   onGenerateCards,
+  onSaveBoard,
+  onNewBoard,
+  onLoadBoard,
+  onDeleteBoard,
   isGenerating = false,
+  isSaving = false,
+  lastSaved = null,
+  userId = '',
+  currentSessionId = null,
 }) => {
   const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
+  const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
   const [generatePrompt, setGeneratePrompt] = useState('');
   const [cardCount, setCardCount] = useState(3);
+  const [sessions, setSessions] = useState<BoardSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const generatePanelRef = useRef<HTMLDivElement | null>(null);
+  const sessionsPanelRef = useRef<HTMLDivElement | null>(null);
   const colorInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -49,10 +70,63 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
       if (generatePanelRef.current && !generatePanelRef.current.contains(target)) {
         setIsGeneratePanelOpen(false);
       }
+      if (sessionsPanelRef.current && !sessionsPanelRef.current.contains(target)) {
+        setIsSessionsPanelOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Fetch sessions when panel opens
+  useEffect(() => {
+    const fetchSessions = async () => {
+      if (!isSessionsPanelOpen || !userId) return;
+      setIsLoadingSessions(true);
+      try {
+        const fetchedSessions = await boardSessionApi.getAllSessions(userId);
+        setSessions(fetchedSessions);
+      } catch (error) {
+        console.error('Failed to fetch sessions:', error);
+        setSessions([]);
+      } finally {
+        setIsLoadingSessions(false);
+      }
+    };
+    fetchSessions();
+  }, [isSessionsPanelOpen, userId]);
+
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this board session?')) return;
+    try {
+      await boardSessionApi.deleteSession(userId, sessionId);
+      setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
+      onDeleteBoard?.(sessionId);
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
+  };
+
+  const handleLoadSession = (sessionId: string) => {
+    onLoadBoard?.(sessionId);
+    setIsSessionsPanelOpen(false);
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +142,7 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
       { id: 'pen', icon: LuPencil, label: 'Pen' },
       { id: 'eraser', icon: LuEraser, label: 'Eraser' },
       { id: 'sticky-note', icon: MdOutlineEventNote, label: 'Note' },
+      { id: 'operate', icon: LuWrench, label: 'Operate' },
     ],
     []
   );
@@ -81,12 +156,17 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
             {primaryTools.map((tool) => {
               const IconComponent = tool.icon as React.ComponentType<{ size?: number; className?: string }>;
               const isActive = currentTool === tool.id;
+              const isAIFeature = tool.id === 'operate'; // AI features use purple
               return (
                 <button
                   key={tool.id}
                   onClick={() => onToolChange(tool.id)}
                   className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${isActive
-                      ? 'bg-orange-500 text-white shadow-lg'
+                    ? isAIFeature
+                      ? 'bg-purple-500 text-white shadow-lg'
+                      : 'bg-orange-500 text-white shadow-lg'
+                    : isAIFeature
+                      ? 'text-purple-600 hover:bg-purple-50'
                       : 'text-orange-600 hover:bg-orange-50'
                     }`}
                   title={tool.label}
@@ -97,18 +177,18 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
               );
             })}
 
-            {/* AI Generate Button */}
+            {/* Generate Button */}
             <div className="relative" ref={generatePanelRef}>
               <button
                 onClick={() => setIsGeneratePanelOpen(!isGeneratePanelOpen)}
                 className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${isGeneratePanelOpen
-                    ? 'bg-purple-500 text-white shadow-lg'
-                    : 'text-purple-600 hover:bg-purple-50'
+                  ? 'bg-purple-500 text-white shadow-lg'
+                  : 'text-purple-600 hover:bg-purple-50'
                   }`}
                 title="Generate AI Cards"
               >
                 <Bot size={18} />
-                <span className="text-xs font-medium">AI</span>
+                <span className="text-xs font-medium">Generate</span>
               </button>
 
               {/* Generate Panel */}
@@ -206,9 +286,6 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="w-px h-8 bg-orange-200" />
-
           {/* Zoom */}
           <div className="flex items-center gap-1">
             <button
@@ -256,6 +333,125 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
             >
               <LuTrash2 size={16} />
             </button>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-8 bg-orange-200" />
+
+          {/* Save/Load */}
+          <div className="flex items-center gap-1 relative" ref={sessionsPanelRef}>
+            <button
+              onClick={onSaveBoard}
+              disabled={isSaving}
+              className={`flex flex-col items-center gap-1 px-2 py-1 rounded-lg transition-colors ${isSaving
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-green-600 hover:bg-green-50'
+                }`}
+              title={isSaving ? 'Saving...' : lastSaved ? `Saved ${lastSaved.toLocaleTimeString()}` : 'Save Board'}
+            >
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <LuSave size={16} />
+              )}
+              <span className="text-xs font-medium">Save</span>
+            </button>
+            <button
+              onClick={() => setIsSessionsPanelOpen(!isSessionsPanelOpen)}
+              className={`flex flex-col items-center gap-1 px-2 py-1 rounded-lg transition-colors ${isSessionsPanelOpen
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'text-blue-600 hover:bg-blue-50'
+                }`}
+              title="Recent Boards"
+            >
+              <LuClock size={16} />
+              <span className="text-xs font-medium">Recent</span>
+            </button>
+            <button
+              onClick={onNewBoard}
+              className="flex flex-col items-center gap-1 px-2 py-1 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+              title="New Board"
+            >
+              <LuFolderOpen size={16} />
+              <span className="text-xs font-medium">New</span>
+            </button>
+
+            {/* Recent Sessions Panel */}
+            {isSessionsPanelOpen && (
+              <div className="absolute bottom-14 right-0 w-80 bg-white rounded-xl shadow-xl border border-blue-200 overflow-hidden z-50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100/50">
+                  <div className="flex items-center gap-2">
+                    <Clock size={18} className="text-blue-500" />
+                    <h3 className="font-semibold text-gray-800">Recent Boards</h3>
+                  </div>
+                  <button
+                    onClick={() => setIsSessionsPanelOpen(false)}
+                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X size={16} className="text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto">
+                  {isLoadingSessions ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : sessions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                      <LuFileText size={32} className="mb-2" />
+                      <p className="text-sm">No saved boards yet</p>
+                      <p className="text-xs">Your boards will appear here</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {sessions.map((session) => (
+                        <div
+                          key={session.sessionId}
+                          onClick={() => handleLoadSession(session.sessionId)}
+                          className={`flex items-center justify-between px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors ${currentSessionId === session.sessionId ? 'bg-blue-100' : ''
+                            }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-800 truncate">
+                                {session.sessionName || `Board ${session.sessionId.slice(-8)}`}
+                              </span>
+                              {currentSessionId === session.sessionId && (
+                                <span className="px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded">Current</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                              <span className="flex items-center gap-1">
+                                <Clock size={12} />
+                                {formatTimeAgo(session.updatedAt)}
+                              </span>
+                              <span>{session.stickyNoteCount} notes</span>
+                              <span>{session.drawingPathCount} strokes</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => handleDeleteSession(session.sessionId, e)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete board"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {sessions.length > 0 && (
+                  <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
+                    <p className="text-xs text-gray-500 text-center">
+                      {sessions.length} saved board{sessions.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -32,6 +32,63 @@ export interface ActionResponse {
   message?: string;
 }
 
+export interface BoardSession {
+  sessionId: string;
+  sessionName?: string;
+  updatedAt: string;
+  cardCount: number;
+  stickyNoteCount: number;
+  drawingPathCount: number;
+}
+
+export interface BoardSessionData {
+  userId: string;
+  sessionId: string;
+  sessionName?: string;
+  drawingPaths: Array<{
+    points: Array<{ x: number; y: number }>;
+    color: string;
+    strokeWidth: number;
+    tool: string;
+  }>;
+  cards: Array<{
+    id: string;
+    title: string;
+    content: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
+  stickyNotes: Array<{
+    id: string;
+    x: number;
+    y: number;
+    text: string;
+    color: string;
+    width: number;
+    height: number;
+    enableMarkdown?: boolean;
+    ruled?: boolean;
+    fontSize?: number;
+    fontFamily?: string;
+    isBold?: boolean;
+    isItalic?: boolean;
+    isUnderline?: boolean;
+  }>;
+  viewOffset: { x: number; y: number };
+  zoom: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+class BoardApiError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BoardApiError";
+  }
+}
+
 /**
  * Check Ollama connection status
  */
@@ -58,7 +115,8 @@ export async function checkOllamaStatus(): Promise<OllamaStatus> {
 export async function generateCards(
   prompt: string,
   cardCount: number = 3,
-  onThinkingUpdate?: (text: string) => void
+  onThinkingUpdate?: (text: string) => void,
+  onCardUpdate?: (cards: CardData[]) => void
 ): Promise<CardData[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/board/generate`, {
@@ -83,6 +141,7 @@ export async function generateCards(
     let buffer = "";
     let accumulatedThinking = "";
     let cards: CardData[] = [];
+    let latestPartialCards: CardData[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -103,9 +162,19 @@ export async function generateCards(
               if (onThinkingUpdate) {
                 onThinkingUpdate(accumulatedThinking);
               }
+            } else if (parsed.type === "card" && parsed.cards) {
+              // Real-time card updates as they're generated
+              latestPartialCards = parsed.cards;
+              if (onCardUpdate) {
+                onCardUpdate(latestPartialCards);
+              }
             } else if (parsed.type === "complete") {
               if (parsed.cards) {
                 cards = parsed.cards;
+                // Send final update
+                if (onCardUpdate) {
+                  onCardUpdate(cards);
+                }
               }
               if (parsed.thinkingText && onThinkingUpdate) {
                 onThinkingUpdate(parsed.thinkingText);
@@ -121,6 +190,11 @@ export async function generateCards(
       }
     }
 
+    // Use final cards or fallback to partial cards
+    if (cards.length === 0 && latestPartialCards.length > 0) {
+      cards = latestPartialCards;
+    }
+
     if (cards.length === 0) {
       throw new Error("No cards generated");
     }
@@ -133,11 +207,13 @@ export async function generateCards(
 }
 
 /**
- * Perform AI action on selected cards
+ * Perform AI action on selected cards (with streaming support)
  */
 export async function performCardAction(
   action: CardAction,
-  cardContents: string[]
+  cardContents: string[],
+  onPartialUpdate?: (data: { type: string; cards?: CardData[]; content?: string }) => void,
+  onThinkingUpdate?: (text: string) => void
 ): Promise<ActionResponse> {
   try {
     if (cardContents.length === 0) {
@@ -159,7 +235,89 @@ export async function performCardAction(
       throw new Error(err.message || "Failed to perform action");
     }
 
-    return response.json();
+    // Handle streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      // Fallback to non-streaming
+      return response.json();
+    }
+
+    let buffer = "";
+    let cards: CardData[] = [];
+    let result = "";
+    let partialCards: CardData[] = [];
+    let partialResult = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          try {
+            const parsed = JSON.parse(data);
+
+            if (parsed.type === "thinking") {
+              // Thinking text updates
+              if (onThinkingUpdate) {
+                onThinkingUpdate(parsed.content || "");
+              }
+            } else if (parsed.type === "card" && parsed.cards) {
+              // Partial card updates
+              partialCards = parsed.cards;
+              if (onPartialUpdate) {
+                onPartialUpdate({ type: "card", cards: partialCards });
+              }
+            } else if (parsed.type === "partial" && parsed.content) {
+              // Partial text updates (for summarize, actionPoints)
+              partialResult = parsed.content;
+              if (onPartialUpdate) {
+                onPartialUpdate({ type: "partial", content: partialResult });
+              }
+            } else if (parsed.type === "complete") {
+              if (parsed.thinkingText && onThinkingUpdate) {
+                onThinkingUpdate(parsed.thinkingText);
+              }
+              if (parsed.cards) {
+                cards = parsed.cards;
+              }
+              if (parsed.result) {
+                result = parsed.result;
+              }
+            } else if (parsed.type === "error") {
+              throw new Error(parsed.error);
+            }
+          } catch (e) {
+            // Skip invalid JSON
+            continue;
+          }
+        }
+      }
+    }
+
+    // Return final result
+    if (cards.length > 0) {
+      return {
+        success: true,
+        action,
+        cards,
+      };
+    } else if (result) {
+      return {
+        success: true,
+        action,
+        result,
+      };
+    } else {
+      throw new Error("No result received from action");
+    }
   } catch (error: any) {
     console.error("Board API: Action error:", error);
     return {
@@ -169,3 +327,208 @@ export async function performCardAction(
   }
 }
 
+/**
+ * Board Session Management
+ */
+export class BoardSessionApi {
+  /**
+   * Get all Board sessions for a user
+   */
+  async getAllSessions(userId: string): Promise<BoardSession[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/board/sessions/${userId}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data.sessions || [];
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to get Board sessions"
+      );
+    }
+  }
+
+  /**
+   * Get a specific Board session
+   */
+  async getSession(userId: string, sessionId: string): Promise<BoardSessionData> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          throw new BoardApiError("Session not found");
+        }
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data.session;
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to get Board session"
+      );
+    }
+  }
+
+  /**
+   * Save Board session
+   */
+  async saveSession(
+    userId: string,
+    sessionId: string,
+    data: {
+      sessionName?: string;
+      drawingPaths?: Array<{
+        points: Array<{ x: number; y: number }>;
+        color: string;
+        strokeWidth: number;
+        tool: string;
+      }>;
+      cards?: Array<{
+        id: string;
+        title: string;
+        content: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }>;
+      stickyNotes?: Array<{
+        id: string;
+        x: number;
+        y: number;
+        text: string;
+        color: string;
+        width: number;
+        height: number;
+        enableMarkdown?: boolean;
+        ruled?: boolean;
+        fontSize?: number;
+        fontFamily?: string;
+        isBold?: boolean;
+        isItalic?: boolean;
+        isUnderline?: boolean;
+      }>;
+      viewOffset?: { x: number; y: number };
+      zoom?: number;
+    }
+  ): Promise<BoardSessionData> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const result = await response.json();
+      return result.session;
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to save Board session"
+      );
+    }
+  }
+
+  /**
+   * Delete Board session
+   */
+  async deleteSession(userId: string, sessionId: string): Promise<void> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to delete Board session"
+      );
+    }
+  }
+
+  /**
+   * Update session name
+   */
+  async updateSessionName(
+    userId: string,
+    sessionId: string,
+    sessionName: string
+  ): Promise<void> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/board/sessions/${userId}/${sessionId}/name`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionName }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new BoardApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof BoardApiError) {
+        throw error;
+      }
+      throw new BoardApiError(
+        error instanceof Error ? error.message : "Failed to update session name"
+      );
+    }
+  }
+}
+
+export const boardSessionApi = new BoardSessionApi();

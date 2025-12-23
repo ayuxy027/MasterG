@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { FileText, ListChecks, Brain, BookOpen, Languages, ChevronDown, X } from 'lucide-react';
 import { DottedBackground, CanvasDock, StickyNote } from './index';
 import { getToolById, Point, DrawingPath } from './tools';
 import Card from './Card';
 import MinimizedNavbar from './MinimizedNavbar';
-import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus } from '../../services/boardApi';
+import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus, boardSessionApi } from '../../services/boardApi';
+import { stitchAPI } from '../../services/stitchApi';
 
 // ============================================================================
 // TYPES
@@ -70,6 +72,7 @@ const BoardPage: React.FC = () => {
   const [cards, setCards] = useState<CardState[]>([]);
   const [stickyNotes, setStickyNotes] = useState<StickyNoteState[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+  const [selectedStickyNoteIds, setSelectedStickyNoteIds] = useState<Set<string>>(new Set());
 
   // AI state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -83,6 +86,43 @@ const BoardPage: React.FC = () => {
 
   // Space key for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+
+  // Track streaming action card IDs for real-time updates
+  const streamingActionCardIdsRef = useRef<Set<string>>(new Set());
+  const resultCardIdRef = useRef<string | null>(null);
+
+  // Translate dropdown state
+  const [isTranslateDropdownOpen, setIsTranslateDropdownOpen] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const translateDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Language options for translation
+  const TOP_LANGUAGES = [
+    { code: 'hi', name: 'Hindi', native: 'हिंदी' },
+    { code: 'mr', name: 'Marathi', native: 'मराठी' },
+    { code: 'bn', name: 'Bengali', native: 'বাংলা' },
+    { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+    { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+    { code: 'en', name: 'English', native: 'English' },
+    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
+    { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
+    { code: 'ml', name: 'Malayalam', native: 'മലയാളം' },
+    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+  ];
+
+  // Board session management
+  const [userId] = useState(() => {
+    // Generate or get user ID from localStorage
+    const stored = localStorage.getItem('board_userId');
+    if (stored) return stored;
+    const newId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('board_userId', newId);
+    return newId;
+  });
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ============================================================================
   // OLLAMA STATUS CHECK
@@ -417,31 +457,77 @@ const BoardPage: React.FC = () => {
     setThinkingText("");
     setShowThinkingModal(true);
 
-    try {
-      const newCards = await generateCards(prompt, count, (thinking) => {
-        setThinkingText(thinking);
-      });
-      const screenCenterX = window.innerWidth / 2;
-      const screenCenterY = window.innerHeight / 2;
-      const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
-      const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
+    // Clear previous AI-generated sticky notes
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
+    const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
+    const noteWidth = 250;
+    const noteHeight = 200;
+    const spacing = 30;
 
-      const cardWidth = 280;
-      const cardHeight = 180;
-      const spacing = 30;
-      const totalWidth = newCards.length * cardWidth + (newCards.length - 1) * spacing;
+    // Convert cards to sticky notes
+    const updateStickyNotesFromCards = (cardsToUpdate: CardData[]) => {
+      const totalWidth = cardsToUpdate.length * noteWidth + (cardsToUpdate.length - 1) * spacing;
       const startX = canvasCenterX - totalWidth / 2;
 
-      const cardsWithPosition: CardState[] = newCards.map((card, index) => ({
-        ...card,
-        x: startX + index * (cardWidth + spacing),
-        y: canvasCenterY - cardHeight / 2,
-        width: cardWidth,
-        height: cardHeight,
-        isSelected: false,
-      }));
+      setStickyNotes(prev => {
+        // Remove old streaming sticky notes (track by a prefix in ID)
+        const filtered = prev.filter(note => !note.id.startsWith('ai-generated-'));
 
-      setCards(prev => [...prev, ...cardsWithPosition]);
+        // Create/update sticky notes from cards
+        const updatedNotes = cardsToUpdate.map((card, index) => {
+          const noteId = `ai-generated-${card.id}`;
+          const existingNote = filtered.find(n => n.id === noteId);
+
+          if (existingNote) {
+            // Update existing note
+            return {
+              ...existingNote,
+              text: `${card.title}\n\n${card.content}`,
+              x: startX + index * (noteWidth + spacing),
+              y: canvasCenterY - noteHeight / 2,
+            };
+          } else {
+            // Create new sticky note
+            return {
+              id: noteId,
+              x: startX + index * (noteWidth + spacing),
+              y: canvasCenterY - noteHeight / 2,
+              text: `${card.title}\n\n${card.content}`,
+              color: '#FFE4B5', // Default peach color
+              width: noteWidth,
+              height: noteHeight,
+              enableMarkdown: false,
+              ruled: false,
+              fontSize: 14,
+              fontFamily: 'Inter',
+              isBold: false,
+              isItalic: false,
+              isUnderline: false,
+            };
+          }
+        });
+
+        return [...filtered, ...updatedNotes];
+      });
+    };
+
+    try {
+      const newCards = await generateCards(
+        prompt,
+        count,
+        (thinking) => {
+          setThinkingText(thinking);
+        },
+        (streamingCards) => {
+          // Real-time sticky note updates as they stream in
+          updateStickyNotesFromCards(streamingCards);
+        }
+      );
+
+      // Final update with complete sticky notes
+      updateStickyNotesFromCards(newCards);
     } catch (error) {
       console.error('Failed to generate cards:', error);
     } finally {
@@ -459,71 +545,163 @@ const BoardPage: React.FC = () => {
   // ============================================================================
 
   const handleCardAction = useCallback(async (action: CardAction) => {
-    if (selectedCardIds.size === 0 || isPerformingAction) return;
-    if (selectedCardIds.size > 4) {
-      alert('Maximum 4 cards can be selected for AI actions');
+    // Use sticky notes if selected, otherwise fall back to cards
+    const selectedIds = selectedStickyNoteIds.size > 0 ? selectedStickyNoteIds : selectedCardIds;
+    if (selectedIds.size === 0 || isPerformingAction) return;
+    if (selectedIds.size > 4) {
+      alert('Maximum 4 items can be selected for AI actions');
       return;
     }
 
     setIsPerformingAction(true);
+    setThinkingText("");
+    setShowThinkingModal(true);
+
+    const screenCenterX = window.innerWidth / 2;
+    const screenCenterY = window.innerHeight / 2;
+    const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
+    const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
+    const noteWidth = 250;
+    const noteHeight = 200;
+    const spacing = 30;
+
+    // Convert action cards to sticky notes
+    const updateActionStickyNotes = (cardsToUpdate: CardData[]) => {
+      const totalWidth = cardsToUpdate.length * noteWidth + (cardsToUpdate.length - 1) * spacing;
+      const startX = canvasCenterX - totalWidth / 2;
+
+      setStickyNotes(prev => {
+        // Remove old streaming action sticky notes
+        const filtered = prev.filter(note => !note.id.startsWith(`ai-action-${action}-`));
+
+        // Create/update sticky notes from cards
+        const updatedNotes = cardsToUpdate.map((card, index) => {
+          const noteId = `ai-action-${action}-${card.id}`;
+          const existingNote = filtered.find(n => n.id === noteId);
+          const noteText = `${card.title}\n\n${card.content}`;
+
+          if (existingNote) {
+            return {
+              ...existingNote,
+              text: noteText,
+              x: startX + index * (noteWidth + spacing),
+              y: canvasCenterY + 200,
+            };
+          } else {
+            streamingActionCardIdsRef.current.add(card.id);
+            return {
+              id: noteId,
+              x: startX + index * (noteWidth + spacing),
+              y: canvasCenterY + 200,
+              text: noteText,
+              color: '#FFE4B5',
+              width: noteWidth,
+              height: noteHeight,
+              enableMarkdown: false,
+              ruled: false,
+              fontSize: 14,
+              fontFamily: 'Inter',
+              isBold: false,
+              isItalic: false,
+              isUnderline: false,
+            };
+          }
+        });
+
+        return [...filtered, ...updatedNotes];
+      });
+    };
+
+    // Convert text results to sticky notes
+    const updateActionResult = (content: string) => {
+      const resultNoteId = resultCardIdRef.current || `ai-action-result-${action}-${Date.now()}`;
+      resultCardIdRef.current = resultNoteId;
+
+      setStickyNotes(prev => {
+        const existing = prev.find(n => n.id === resultNoteId);
+        if (existing) {
+          return prev.map(n =>
+            n.id === resultNoteId
+              ? { ...n, text: content }
+              : n
+          );
+        } else {
+          return [...prev, {
+            id: resultNoteId,
+            x: canvasCenterX - 160,
+            y: canvasCenterY + 150,
+            text: content,
+            color: '#FFE4B5',
+            width: 320,
+            height: action === 'actionPoints' ? 280 : 220,
+            enableMarkdown: false,
+            ruled: false,
+            fontSize: 14,
+            fontFamily: 'Inter',
+            isBold: false,
+            isItalic: false,
+            isUnderline: false,
+          }];
+        }
+      });
+    };
 
     try {
-      const selectedCards = cards.filter(c => selectedCardIds.has(c.id));
-      const contents = selectedCards.map(c => c.content);
-      const result = await performCardAction(action, contents);
+      // Get content from sticky notes or cards
+      let contents: string[] = [];
+      if (selectedStickyNoteIds.size > 0) {
+        const selectedNotes = stickyNotes.filter(n => selectedStickyNoteIds.has(n.id));
+        contents = selectedNotes.map(n => n.text);
+      } else {
+        const selectedCards = cards.filter(c => selectedCardIds.has(c.id));
+        contents = selectedCards.map(c => c.content);
+      }
+
+      const result = await performCardAction(
+        action,
+        contents,
+        (partialData) => {
+          if (partialData.type === "card" && partialData.cards) {
+            // Real-time sticky note updates for mindMap/flashcards
+            updateActionStickyNotes(partialData.cards);
+          } else if (partialData.type === "partial" && partialData.content) {
+            // Real-time text updates for summarize/actionPoints
+            updateActionResult(partialData.content);
+          }
+        },
+        (thinking) => {
+          // Real-time thinking process updates
+          setThinkingText(thinking);
+        }
+      );
 
       if (!result.success) {
         console.error('Action failed:', result.message);
         return;
       }
 
-      const screenCenterX = window.innerWidth / 2;
-      const screenCenterY = window.innerHeight / 2;
-      const canvasCenterX = (screenCenterX - viewOffset.x) / zoom;
-      const canvasCenterY = (screenCenterY - viewOffset.y) / zoom;
-
-      // Check if action generated cards (mindMap, flashcards)
+      // Final update with complete results
       if (result.cards && result.cards.length > 0) {
-        // Add generated cards
-        const cardWidth = 280;
-        const cardHeight = 180;
-        const spacing = 30;
-        const totalWidth = result.cards.length * cardWidth + (result.cards.length - 1) * spacing;
-        const startX = canvasCenterX - totalWidth / 2;
-
-        const cardsWithPosition: CardState[] = result.cards.map((card, index) => ({
-          ...card,
-          x: startX + index * (cardWidth + spacing),
-          y: canvasCenterY + 200,
-          width: cardWidth,
-          height: cardHeight,
-          isSelected: false,
-        }));
-
-        setCards(prev => [...prev, ...cardsWithPosition]);
+        updateActionStickyNotes(result.cards);
       } else if (result.result) {
-        // Create a single result card (summarize, actionPoints)
-        const newCard: CardState = {
-          id: `result-${Date.now()}`,
-          title: action === 'summarize' ? 'Summary' : action === 'actionPoints' ? 'Action Points' : `${action} Result`,
-          content: result.result,
-          x: canvasCenterX - 160,
-          y: canvasCenterY + 150,
-          width: 320,
-          height: 220,
-          isSelected: false,
-        };
-
-        setCards(prev => [...prev, newCard]);
+        updateActionResult(result.result);
       }
 
+      setSelectedStickyNoteIds(new Set());
       setSelectedCardIds(new Set());
     } catch (error) {
       console.error('Failed to perform card action:', error);
     } finally {
       setIsPerformingAction(false);
+      streamingActionCardIdsRef.current.clear();
+      resultCardIdRef.current = null;
+      // Keep thinking modal open briefly, then auto-close after 2 seconds
+      setTimeout(() => {
+        setShowThinkingModal(false);
+        setThinkingText("");
+      }, 2000);
     }
-  }, [selectedCardIds, cards, isPerformingAction, viewOffset, zoom]);
+  }, [selectedStickyNoteIds, selectedCardIds, stickyNotes, cards, isPerformingAction, viewOffset, zoom]);
 
   // ============================================================================
   // CARD SELECTION
@@ -577,7 +755,242 @@ const BoardPage: React.FC = () => {
 
   const handleStickyNoteDelete = useCallback((id: string) => {
     setStickyNotes(prev => prev.filter(note => note.id !== id));
+    setSelectedStickyNoteIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
   }, []);
+
+  const handleStickyNoteSelect = useCallback((noteId: string, isMultiSelect: boolean) => {
+    setSelectedStickyNoteIds(prev => {
+      const newSet = new Set(prev);
+      if (isMultiSelect) {
+        if (newSet.has(noteId)) {
+          newSet.delete(noteId);
+        } else if (newSet.size < 4) {
+          newSet.add(noteId);
+        }
+      } else {
+        if (newSet.has(noteId) && newSet.size === 1) {
+          newSet.clear();
+        } else {
+          newSet.clear();
+          newSet.add(noteId);
+        }
+      }
+      return newSet;
+    });
+  }, []);
+
+  // ============================================================================
+  // BOARD SESSION MANAGEMENT
+  // ============================================================================
+
+  const handleSaveBoardWithId = useCallback(async (sessionId: string) => {
+    setIsSaving(true);
+    try {
+      await boardSessionApi.saveSession(userId, sessionId, {
+        drawingPaths: drawingPaths.map(path => ({
+          points: path.points,
+          color: path.color,
+          strokeWidth: path.strokeWidth,
+          tool: path.tool,
+        })),
+        cards: cards.map(card => ({
+          id: card.id,
+          title: card.title,
+          content: card.content,
+          x: card.x,
+          y: card.y,
+          width: card.width,
+          height: card.height,
+        })),
+        stickyNotes: stickyNotes.map(note => ({
+          id: note.id,
+          x: note.x,
+          y: note.y,
+          text: note.text,
+          color: note.color,
+          width: note.width,
+          height: note.height,
+          enableMarkdown: note.enableMarkdown,
+          ruled: note.ruled,
+          fontSize: note.fontSize,
+          fontFamily: note.fontFamily,
+          isBold: note.isBold,
+          isItalic: note.isItalic,
+          isUnderline: note.isUnderline,
+        })),
+        viewOffset,
+        zoom,
+      });
+      setLastSaved(new Date());
+      setCurrentSessionId(sessionId);
+      console.log('✅ Board saved successfully');
+    } catch (error) {
+      console.error('❌ Failed to save board:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [userId, drawingPaths, cards, stickyNotes, viewOffset, zoom]);
+
+  const handleSaveBoard = useCallback(async () => {
+    if (!currentSessionId) {
+      // Create new session ID
+      const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentSessionId(newSessionId);
+      await handleSaveBoardWithId(newSessionId);
+    } else {
+      await handleSaveBoardWithId(currentSessionId);
+    }
+  }, [currentSessionId, handleSaveBoardWithId]);
+
+  const handleLoadBoard = useCallback(async (sessionId: string) => {
+    try {
+      console.log('🔍 Loading board session:', sessionId);
+      const session = await boardSessionApi.getSession(userId, sessionId);
+      if (session) {
+        console.log('📦 Session data received:');
+        console.log('   - Sticky Notes:', session.stickyNotes?.length || 0);
+        console.log('   - Cards:', session.cards?.length || 0);
+        console.log('   - Drawing Paths:', session.drawingPaths?.length || 0);
+
+        // Restore drawing paths
+        if (session.drawingPaths && session.drawingPaths.length > 0) {
+          setDrawingPaths(session.drawingPaths.map(path => ({
+            points: path.points,
+            color: path.color,
+            strokeWidth: path.strokeWidth,
+            tool: path.tool,
+          })));
+        }
+
+        // Restore cards
+        if (session.cards && session.cards.length > 0) {
+          setCards(session.cards.map(card => ({
+            ...card,
+            isSelected: false,
+          })));
+        }
+
+        // Restore sticky notes
+        if (session.stickyNotes && session.stickyNotes.length > 0) {
+          setStickyNotes(session.stickyNotes);
+        }
+
+        // Restore view state
+        if (session.viewOffset) {
+          setViewOffset(session.viewOffset);
+        }
+        if (session.zoom) {
+          setZoom(session.zoom);
+        }
+
+        setCurrentSessionId(sessionId);
+        console.log('✅ Board loaded successfully:', sessionId);
+      } else {
+        console.warn('⚠️ No session data found for:', sessionId);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load board:', error);
+    }
+  }, [userId]);
+
+  // Auto-load test session on mount if userId matches test user
+  useEffect(() => {
+    const testUserId = 'user_test_board_123';
+    const testSessionId = 'board_test_123';
+
+    if (userId === testUserId && !currentSessionId && stickyNotes.length === 0 && cards.length === 0 && drawingPaths.length === 0) {
+      console.log('🔍 Detected test user, attempting to load test session...');
+      handleLoadBoard(testSessionId).catch(err => {
+        console.error('Failed to auto-load test session:', err);
+      });
+    }
+  }, [userId, currentSessionId, handleLoadBoard, stickyNotes.length, cards.length, drawingPaths.length]);
+
+  const handleNewBoard = useCallback(() => {
+    setDrawingPaths([]);
+    setCards([]);
+    setStickyNotes([]);
+    setSelectedCardIds(new Set());
+    setSelectedStickyNoteIds(new Set());
+    setViewOffset({ x: 0, y: 0 });
+    setZoom(1);
+    setCurrentSessionId(null);
+    setLastSaved(null);
+  }, []);
+
+  // Auto-save functionality (debounced)
+  useEffect(() => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Only auto-save if there's content
+    const hasContent = drawingPaths.length > 0 || cards.length > 0 || stickyNotes.length > 0;
+    if (!hasContent) return;
+
+    // Auto-save after 3 seconds of inactivity
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      if (currentSessionId) {
+        // Session exists, save to it
+        handleSaveBoardWithId(currentSessionId);
+      } else {
+        // No session yet, create one and save
+        const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        setCurrentSessionId(newSessionId);
+        handleSaveBoardWithId(newSessionId);
+      }
+    }, 3000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [drawingPaths, cards, stickyNotes, viewOffset, zoom, currentSessionId, handleSaveBoardWithId]);
+
+  // ============================================================================
+  // TRANSLATION HANDLER
+  // ============================================================================
+
+  const handleTranslate = useCallback(async (targetLanguageCode: string) => {
+    if (selectedStickyNoteIds.size === 0) return;
+
+    const selectedNotes = stickyNotes.filter(note => selectedStickyNoteIds.has(note.id));
+    if (selectedNotes.length === 0) return;
+
+    setIsTranslating(true);
+    setIsTranslateDropdownOpen(false);
+
+    // Translate each selected note
+    for (const note of selectedNotes) {
+      try {
+        const result = await stitchAPI.translateContent({
+          text: note.text,
+          sourceLanguage: 'en', // Assuming English as source
+          targetLanguage: targetLanguageCode,
+        });
+
+        if (result.success && result.translated) {
+          // Update the sticky note with translated text
+          setStickyNotes(prev => prev.map(n =>
+            n.id === note.id
+              ? { ...n, text: result.translated! }
+              : n
+          ));
+        }
+      } catch (error) {
+        console.error(`Failed to translate note ${note.id}:`, error);
+      }
+    }
+
+    setIsTranslating(false);
+    // Clear selection after translation
+    setSelectedStickyNoteIds(new Set());
+  }, [selectedStickyNoteIds, stickyNotes]);
 
   // ============================================================================
   // TOOLBAR HANDLERS
@@ -784,7 +1197,9 @@ const BoardPage: React.FC = () => {
               isItalic={note.isItalic}
               isUnderline={note.isUnderline}
               zoom={zoom}
-              selectionMode={currentTool === 'select'}
+              selectionMode={currentTool === 'select' || currentTool === 'operate'}
+              isSelected={selectedStickyNoteIds.has(note.id)}
+              onSelect={currentTool === 'operate' ? handleStickyNoteSelect : undefined}
               onUpdate={handleStickyNoteUpdate}
               onDelete={handleStickyNoteDelete}
             />
@@ -792,30 +1207,32 @@ const BoardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* AI Actions Panel (when cards selected) */}
-      {selectedCardIds.size > 0 && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-orange-200 p-4 flex items-center gap-3">
-          {isPerformingAction ? (
+      {/* AI Actions Panel (when operate tool is active and sticky notes selected) */}
+      {currentTool === 'operate' && (selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0) && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-purple-200 p-4 flex items-center gap-3">
+          {isPerformingAction || isTranslating ? (
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-orange-600 font-medium">Generating AI response...</span>
+              <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-purple-600 font-medium">
+                {isTranslating ? 'Translating...' : 'Generating AI response...'}
+              </span>
             </div>
           ) : (
             <>
               <div className="flex flex-col gap-1 pr-3 border-r border-gray-200">
                 <span className="text-xs text-gray-400 uppercase tracking-wide">Selected</span>
-                <span className="text-lg font-bold text-orange-600">
-                  {selectedCardIds.size} / 4
+                <span className="text-lg font-bold text-purple-600">
+                  {selectedStickyNoteIds.size + selectedCardIds.size} / 4
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleCardAction('summarize')}
-                  className="flex flex-col items-center gap-1 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
+                  className="flex flex-col items-center gap-1 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Generate a concise summary"
                 >
-                  <span className="text-base">📝</span>
+                  <FileText className="w-5 h-5" />
                   <span>Summarize</span>
                 </button>
 
@@ -824,7 +1241,7 @@ const BoardPage: React.FC = () => {
                   className="flex flex-col items-center gap-1 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Extract actionable bullet points"
                 >
-                  <span className="text-base">✅</span>
+                  <ListChecks className="w-5 h-5" />
                   <span>Action Points</span>
                 </button>
 
@@ -833,7 +1250,7 @@ const BoardPage: React.FC = () => {
                   className="flex flex-col items-center gap-1 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Generate concept cards as mind map"
                 >
-                  <span className="text-base">🧠</span>
+                  <Brain className="w-5 h-5" />
                   <span>Mind Map</span>
                 </button>
 
@@ -842,13 +1259,65 @@ const BoardPage: React.FC = () => {
                   className="flex flex-col items-center gap-1 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Create Q&A flashcards for studying"
                 >
-                  <span className="text-base">🎴</span>
+                  <BookOpen className="w-5 h-5" />
                   <span>Flashcards</span>
                 </button>
+
+                {/* Divider */}
+                <div className="w-px h-10 bg-gray-200 mx-1" />
+
+                {/* Translate Button with Dropdown */}
+                <div className="relative" ref={translateDropdownRef}>
+                  <button
+                    onClick={() => setIsTranslateDropdownOpen(!isTranslateDropdownOpen)}
+                    className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg text-xs font-medium transition-all hover:scale-105 ${isTranslateDropdownOpen
+                      ? 'bg-blue-500 text-white shadow-lg'
+                      : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                      }`}
+                    title="Translate selected notes"
+                  >
+                    <Languages className="w-5 h-5" />
+                    <span className="flex items-center gap-1">
+                      Translate
+                      <ChevronDown className={`w-3 h-3 transition-transform ${isTranslateDropdownOpen ? 'rotate-180' : ''}`} />
+                    </span>
+                  </button>
+
+                  {/* Language Dropdown */}
+                  {isTranslateDropdownOpen && (
+                    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-56 bg-white rounded-xl shadow-xl border border-blue-200 overflow-hidden z-50">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-blue-100/50">
+                        <span className="text-xs font-semibold text-gray-700">Select Language</span>
+                        <button
+                          onClick={() => setIsTranslateDropdownOpen(false)}
+                          className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {TOP_LANGUAGES.map((lang) => (
+                          <button
+                            key={lang.code}
+                            onClick={() => handleTranslate(lang.code)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 transition-colors"
+                          >
+                            <span className="font-medium text-gray-700">{lang.name}</span>
+                            <span className="text-xs text-gray-500">{lang.native}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button
-                onClick={() => setSelectedCardIds(new Set())}
+                onClick={() => {
+                  setSelectedStickyNoteIds(new Set());
+                  setSelectedCardIds(new Set());
+                  setIsTranslateDropdownOpen(false);
+                }}
                 className="ml-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium transition-colors"
                 title="Clear selection"
               >
@@ -874,7 +1343,20 @@ const BoardPage: React.FC = () => {
         onZoomChange={setZoom}
         onZoomReset={() => { setZoom(1); setViewOffset({ x: 0, y: 0 }); }}
         onGenerateCards={handleGenerateCards}
+        onSaveBoard={handleSaveBoard}
+        onNewBoard={handleNewBoard}
+        onLoadBoard={handleLoadBoard}
+        onDeleteBoard={(sessionId) => {
+          // If deleted session was current, create new board
+          if (currentSessionId === sessionId) {
+            handleNewBoard();
+          }
+        }}
         isGenerating={isGenerating}
+        isSaving={isSaving}
+        lastSaved={lastSaved}
+        userId={userId}
+        currentSessionId={currentSessionId}
       />
     </div>
   );
