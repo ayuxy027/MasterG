@@ -6,7 +6,7 @@ export interface StitchGenerateRequest {
   topic: string;
   grade: string;
   subject: string;
-  length?: "short" | "medium" | "long";
+  mode?: "local" | "cloud"; // "local" for Ollama, "cloud" for Groq
   culturalContext?: boolean;
 }
 
@@ -17,6 +17,7 @@ export interface StitchGenerateResponse {
     topic: string;
     grade: string;
     subject: string;
+    mode?: "local" | "cloud";
     generatedAt: string;
   };
   error?: string;
@@ -50,6 +51,7 @@ export interface StitchTranslateRequest {
   text: string;
   sourceLanguage: string;
   targetLanguage: string;
+  mode?: "local" | "cloud"; // "local" for NLLB, "cloud" for Groq
 }
 
 export interface StitchTranslateResponse {
@@ -312,6 +314,43 @@ class StitchApi {
 
         sepIndex = buffer.indexOf("\n\n");
       }
+    }
+  }
+
+  /**
+   * Check NLLB-200 connection status
+   */
+  /**
+   * Check Groq API connection status
+   */
+  async checkGroqStatus(): Promise<{
+    success: boolean;
+    connected: boolean;
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stitch/status/groq`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new StitchApiError(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof StitchApiError) {
+        throw error;
+      }
+      throw new StitchApiError(
+        error instanceof Error ? error.message : "Failed to check Groq status"
+      );
     }
   }
 

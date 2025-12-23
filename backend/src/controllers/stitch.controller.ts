@@ -3,6 +3,8 @@ import { ollamaService } from "../services/ollama.service";
 import { languageService } from "../services/language.service";
 import { nllbService } from "../services/nllb.service";
 import { stitchService } from "../services/stitch.service";
+import { groqStitchService } from "../services/groqStitch.service";
+import { groqTranslationService } from "../services/groqTranslation.service";
 import { env } from "../config/env";
 
 export class StitchController {
@@ -42,7 +44,7 @@ export class StitchController {
         topic,
         grade,
         subject,
-        length,
+        mode, // "local" or "cloud"
         stream,
       } = req.body;
 
@@ -83,16 +85,16 @@ export class StitchController {
         return;
       }
 
-      // Validate length
-      const validLengths = ["short", "medium", "long"];
-      const contentLength = length && validLengths.includes(length) ? length : "medium";
+      // Determine mode: "local" (Ollama) or "cloud" (Groq)
+      const generationMode = mode === "cloud" ? "cloud" : "local";
 
       // Build comprehensive prompt (content is always generated in English)
+      // Default to 400-500 words, no length parameter needed
       const prompt = this.buildContentPrompt({
         topic: sanitizedTopic,
         grade: grade || "8",
         subject: subject || "mathematics",
-        length: contentLength as "short" | "medium" | "long",
+        mode: generationMode,
       });
 
       // If streaming requested, use SSE
@@ -111,15 +113,18 @@ export class StitchController {
         let responseText = "";
 
         try {
-          for await (const chunk of ollamaService.generateStream(prompt, {
-            temperature: 0.7,
-          })) {
+          // Route to appropriate service based on mode
+          const streamGenerator = generationMode === "cloud"
+            ? groqStitchService.generateStream(prompt, { temperature: 0.7, maxTokens: 4096 })
+            : ollamaService.generateStream(prompt, { temperature: 0.7 });
+
+          for await (const chunk of streamGenerator) {
             if (chunk.type === "thinking") {
-              thinkingText += chunk.content;
+              thinkingText += chunk.content || "";
               // Send thinking chunk to client
               res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
             } else if (chunk.type === "response") {
-              responseText += chunk.content;
+              responseText += chunk.content || "";
               // Send response chunk to client (this is the actual content output)
               res.write(`data: ${JSON.stringify({ type: "response", content: chunk.content })}\n\n`);
             }
@@ -127,7 +132,7 @@ export class StitchController {
 
           // After streaming completes, send final result with complete content
           const content = responseText || thinkingText;
-          res.write(`data: ${JSON.stringify({ type: "complete", content, thinkingText })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: "complete", content, thinkingText, mode: generationMode })}\n\n`);
           res.end();
         } catch (error) {
           res.write(
@@ -138,11 +143,10 @@ export class StitchController {
         return;
       }
 
-      // Non-streaming: Generate plain text content using Ollama
-      const content = await ollamaService.generateTextContent(prompt, {
-        temperature: 0.7,
-        maxTokens: 4096,
-      });
+      // Non-streaming: Generate plain text content
+      const content = generationMode === "cloud"
+        ? await groqStitchService.generateTextContent(prompt, { temperature: 0.7, maxTokens: 4096 })
+        : await ollamaService.generateTextContent(prompt, { temperature: 0.7, maxTokens: 4096 });
 
       res.json({
         success: true,
@@ -151,6 +155,7 @@ export class StitchController {
           topic,
           grade,
           subject,
+          mode: generationMode,
           generatedAt: new Date().toISOString(),
         },
       });
@@ -221,13 +226,17 @@ export class StitchController {
         return;
       }
 
-      const { text, sourceLanguage, targetLanguage, batchSize } = req.body as {
+      const { text, sourceLanguage, targetLanguage, batchSize, mode } = req.body as {
         text?: string;
         sourceLanguage?: string;
         targetLanguage?: string;
         stream?: boolean;
         batchSize?: number;
+        mode?: "local" | "cloud";
       };
+
+      // Determine translation mode: "local" (NLLB) or "cloud" (Groq)
+      const translationMode = mode === "cloud" ? "cloud" : "local";
 
       // Input validation and sanitization
       if (!text || typeof text !== "string" || !text.trim()) {
@@ -318,13 +327,22 @@ export class StitchController {
         return;
       }
 
-      // Non-streaming: single-shot translation with batch processing
-      const translated = await nllbService.translate(text, {
-        srcLang: srcLang,
-        tgtLang: tgtLang,
-        batchSize: batchSize, // Auto-detected if not provided (CPU vs GPU optimized)
-        useCache: true, // Enable caching for repeated translations
-      });
+      // Non-streaming: route to appropriate service
+      let translated: string;
+      if (translationMode === "cloud") {
+        translated = await groqTranslationService.translate(
+          text,
+          sourceLanguage || "en",
+          targetLanguage || "hi"
+        );
+      } else {
+        translated = await nllbService.translate(text, {
+          srcLang: srcLang,
+          tgtLang: tgtLang,
+          batchSize: batchSize, // Auto-detected if not provided (CPU vs GPU optimized)
+          useCache: true, // Enable caching for repeated translations
+        });
+      }
 
       res.json({
         success: true,
@@ -342,6 +360,140 @@ export class StitchController {
     }
   }
 
+
+  /**
+   * Refine existing content based on user query
+   */
+  async refineContent(req: Request, res: Response): Promise<void> {
+    try {
+      const { content, refineQuery, mode, stream } = req.body;
+
+      if (!content || typeof content !== "string" || !content.trim()) {
+        res.status(400).json({
+          success: false,
+          error: "Content is required and must be a non-empty string",
+        });
+        return;
+      }
+
+      if (!refineQuery || typeof refineQuery !== "string" || !refineQuery.trim()) {
+        res.status(400).json({
+          success: false,
+          error: "Refinement query is required and must be a non-empty string",
+        });
+        return;
+      }
+
+      const generationMode = mode === "cloud" ? "cloud" : "local";
+
+      // Build refinement prompt
+      const prompt = `You are an expert Indian educator. Refine and improve the following educational content based on the user's request.
+
+EXISTING CONTENT:
+"""
+${content}
+"""
+
+USER'S REFINEMENT REQUEST:
+"""
+${refineQuery.trim()}
+"""
+
+INSTRUCTIONS:
+- Apply the refinement request to the existing content
+- Maintain all existing formatting, structure, and markdown
+- Preserve technical terms, formulas, and scientific notation
+- Keep the same educational quality and curriculum alignment
+- Only modify what the user requested - don't change unrelated parts
+- Ensure the refined content is ready for direct use in educational contexts
+
+Generate the refined content now, maintaining perfect markdown formatting.`;
+
+      // If streaming requested, use SSE
+      if (stream) {
+        res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+
+        let thinkingText = "";
+        let responseText = "";
+
+        try {
+          const streamGenerator = generationMode === "cloud"
+            ? groqStitchService.generateStream(prompt, { temperature: 0.7, maxTokens: 4096 })
+            : ollamaService.generateStream(prompt, { temperature: 0.7 });
+
+          for await (const chunk of streamGenerator) {
+            if (chunk.type === "thinking") {
+              thinkingText += chunk.content || "";
+              res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
+            } else if (chunk.type === "response") {
+              responseText += chunk.content || "";
+              res.write(`data: ${JSON.stringify({ type: "response", content: chunk.content })}\n\n`);
+            }
+          }
+
+          const finalContent = responseText || thinkingText;
+          res.write(`data: ${JSON.stringify({ type: "complete", content: finalContent, thinkingText, mode: generationMode })}\n\n`);
+          res.end();
+        } catch (error) {
+          res.write(
+            `data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Refinement failed" })}\n\n`
+          );
+          res.end();
+        }
+        return;
+      }
+
+      // Non-streaming
+      const refinedContent = generationMode === "cloud"
+        ? await groqStitchService.generateTextContent(prompt, { temperature: 0.7, maxTokens: 4096 })
+        : await ollamaService.generateTextContent(prompt, { temperature: 0.7, maxTokens: 4096 });
+
+      res.json({
+        success: true,
+        content: refinedContent,
+        metadata: {
+          mode: generationMode,
+          refinedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error("Content refinement error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Content refinement failed",
+      });
+    }
+  }
+
+  /**
+   * Check Groq API connection status
+   */
+  async checkGroqStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const isConnected = await groqStitchService.checkConnection();
+      res.json({
+        success: true,
+        connected: isConnected,
+        message: isConnected
+          ? "Groq API (Kimi K2) is connected and ready"
+          : "Groq API is not available. Check GROQ_API_KEY environment variable.",
+      });
+    } catch (error) {
+      console.error("Groq status check error:", error);
+      res.json({
+        success: false,
+        connected: false,
+        message: error instanceof Error ? error.message : "Groq service unavailable",
+      });
+    }
+  }
 
   /**
    * Check NLLB-200 connection status
@@ -392,7 +544,7 @@ export class StitchController {
     topic: string;
     grade: string;
     subject: string;
-    length: "short" | "medium" | "long";
+    mode: "local" | "cloud";
   }): string {
     const subjectNames: Record<string, string> = {
       mathematics: "Mathematics",
@@ -447,48 +599,57 @@ CRITICAL MATHEMATICAL REQUIREMENTS (OPTIMIZED FOR SMALL MODEL):
 
 ` : '';
 
-    // Length-specific instructions (BATTLE-TESTED)
-    const lengthInstructions = params.length === "short" ? `
-CRITICAL LENGTH REQUIREMENT: SHORT CONTENT (200-400 words)
-- Generate a BRIEF, CONCISE overview of the topic
-- Focus on ESSENTIAL concepts only - no deep dives
-- Structure: Introduction → Key Points (3-5 main points) → Brief Summary
-- Keep explanations SHORT and DIRECT - maximum 2-3 sentences per concept
-- Include ONE simple example only (no complex worked examples)
-- NO extensive background or historical context
-- NO multiple examples or practice problems
-- Target word count: 200-400 words (STRICTLY enforce this limit)
-- Every sentence must be HIGH-VALUE - no filler or repetition
-- Use bullet points or numbered lists for key concepts to save space
-- Be PRECISE and CONCISE - quality over quantity
-
-` : params.length === "long" ? `
-CRITICAL LENGTH REQUIREMENT: LONG COMPREHENSIVE CONTENT (1000+ words)
-- Generate EXTENSIVE, THOROUGH coverage of the topic
-- Include COMPLETE explanations with full context and background
-- Structure: Introduction → Detailed Background → Core Concepts (with sub-concepts) → Multiple Examples → Applications → Practice Problems → Summary
-- Provide MULTIPLE worked examples (at least 3-4) with complete step-by-step solutions
-- Include historical context, real-world applications, and connections to other topics
-- Cover edge cases, common misconceptions, and advanced insights
-- Include practice problems with solutions
-- Use detailed explanations - 4-6 sentences per major concept
-- Target word count: 1000+ words (ensure comprehensive coverage)
-- Include visual descriptions, analogies, and multiple perspectives
-- Cover the topic from multiple angles: theoretical, practical, and applied
-- Provide extensive examples and counter-examples where relevant
-
-` : `
-CRITICAL LENGTH REQUIREMENT: MEDIUM CONTENT (500-800 words)
-- Generate BALANCED, STANDARD explanation of the topic
+    // Length instructions - default to 400-500 words
+    const lengthInstructions = `
+CRITICAL LENGTH REQUIREMENT: OPTIMAL CONTENT (400-500 words)
+- Generate a BALANCED, COMPREHENSIVE explanation of the topic
 - Structure: Introduction → Core Concepts → Examples → Applications → Summary
 - Include 2-3 worked examples with complete solutions
 - Provide sufficient detail for understanding without overwhelming
 - Include relevant context and real-world connections
 - Use 3-4 sentences per major concept
-- Target word count: 500-800 words (maintain this range)
+- Target word count: 400-500 words (STRICTLY maintain this range)
 - Balance between brevity and completeness
 - Include practice problems (1-2) with solutions
 - Cover main aspects thoroughly with moderate depth
+- Every sentence must be HIGH-VALUE - no filler or repetition
+
+`;
+
+    // Mode-specific instructions
+    const modeSpecificInstructions = params.mode === "cloud" ? `
+CRITICAL: KIMI K2 MODEL CAPABILITIES (CLOUD MODE)
+- You have FULL CAPABILITY to include complex mathematical equations, expressions, and scientific notation
+- FREELY use mathematical symbols, operators, and expressions when appropriate:
+  * Powers: x², x³, xⁿ (or x^2, x^3, x^n)
+  * Subscripts: H₂O, CO₂, C₆H₁₂O₆ (or H2O, CO2, C6H12O6)
+  * Fractions: ½, ¾, a/b, (numerator)/(denominator)
+  * Square roots: √x, √(a+b), sqrt(x)
+  * Greek letters: α, β, γ, π, θ, Δ, Σ, etc.
+  * Operators: ±, ×, ÷, ≤, ≥, ≠, ≈, ∞
+  * Integrals: ∫, derivatives: ∂, summations: Σ
+- For complex equations, you can use LaTeX-style notation if needed: $E = mc^2$, $\\frac{a}{b}$, $\\sqrt{x}$
+- Include chemical formulas with proper subscripts: H₂SO₄, NaCl, C₆H₁₂O₆
+- Use proper mathematical notation for formulas: F = ma, E = mc², PV = nRT
+- Don't hesitate to include equations, formulas, and mathematical expressions - Kimi handles them excellently
+- For science topics, include proper chemical equations and balanced reactions
+- Use proper units and scientific notation: 6.022 × 10²³, 3.0 × 10⁸ m/s
+- Include diagrams descriptions with mathematical relationships
+
+` : `
+CRITICAL: DEEPSEEK-R1 MODEL OPTIMIZATION (LOCAL MODE)
+- Keep content TEXT-FOCUSED and straightforward
+- Use simple, plain text notation for formulas:
+  * Write powers as: x^2, x^3, x^n
+  * Write subscripts as: H2O, CO2, C6H12O6
+  * Write fractions as: a/b, 1/2, 3/4
+  * Write square roots as: sqrt(x), sqrt(16) = 4
+- Avoid complex mathematical notation - keep it simple and readable
+- Focus on clear explanations rather than complex equations
+- Use natural language for mathematical concepts: "x squared plus y squared equals z squared"
+- Keep formulas simple and easy to understand
+- Prefer text descriptions over complex symbolic notation
+- Use code formatting for formulas: \`H2O\`, \`x^2 + 5 = 10\`
 
 `;
 
@@ -500,7 +661,7 @@ Generate educational content with the following details:
 Topic: ${params.topic}
 Subject: ${subjectName}
 Grade Level: Class ${params.grade}
-Content Length: ${params.length.toUpperCase()} (${params.length === "short" ? "200-400 words" : params.length === "long" ? "1000+ words" : "500-800 words"})
+Content Length: 400-500 words (STRICTLY maintain this range)
 Curriculum Alignment: Follow NCERT, CBSE, and State Board standards
 
 IMPORTANT: This content will be translated into multiple Indian languages using NLLB-200. Write in clear, translation-friendly English.
@@ -513,6 +674,8 @@ TRANSLATION COMPATIBILITY REQUIREMENTS:
 - Ensure formulas are self-contained and don't rely on surrounding text context
 
 ${lengthInstructions}
+
+${modeSpecificInstructions}
 
 Content Requirements:
 - Provide explanations suitable for Class ${params.grade} level
@@ -678,12 +841,13 @@ Scientific & Mathematical Accuracy:
 
 ${mathSpecificInstructions}
 
-Content Scope (Length-Adjusted):
-${params.length === "short" 
-  ? "- Focus on ESSENTIAL concepts only - no deep dives\n- Include ONE simple example\n- NO extensive background or multiple examples\n- Keep it BRIEF and CONCISE"
-  : params.length === "long"
-  ? "- Generate EXTENSIVE coverage with full context\n- Include MULTIPLE worked examples (3-4+)\n- Cover historical context, applications, and edge cases\n- Include practice problems with solutions\n- Provide comprehensive depth from multiple angles"
-  : "- Generate BALANCED coverage with sufficient detail\n- Include 2-3 worked examples\n- Cover main aspects thoroughly\n- Include 1-2 practice problems\n- Balance between brevity and completeness"}
+Content Scope (400-500 words):
+- Generate BALANCED coverage with sufficient detail
+- Include 2-3 worked examples with complete solutions
+- Cover main aspects thoroughly
+- Include 1-2 practice problems with solutions
+- Balance between brevity and completeness
+- Target word count: 400-500 words (STRICTLY maintain this range)
 
 Educational Guardrails:
 - ONLY generate content related to educational topics

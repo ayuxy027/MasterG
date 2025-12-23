@@ -33,6 +33,16 @@ router.post(
 );
 
 /**
+ * POST /api/stitch/refine
+ * Refine existing content based on user query
+ * Body: { content, refineQuery, mode?, stream? }
+ */
+router.post(
+  "/refine",
+  asyncHandler(stitchController.refineContent.bind(stitchController))
+);
+
+/**
  * POST /api/stitch/pdf
  * Generate PDF from content (not yet implemented)
  * Body: { content }
@@ -59,6 +69,15 @@ router.post(
 router.get(
   "/status/nllb",
   asyncHandler(stitchController.checkNLLBStatus.bind(stitchController))
+);
+
+/**
+ * GET /api/stitch/status/groq
+ * Check Groq API connection status
+ */
+router.get(
+  "/status/groq",
+  asyncHandler(stitchController.checkGroqStatus.bind(stitchController))
 );
 
 /**

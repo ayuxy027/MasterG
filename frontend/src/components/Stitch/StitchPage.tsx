@@ -230,7 +230,7 @@ const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
             // Code blocks and inline code - SIMPLIFIED
             code: ({ children, className: codeClassName, ...props }: any) => {
               const isInline = !codeClassName;
-              
+
               if (isInline) {
                 return (
                   <code {...props} className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
@@ -375,7 +375,7 @@ const StitchPage: React.FC = () => {
   const [customGrade, setCustomGrade] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("mathematics");
   const [customSubject, setCustomSubject] = useState("");
-  const [selectedLength, setSelectedLength] = useState<"short" | "medium" | "long">("medium");
+  const [generationMode, setGenerationMode] = useState<"local" | "cloud">("local");
   const [topic, setTopic] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -387,6 +387,13 @@ const StitchPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [generationTimes, setGenerationTimes] = useState<{
+    thinkingTime?: number;
+    generationTime?: number;
+    translationTime?: number;
+  }>({});
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineQuery, setRefineQuery] = useState("");
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: "success" | "error" | "info" }>>([]);
   const contentPreviewRef = useRef<HTMLDivElement>(null); // Ref for auto-scroll
@@ -400,6 +407,10 @@ const StitchPage: React.FC = () => {
     checking: boolean;
     error?: string;
   }>({ connected: false, enabled: false, checking: true });
+  const [groqStatus, setGroqStatus] = useState<{
+    connected: boolean;
+    checking: boolean;
+  }>({ connected: false, checking: false });
 
   // OPTIMIZATION: Memoize language name lookup (define early to avoid hoisting issues)
   const getLanguageName = useCallback((code: string) => {
@@ -512,6 +523,126 @@ const StitchPage: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, englishContent, translatedContent, handleCopy, handleDownload, getLanguageName]);
 
+  // Handle refine content
+  const handleRefine = async () => {
+    if (!refineQuery.trim() || !englishContent.trim()) {
+      setError("Please enter a refinement request");
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+    setThinkingText("");
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL
+        ? `${import.meta.env.VITE_API_URL}/api`
+        : "http://localhost:5001/api";
+
+      const response = await fetch(`${API_BASE_URL}/stitch/refine`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: englishContent,
+          refineQuery: refineQuery.trim(),
+          mode: generationMode,
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body for streaming");
+      }
+
+      let buffer = "";
+      let accumulatedThinking = "";
+      let accumulatedResponse = "";
+      let thinkingStartTime: number | null = null;
+      let generationStartTime: number | null = null;
+      let firstThinkingChunk = true;
+      let firstResponseChunk = true;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+
+              if (parsed.type === "thinking") {
+                if (firstThinkingChunk) {
+                  thinkingStartTime = Date.now();
+                  firstThinkingChunk = false;
+                }
+                accumulatedThinking += parsed.content;
+                setThinkingText(accumulatedThinking);
+              } else if (parsed.type === "response") {
+                if (firstResponseChunk) {
+                  generationStartTime = Date.now();
+                  firstResponseChunk = false;
+                  if (generationMode === "cloud" && !accumulatedThinking) {
+                    setThinkingText("Processing refinement with Kimi K2 model...");
+                  }
+                }
+                accumulatedResponse += parsed.content;
+                setEnglishContent(accumulatedResponse);
+              } else if (parsed.type === "complete") {
+                const finalContent = parsed.content || accumulatedResponse;
+                setEnglishContent(finalContent);
+                setMarkdownEnabled(false);
+                if (parsed.thinkingText) {
+                  setThinkingText(parsed.thinkingText);
+                }
+
+                const thinkingTime = thinkingStartTime ? Date.now() - thinkingStartTime : undefined;
+                const generationTime = generationStartTime ? Date.now() - generationStartTime : undefined;
+                setGenerationTimes({
+                  thinkingTime,
+                  generationTime,
+                });
+              } else if (parsed.type === "error") {
+                throw new Error(parsed.error);
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      }
+
+      setIsRefining(false);
+      setRefineQuery("");
+      showToast("Content refined successfully!", "success");
+    } catch (err) {
+      const errorMessage =
+        err instanceof StitchApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to refine content. Please try again.";
+      setError(errorMessage);
+      showToast(`Refinement failed: ${errorMessage}`, "error");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Handle translation
   const handleTranslate = async (targetLang: string) => {
     if (!englishContent.trim()) {
@@ -536,13 +667,29 @@ const StitchPage: React.FC = () => {
     setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
     setError(null);
 
+    const translationStartTime = Date.now();
+
+    // Show thinking text for translation
+    if (generationMode === "cloud") {
+      setThinkingText(`Translating to ${getLanguageName(targetLang)} using Kimi K2...`);
+    } else {
+      setThinkingText(`Translating to ${getLanguageName(targetLang)} using NLLB-200...`);
+    }
+
     try {
       // Use simple non-streaming translation (reliable and correct)
       const resp = await stitchAPI.translateContent({
         text: englishContent,
         sourceLanguage: "en",
         targetLanguage: targetLang,
+        mode: generationMode, // Pass mode for Groq translation
       });
+
+      const translationTime = Date.now() - translationStartTime;
+      setGenerationTimes(prev => ({ ...prev, translationTime }));
+
+      // Clear thinking text after translation
+      setThinkingText("");
 
       if (resp.success && resp.translated) {
         setTranslatedContent(prev => ({ ...prev, [targetLang]: resp.translated! }));
@@ -582,6 +729,11 @@ const StitchPage: React.FC = () => {
         delete newPrev[targetLang];
         return newPrev;
       });
+
+      // Clear thinking text on error
+      setThinkingText("");
+      // Clear thinking text on error
+      setThinkingText("");
 
       // If translation failed and no content was set, remove the tab
       if (!translatedContent[targetLang]) {
@@ -700,7 +852,6 @@ const StitchPage: React.FC = () => {
         subject: selectedSubject,
         customGrade: customGrade || undefined,
         customSubject: customSubject || undefined,
-        length: selectedLength,
         englishContent,
         thinkingText: thinkingText || undefined,
         translatedContent,
@@ -750,7 +901,6 @@ const StitchPage: React.FC = () => {
         subject: selectedSubject,
         customGrade: customGrade || undefined,
         customSubject: customSubject || undefined,
-        length: selectedLength,
         englishContent,
         thinkingText: thinkingText || undefined,
         translatedContent,
@@ -813,11 +963,12 @@ const StitchPage: React.FC = () => {
     }, 2000); // Debounce by 2 seconds
 
     return () => clearTimeout(timeoutId);
-  }, [englishContent, translatedContent, topic, selectedGrade, selectedSubject, customGrade, customSubject, selectedLength, markdownEnabled, currentSessionId]);
+  }, [englishContent, translatedContent, topic, selectedGrade, selectedSubject, customGrade, customSubject, markdownEnabled, currentSessionId]);
 
-  // Check Ollama and NLLB status on mount
+  // Check Ollama, Groq, and NLLB status on mount
   useEffect(() => {
     checkOllamaStatus();
+    checkGroqStatus();
     checkNLLBStatus();
 
     // Cleanup: Cancel content generation on unmount
@@ -842,7 +993,6 @@ const StitchPage: React.FC = () => {
     setCustomGrade("");
     setSelectedSubject("mathematics");
     setCustomSubject("");
-    setSelectedLength("medium");
     setEnglishContent("");
     setThinkingText("");
     setTranslatedContent({});
@@ -908,21 +1058,27 @@ const StitchPage: React.FC = () => {
     }
   };
 
+  const checkGroqStatus = async () => {
+    setGroqStatus({ connected: false, checking: true });
+    try {
+      const status = await stitchAPI.checkGroqStatus();
+      setGroqStatus({ connected: status.connected, checking: false });
+    } catch (err) {
+      setGroqStatus({ connected: false, checking: false });
+      console.error("Failed to check Groq status:", err);
+    }
+  };
+
+  // Check Groq status when switching to cloud mode
+  useEffect(() => {
+    if (generationMode === "cloud") {
+      checkGroqStatus();
+    }
+  }, [generationMode]);
+
   const handleGenerate = async () => {
     if (!topic.trim()) {
       setError("Please enter a topic");
-      return;
-    }
-
-    // Validate custom grade if selected
-    if (selectedGrade === "custom" && !customGrade.trim()) {
-      setError("Please enter a custom grade level");
-      return;
-    }
-
-    // Validate custom subject if selected
-    if (selectedSubject === "custom" && !customSubject.trim()) {
-      setError("Please enter a custom subject name");
       return;
     }
 
@@ -945,16 +1101,12 @@ const StitchPage: React.FC = () => {
     setEnglishContent("");
     setTranslatedContent({});
     setActiveTab("english");
+    setGenerationTimes({}); // Reset times
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL
         ? `${import.meta.env.VITE_API_URL}/api`
         : "http://localhost:5001/api";
-
-      // Use custom grade if selected, otherwise use selectedGrade
-      const finalGrade = selectedGrade === "custom" ? customGrade.trim() : selectedGrade;
-      // Use custom subject if selected, otherwise use selectedSubject
-      const finalSubject = selectedSubject === "custom" ? customSubject.trim() : selectedSubject;
 
       const response = await fetch(`${API_BASE_URL}/stitch/generate`, {
         method: "POST",
@@ -964,9 +1116,9 @@ const StitchPage: React.FC = () => {
         signal: controller.signal,
         body: JSON.stringify({
           topic: topic.trim(),
-          grade: finalGrade,
-          subject: finalSubject,
-          length: selectedLength,
+          grade: selectedGrade,
+          subject: selectedSubject,
+          mode: generationMode,
           stream: true,
         }),
       });
@@ -985,6 +1137,10 @@ const StitchPage: React.FC = () => {
       let buffer = "";
       let accumulatedThinking = "";
       let accumulatedResponse = "";
+      let thinkingStartTime: number | null = null;
+      let generationStartTime: number | null = null;
+      let firstThinkingChunk = true;
+      let firstResponseChunk = true;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1001,10 +1157,22 @@ const StitchPage: React.FC = () => {
               const parsed = JSON.parse(data);
 
               if (parsed.type === "thinking") {
-                accumulatedThinking += parsed.content;
+                if (firstThinkingChunk) {
+                  thinkingStartTime = Date.now();
+                  firstThinkingChunk = false;
+                }
+                accumulatedThinking += parsed.content || "";
                 setThinkingText(accumulatedThinking);
               } else if (parsed.type === "response") {
-                accumulatedResponse += parsed.content;
+                if (firstResponseChunk) {
+                  generationStartTime = Date.now();
+                  firstResponseChunk = false;
+                  // For cloud mode, simulate thinking text if not provided
+                  if (generationMode === "cloud" && !accumulatedThinking) {
+                    setThinkingText("Processing request with Kimi K2 model...");
+                  }
+                }
+                accumulatedResponse += parsed.content || "";
                 setEnglishContent(accumulatedResponse); // Store English version
               } else if (parsed.type === "complete") {
                 const finalContent = parsed.content || accumulatedResponse;
@@ -1014,6 +1182,14 @@ const StitchPage: React.FC = () => {
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }
+
+                // Calculate times
+                const thinkingTime = thinkingStartTime ? Date.now() - thinkingStartTime : undefined;
+                const generationTime = generationStartTime ? Date.now() - generationStartTime : undefined;
+                setGenerationTimes({
+                  thinkingTime,
+                  generationTime,
+                });
               } else if (parsed.type === "error") {
                 throw new Error(parsed.error);
               }
@@ -1113,6 +1289,41 @@ const StitchPage: React.FC = () => {
                   </div>
 
                   <div className="space-y-6">
+                    {/* Generation Mode Toggle - SIMPLIFIED */}
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                        Generation Mode
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setGenerationMode("local")}
+                          className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all border-2 ${
+                            generationMode === "local"
+                              ? generationMode === "cloud"
+                                ? "border-blue-300 bg-blue-50 text-blue-700"
+                                : "border-orange-300 bg-orange-50 text-orange-700"
+                              : generationMode === "cloud"
+                                ? "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
+                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          Local
+                        </button>
+                        <button
+                          onClick={() => setGenerationMode("cloud")}
+                          className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all border-2 ${
+                            generationMode === "cloud"
+                              ? "border-blue-300 bg-blue-50 text-blue-700"
+                              : generationMode === "local"
+                                ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          Cloud
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Grade Level */}
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
@@ -1125,38 +1336,21 @@ const StitchPage: React.FC = () => {
                               key={grade.value}
                               onClick={() => {
                                 setSelectedGrade(grade.value);
-                                setCustomGrade("");
                               }}
-                              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === grade.value && selectedGrade !== "custom"
-                                ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
-                                : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
-                                }`}
+                              className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
+                                selectedGrade === grade.value
+                                  ? generationMode === "cloud"
+                                    ? "border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-200 ring-opacity-50"
+                                    : "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
+                                  : generationMode === "cloud"
+                                    ? "border-blue-200 hover:border-blue-300 text-gray-700 bg-white hover:bg-blue-50"
+                                    : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white hover:bg-gray-50"
+                              }`}
                             >
                               {grade.label}
                             </button>
                           ))}
                         </div>
-                        <button
-                          onClick={() => {
-                            setSelectedGrade("custom");
-                            setCustomGrade("");
-                          }}
-                          className={`w-full px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${selectedGrade === "custom"
-                            ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
-                            : "border-gray-200 hover:border-gray-250 text-gray-700 bg-white"
-                            }`}
-                        >
-                          Custom
-                        </button>
-                        {selectedGrade === "custom" && (
-                          <input
-                            type="text"
-                            value={customGrade}
-                            onChange={(e) => setCustomGrade(e.target.value)}
-                            placeholder="Enter grade level..."
-                            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
-                          />
-                        )}
                       </div>
                     </div>
 
@@ -1169,53 +1363,27 @@ const StitchPage: React.FC = () => {
                         value={selectedSubject}
                         onChange={(e) => {
                           setSelectedSubject(e.target.value);
-                          if (e.target.value !== "custom") {
-                            setCustomSubject("");
-                          }
                         }}
-                        className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${selectedSubject && selectedSubject !== ""
-                          ? "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
-                          : "border-gray-200 focus:border-orange-300"
-                          } focus:ring-2 focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300`}
+                        className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 transition-all ${
+                          selectedSubject && selectedSubject !== ""
+                            ? generationMode === "cloud"
+                              ? "border-blue-300 ring-1 ring-blue-200 ring-opacity-50"
+                              : "border-orange-300 ring-1 ring-orange-200 ring-opacity-50"
+                            : generationMode === "cloud"
+                              ? "border-gray-200 focus:border-blue-300"
+                              : "border-gray-200 focus:border-orange-300"
+                          } focus:ring-2 ${
+                            generationMode === "cloud"
+                              ? "focus:ring-blue-200 focus:ring-opacity-50 focus:border-blue-300"
+                              : "focus:ring-orange-200 focus:ring-opacity-50 focus:border-orange-300"
+                          }`}
                       >
                         {CORE_SUBJECTS.map((subject) => (
                           <option key={subject.value} value={subject.value}>
                             {subject.label}
                           </option>
                         ))}
-                        <option value="custom">Custom</option>
                       </select>
-                      {selectedSubject === "custom" && (
-                        <input
-                          type="text"
-                          value={customSubject}
-                          onChange={(e) => setCustomSubject(e.target.value)}
-                          placeholder="Enter subject name..."
-                          className="w-full mt-2 px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
-                        />
-                      )}
-                    </div>
-
-                    {/* Content Length */}
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                        Content Length
-                      </label>
-                      <div className="space-y-2">
-                        {CONTENT_LENGTHS.map((length) => (
-                          <button
-                            key={length.value}
-                            onClick={() => setSelectedLength(length.value as "short" | "medium" | "long")}
-                            className={`w-full px-4 py-3 rounded-lg border-2 transition-all text-left ${selectedLength === length.value
-                              ? "border-orange-300 bg-orange-50 text-orange-700 ring-1 ring-orange-200 ring-opacity-50"
-                              : "border-gray-200 hover:border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
-                              }`}
-                          >
-                            <div className="font-medium text-sm">{length.label}</div>
-                            <div className="text-xs text-gray-600 mt-0.5">{length.description}</div>
-                          </button>
-                        ))}
-                      </div>
                     </div>
 
                     {/* Topic */}
@@ -1228,15 +1396,23 @@ const StitchPage: React.FC = () => {
                         value={topic}
                         onChange={(e) => setTopic(e.target.value)}
                         placeholder="e.g., Photosynthesis, Quadratic Equations"
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 placeholder-gray-400 transition-all"
+                        className={`w-full px-4 py-2.5 border rounded-lg bg-white text-gray-900 placeholder-gray-400 transition-all ${
+                          generationMode === "cloud"
+                            ? "border-gray-200 focus:ring-2 focus:ring-blue-200 focus:border-blue-300"
+                            : "border-gray-200 focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+                        }`}
                       />
                     </div>
 
                     {/* Generate Button */}
                     <button
                       onClick={handleGenerate}
-                      disabled={isGenerating || !topic.trim() || (selectedGrade === "custom" && !customGrade.trim()) || (selectedSubject === "custom" && !customSubject.trim())}
-                      className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 active:bg-orange-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300"
+                      disabled={isGenerating || !topic.trim() || (generationMode === "cloud" && !groqStatus.connected)}
+                      className={`w-full px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-gray-300 ${
+                        generationMode === "cloud"
+                          ? "bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700"
+                          : "bg-orange-500 text-white hover:bg-orange-600 active:bg-orange-700"
+                      }`}
                     >
                       {isGenerating ? (
                         <span className="flex items-center justify-center gap-2">
@@ -1259,16 +1435,30 @@ const StitchPage: React.FC = () => {
                               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                             />
                           </svg>
-                          Generating...
+                          Generating via {generationMode === "cloud" ? "Cloud (Kimi K2)" : "Local (DeepSeek-R1)"}...
                         </span>
                       ) : (
-                        "Generate Content"
+                        <span className="flex items-center justify-center gap-2">
+                          Generate Content
+                          <span className="text-xs opacity-75">
+                            ({generationMode === "cloud" ? "Cloud" : "Local"})
+                          </span>
+                        </span>
                       )}
                     </button>
+                    {generationMode === "cloud" && !groqStatus.connected && !groqStatus.checking && (
+                      <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                        ⚠️ Cloud mode requires Groq API connection. Please check your GROQ_API_KEY or switch to Local mode.
+                      </div>
+                    )}
                     {isGenerating && (
                       <button
                         onClick={handleStopGeneration}
-                        className="w-full mt-3 bg-gray-100 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 border border-gray-300 shadow-sm hover:shadow"
+                        className={`w-full mt-3 px-6 py-3 rounded-lg font-semibold transition-all duration-200 border shadow-sm hover:shadow ${
+                          generationMode === "cloud"
+                            ? "bg-blue-100 text-blue-800 hover:bg-blue-200 active:bg-blue-300 border-blue-300"
+                            : "bg-gray-100 text-gray-800 hover:bg-gray-200 active:bg-gray-300 border-gray-300"
+                        }`}
                       >
                         Stop Generating
                       </button>
@@ -1324,6 +1514,7 @@ const StitchPage: React.FC = () => {
                     <button
                       onClick={() => {
                         checkOllamaStatus();
+                        checkGroqStatus();
                         checkNLLBStatus();
                       }}
                       className="text-xs text-orange-600 hover:text-orange-700 font-medium"
@@ -1343,6 +1534,26 @@ const StitchPage: React.FC = () => {
                           Checking...
                         </span>
                       ) : ollamaStatus.connected ? (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
+                          Connected
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">
+                          Not Connected
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Groq Status */}
+                    <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-700">Groq (Kimi K2)</span>
+                      </div>
+                      {groqStatus.checking ? (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
+                          Checking...
+                        </span>
+                      ) : groqStatus.connected ? (
                         <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
                           Connected
                         </span>
@@ -1527,7 +1738,11 @@ const StitchPage: React.FC = () => {
                         type="button"
                         disabled={!englishContent.trim() || isTranslating[targetLanguageForTranslation]}
                         onClick={() => handleTranslate(targetLanguageForTranslation)}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2"
+                        className={`text-xs px-3 py-1.5 rounded-lg font-medium disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2 ${
+                          generationMode === "cloud"
+                            ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                        }`}
                       >
                         {isTranslating[targetLanguageForTranslation] ? (
                           <>
@@ -1556,9 +1771,9 @@ const StitchPage: React.FC = () => {
                       >
                         English
                       </button>
-                      {/* Markdown Toggle - Only show when English tab is active AND generation is complete */}
+                      {/* Markdown Toggle & Refine Button - Only show when English tab is active AND generation is complete */}
                       {activeTab === "english" && !isGenerating && englishContent && (
-                        <div className="ml-4 flex items-center gap-2 border-l border-orange-200 pl-4">
+                        <div className="ml-4 flex items-center gap-3 border-l border-orange-200 pl-4">
                           <span className="text-xs text-gray-600 font-medium">Markdown:</span>
                           <button
                             onClick={() => setMarkdownEnabled(!markdownEnabled)}
@@ -1576,6 +1791,17 @@ const StitchPage: React.FC = () => {
                           <span className="text-xs text-gray-500 font-medium">
                             {markdownEnabled ? "On" : "Off"}
                           </span>
+                          {/* Refine Button */}
+                          <button
+                            onClick={() => setIsRefining(!isRefining)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                              generationMode === "cloud"
+                                ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                            }`}
+                          >
+                            {isRefining ? "Cancel Refine" : "Refine"}
+                          </button>
                         </div>
                       )}
                       {/* Show all languages that are either translated or currently translating */}
