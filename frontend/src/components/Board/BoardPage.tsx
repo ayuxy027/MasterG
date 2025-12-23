@@ -624,15 +624,23 @@ const BoardPage: React.FC = () => {
         contents = selectedCards.map(c => c.content);
       }
 
-      const result = await performCardAction(action, contents, (partialData) => {
-        if (partialData.type === "card" && partialData.cards) {
-          // Real-time sticky note updates for mindMap/flashcards
-          updateActionStickyNotes(partialData.cards);
-        } else if (partialData.type === "partial" && partialData.content) {
-          // Real-time text updates for summarize/actionPoints
-          updateActionResult(partialData.content);
+      const result = await performCardAction(
+        action,
+        contents,
+        (partialData) => {
+          if (partialData.type === "card" && partialData.cards) {
+            // Real-time sticky note updates for mindMap/flashcards
+            updateActionStickyNotes(partialData.cards);
+          } else if (partialData.type === "partial" && partialData.content) {
+            // Real-time text updates for summarize/actionPoints
+            updateActionResult(partialData.content);
+          }
+        },
+        (thinking) => {
+          // Real-time thinking process updates
+          setThinkingText(thinking);
         }
-      });
+      );
 
       if (!result.success) {
         console.error('Action failed:', result.message);
@@ -995,17 +1003,17 @@ const BoardPage: React.FC = () => {
 
       {/* AI Actions Panel (when operate tool is active and sticky notes selected) */}
       {currentTool === 'operate' && (selectedStickyNoteIds.size > 0 || selectedCardIds.size > 0) && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-orange-200 p-4 flex items-center gap-3">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-purple-200 p-4 flex items-center gap-3">
           {isPerformingAction ? (
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-orange-600 font-medium">Generating AI response...</span>
+              <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-purple-600 font-medium">Generating AI response...</span>
             </div>
           ) : (
             <>
               <div className="flex flex-col gap-1 pr-3 border-r border-gray-200">
                 <span className="text-xs text-gray-400 uppercase tracking-wide">Selected</span>
-                <span className="text-lg font-bold text-orange-600">
+                <span className="text-lg font-bold text-purple-600">
                   {selectedStickyNoteIds.size + selectedCardIds.size} / 4
                 </span>
               </div>
@@ -1013,7 +1021,7 @@ const BoardPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleCardAction('summarize')}
-                  className="flex flex-col items-center gap-1 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
+                  className="flex flex-col items-center gap-1 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-xs font-medium transition-all hover:scale-105"
                   title="Generate a concise summary"
                 >
                   <FileText className="w-5 h-5" />

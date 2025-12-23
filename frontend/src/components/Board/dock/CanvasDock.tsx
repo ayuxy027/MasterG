@@ -141,14 +141,20 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
             {primaryTools.map((tool) => {
               const IconComponent = tool.icon as React.ComponentType<{ size?: number; className?: string }>;
               const isActive = currentTool === tool.id;
+              const isAIFeature = tool.id === 'operate'; // AI features use purple
               return (
                 <button
                   key={tool.id}
                   onClick={() => onToolChange(tool.id)}
-                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${isActive
-                      ? 'bg-orange-500 text-white shadow-lg'
-                      : 'text-orange-600 hover:bg-orange-50'
-                    }`}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                    isActive
+                      ? isAIFeature
+                        ? 'bg-purple-500 text-white shadow-lg'
+                        : 'bg-orange-500 text-white shadow-lg'
+                      : isAIFeature
+                        ? 'text-purple-600 hover:bg-purple-50'
+                        : 'text-orange-600 hover:bg-orange-50'
+                  }`}
                   title={tool.label}
                 >
                   <IconComponent size={18} />

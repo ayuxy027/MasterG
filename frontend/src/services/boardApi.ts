@@ -155,7 +155,8 @@ export async function generateCards(
 export async function performCardAction(
   action: CardAction,
   cardContents: string[],
-  onPartialUpdate?: (data: { type: string; cards?: CardData[]; content?: string }) => void
+  onPartialUpdate?: (data: { type: string; cards?: CardData[]; content?: string }) => void,
+  onThinkingUpdate?: (text: string) => void
 ): Promise<ActionResponse> {
   try {
     if (cardContents.length === 0) {
@@ -206,7 +207,12 @@ export async function performCardAction(
           try {
             const parsed = JSON.parse(data);
 
-            if (parsed.type === "card" && parsed.cards) {
+            if (parsed.type === "thinking") {
+              // Thinking text updates
+              if (onThinkingUpdate) {
+                onThinkingUpdate(parsed.content || "");
+              }
+            } else if (parsed.type === "card" && parsed.cards) {
               // Partial card updates
               partialCards = parsed.cards;
               if (onPartialUpdate) {
@@ -219,6 +225,9 @@ export async function performCardAction(
                 onPartialUpdate({ type: "partial", content: partialResult });
               }
             } else if (parsed.type === "complete") {
+              if (parsed.thinkingText && onThinkingUpdate) {
+                onThinkingUpdate(parsed.thinkingText);
+              }
               if (parsed.cards) {
                 cards = parsed.cards;
               }

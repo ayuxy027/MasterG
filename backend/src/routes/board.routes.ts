@@ -345,7 +345,7 @@ CONTENT TO ANALYZE:
 ${combinedContent}
 
 REQUIREMENTS:
-1. Identify 4-6 core concepts or themes from the content
+1. Identify exactly 6 core concepts or themes from the content
 2. Each concept should be:
    - A distinct, important idea
    - Related to other concepts in the map
@@ -354,15 +354,17 @@ REQUIREMENTS:
 4. Ensure concepts cover different aspects of the content
 5. Make titles concise (2-4 words) and descriptive
 
-OUTPUT FORMAT (JSON array only):
+OUTPUT FORMAT (JSON array only - EXACTLY 6 cards):
 [
   {"title": "Core Concept 1", "content": "Detailed explanation of this concept and its importance..."},
   {"title": "Core Concept 2", "content": "Detailed explanation of this concept and its relationships..."},
   {"title": "Core Concept 3", "content": "Detailed explanation of this concept and its connections..."},
-  {"title": "Core Concept 4", "content": "Detailed explanation of this concept and its role..."}
+  {"title": "Core Concept 4", "content": "Detailed explanation of this concept and its role..."},
+  {"title": "Core Concept 5", "content": "Detailed explanation of this concept and its significance..."},
+  {"title": "Core Concept 6", "content": "Detailed explanation of this concept and its applications..."}
 ]
 
-Generate the JSON array:`,
+Generate exactly 6 cards as JSON array:`,
       
       flashcards: `You are an expert at creating effective educational flashcards. Analyze the following content and create high-quality Q&A flashcards for studying.
 
@@ -370,7 +372,7 @@ CONTENT TO ANALYZE:
 ${combinedContent}
 
 REQUIREMENTS:
-1. Create 5-6 flashcards covering key information
+1. Create exactly 6 flashcards covering key information
 2. Each flashcard should have:
    - A clear, specific question (as the title)
    - A comprehensive answer (50-80 words)
@@ -380,14 +382,17 @@ REQUIREMENTS:
 4. Answers should be complete and educational
 5. Cover different aspects: definitions, processes, examples, applications
 
-OUTPUT FORMAT (JSON array only):
+OUTPUT FORMAT (JSON array only - EXACTLY 6 cards):
 [
   {"title": "What is [key concept]?", "content": "Comprehensive answer explaining the concept, its importance, and relevant details..."},
   {"title": "How does [process] work?", "content": "Step-by-step explanation of the process with key details..."},
-  {"title": "Why is [concept] important?", "content": "Explanation of importance, applications, and real-world relevance..."}
+  {"title": "Why is [concept] important?", "content": "Explanation of importance, applications, and real-world relevance..."},
+  {"title": "What are the key details?", "content": "Important details and examples from the content..."},
+  {"title": "How can this be applied?", "content": "Practical applications and real-world examples..."},
+  {"title": "What should be remembered?", "content": "Key takeaways and essential information to remember..."}
 ]
 
-Generate the JSON array:`,
+Generate exactly 6 cards as JSON array:`,
     };
 
     const prompt = actionPrompts[action];
@@ -416,7 +421,10 @@ Generate the JSON array:`,
           model: OLLAMA_MODEL,
           temperature: 0.7,
         })) {
-          if (chunk.type === "response") {
+          if (chunk.type === "thinking") {
+            // Stream thinking process
+            res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
+          } else if (chunk.type === "response") {
             responseText += chunk.content;
             accumulatedResponse += chunk.content;
 
@@ -476,26 +484,52 @@ Generate the JSON array:`,
           console.log(`✅ Board: Successfully parsed ${cards.length} cards for "${action}"`);
         } else {
           console.log(`⚠️ Board: Failed to parse JSON for "${action}". Response preview:`, cleanResponse.slice(0, 200));
-          // Fallback
+          // Fallback - ensure 6 cards
           cards = action === "mindMap" ? [
             { title: "Core Concept 1", content: "Key concept extracted from the selected cards." },
             { title: "Core Concept 2", content: "Another important concept or theme." },
             { title: "Core Concept 3", content: "Supporting concept or related idea." },
             { title: "Core Concept 4", content: "Additional concept or application." },
+            { title: "Core Concept 5", content: "Related concept with connections to others." },
+            { title: "Core Concept 6", content: "Final important concept from the content." },
           ] : [
             { title: "What is the main concept?", content: "Key information from the selected cards." },
             { title: "How does this work?", content: "Explanation based on the content provided." },
             { title: "Why is this important?", content: "Significance and relevance of the topic." },
             { title: "What are the key details?", content: "Important details and examples." },
+            { title: "How can this be applied?", content: "Practical applications and real-world examples." },
+            { title: "What should be remembered?", content: "Key takeaways and essential information." },
           ];
         }
 
-        // Normalize cards
-        cards = cards.slice(0, action === "mindMap" ? 6 : 6).map((c: any, idx: number) => ({
+        // Normalize cards - enforce count: 6 for mindMap, 5-6 for flashcards
+        const maxCards = action === "mindMap" ? 6 : 6; // Both use 6, but flashcards prompt says 5-6
+        cards = cards.slice(0, maxCards).map((c: any, idx: number) => ({
           id: `${action}-${Date.now()}-${idx}`,
           title: c.title || `${action === "mindMap" ? "Concept" : "Question"} ${idx + 1}`,
           content: c.content || "",
         }));
+        
+        // Ensure we have the right number of cards
+        if (action === "mindMap" && cards.length < 6) {
+          // Pad to 6 cards if needed
+          while (cards.length < 6) {
+            cards.push({
+              id: `${action}-${Date.now()}-${cards.length}`,
+              title: `Concept ${cards.length + 1}`,
+              content: "Additional concept from the content.",
+            });
+          }
+        } else if (action === "flashcards" && cards.length < 5) {
+          // Ensure at least 5 cards for flashcards
+          while (cards.length < 5) {
+            cards.push({
+              id: `${action}-${Date.now()}-${cards.length}`,
+              title: `Question ${cards.length + 1}`,
+              content: "Additional question and answer from the content.",
+            });
+          }
+        }
 
         console.log(`✅ Board: Action "${action}" generated ${cards.length} cards`);
 
@@ -521,7 +555,10 @@ Generate the JSON array:`,
           model: OLLAMA_MODEL,
           temperature: action === "summarize" ? 0.6 : 0.7,
         })) {
-          if (chunk.type === "response") {
+          if (chunk.type === "thinking") {
+            // Stream thinking process
+            res.write(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`);
+          } else if (chunk.type === "response") {
             responseText += chunk.content;
             accumulatedText += chunk.content;
             
