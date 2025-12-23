@@ -435,6 +435,32 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
               <LuTrash2 size={16} />
             </button>
           </div>
+
+          {/* Divider */}
+          <div className="w-px h-8 bg-orange-200" />
+
+          {/* Save/Load */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onSaveBoard}
+              disabled={isSaving}
+              className={`p-2 rounded-lg transition-colors ${
+                isSaving
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-green-600 hover:bg-green-50'
+              }`}
+              title={isSaving ? 'Saving...' : lastSaved ? `Saved ${lastSaved.toLocaleTimeString()}` : 'Save Board'}
+            >
+              <LuSave size={16} />
+            </button>
+            <button
+              onClick={onNewBoard}
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="New Board"
+            >
+              <LuFolderOpen size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { DottedBackground, CanvasDock, StickyNote } from './index';
 import { getToolById, Point, DrawingPath } from './tools';
 import Card from './Card';
 import MinimizedNavbar from './MinimizedNavbar';
-import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus, boardSessionApi, BoardSessionData } from '../../services/boardApi';
+import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus, boardSessionApi } from '../../services/boardApi';
 import { stitchAPI } from '../../services/stitchApi';
 
 // ============================================================================
