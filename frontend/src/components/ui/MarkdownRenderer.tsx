@@ -54,8 +54,19 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         ...style
     };
 
+    // Add custom styles for KaTeX to fix spacing
+    const katexStyleFix = `
+      .katex-display {
+        margin: 0.5em 0 !important;
+      }
+      .katex-display > .katex {
+        white-space: normal !important;
+      }
+    `;
+
     // Custom components to maintain styling consistency
     const components: Components = {
+        // ... (rest of components remain same, just patching the start of function)
         // Headers with proper spacing
         h1: ({ children, ...props }) => (
             <h1 {...props} style={{
@@ -265,6 +276,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
     return (
         <div className={`markdown-content ${className}`} style={combinedStyle}>
+            <style>{katexStyleFix}</style>
             <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeKatex]}
@@ -285,8 +297,8 @@ function preprocessLatex(content: string): string {
 
     let processed = content;
 
-    // Convert \[ ... \] to $$ ... $$ (block math)
-    processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, '\n$$\n$1\n$$\n');
+    // Convert \[ ... \] to $$ ... $$ (block math) - Use tighter spacing
+    processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, '$$$1$$');
 
     // Convert \( ... \) to $ ... $ (inline math)
     processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');

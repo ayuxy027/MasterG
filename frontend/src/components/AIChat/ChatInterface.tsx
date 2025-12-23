@@ -132,6 +132,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   sources: chunk.type === "source" && chunk.source
                     ? [...(msg.sources || []), chunk.source]
                     : msg.sources,
+                  thinking: chunk.type === "thinking" && chunk.thinking
+                    ? chunk.thinking
+                    : msg.thinking,
                   isStreaming: chunk.type !== "done" && chunk.type !== "error",
                 }
                 : msg
@@ -442,9 +445,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                       <span className="text-xs font-semibold text-orange-700">
                                         {source.pdfName}
                                       </span>
-                                      <span className="text-xs text-orange-500">
-                                        • Page {source.pageNo}
-                                      </span>
                                     </div>
                                     <p className="text-xs text-gray-700 leading-relaxed">
                                       {source.snippet}
@@ -455,6 +455,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             </Accordion>
                           </div>
                         )}
+
+                        {/* Thinking Process - Accordion */}
+                        {message.thinking && !message.isStreaming && message.role === "assistant" && (
+                          <div className="mt-3">
+                            <Accordion
+                              title="Thinking Process"
+                              icon={
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                                  />
+                                </svg>
+                              }
+                            >
+                              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap font-mono">
+                                  {message.thinking}
+                                </p>
+                              </div>
+                            </Accordion>
+                          </div>
+                        )}
+
 
                         {/* Translation Section */}
                         {message.role === "assistant" &&
