@@ -1,9 +1,27 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
+// Enhanced key topic with description for quick recall
+export interface KeyTopic {
+  name: string;
+  description: string;
+}
+
+// Enhanced important concept with 5 bullet point descriptions
+export interface ImportantConcept {
+  name: string;
+  points: string[];
+}
+
 export interface LMRSummary {
-  summary: string;
-  keyTopics: string[];
-  importantConcepts: string[];
+  // Structured summary format for last-minute revision
+  introduction: string;        // Short intro paragraph (2-3 sentences)
+  summaryPoints: string[];     // Bullet points with descriptions
+  conclusion: string;          // Conclusion paragraph (1-2 sentences)
+  // Legacy field for backward compatibility
+  summary?: string;
+  // Enhanced fields with descriptions
+  keyTopics: KeyTopic[];
+  importantConcepts: ImportantConcept[];
   language: string;
 }
 

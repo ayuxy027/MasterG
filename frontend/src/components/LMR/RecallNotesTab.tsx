@@ -6,6 +6,39 @@ interface RecallNotesTabProps {
   isLoading?: boolean;
 }
 
+// Helper function to safely convert any value to a displayable string
+// This fixes the "[object Object]" bug when AI returns nested objects
+const safeToString = (value: any): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return String(value);
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') {
+    // Try to extract meaningful text from common property names
+    if (value.text) return String(value.text);
+    if (value.content) return String(value.content);
+    if (value.point) return String(value.point);
+    if (value.fact) return String(value.fact);
+    if (value.value) return String(value.value);
+    if (value.description) return String(value.description);
+    if (value.name) return String(value.name);
+    // Last resort: stringify, but filter out unhelpful results
+    const stringified = JSON.stringify(value);
+    if (stringified === '{}' || stringified === '[]') return '';
+    return stringified;
+  }
+  return String(value);
+};
+
+// Helper function to normalize an array of items to strings
+const normalizeItems = (items: any): string[] => {
+  if (!items) return [];
+  if (!Array.isArray(items)) return [safeToString(items)];
+  return items
+    .map(item => safeToString(item))
+    .filter(item => item && item !== '{}' && item !== '[]' && item !== 'null' && item !== 'undefined');
+};
+
 const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
   recallNotes,
   isLoading,
@@ -83,33 +116,38 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
           </h3>
         </div>
         <p className="text-sm text-gray-600">
-          Concise, memorable notes for last-minute exam preparation
+          Comprehensive, memorable notes for last-minute exam preparation • 5 key points & 5-8 quick facts per topic
         </p>
       </div>
 
       {/* Notes sections */}
-      {recallNotes.map((note, index) => (
-        <div
-          key={index}
-          className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden hover:shadow-lg transition-all duration-300"
-        >
-          {/* Topic header */}
-          <div className="bg-orange-50 border-b-2 border-orange-200 px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-sm">
-                  {index + 1}
-                </span>
-              </div>
-              <h4 className="text-lg font-bold text-gray-800">{note.topic}</h4>
-            </div>
-          </div>
+      {recallNotes.map((note, index) => {
+        // Normalize all arrays to ensure they contain only strings
+        const keyPoints = normalizeItems(note.keyPoints);
+        const quickFacts = normalizeItems(note.quickFacts);
+        const mnemonics = normalizeItems(note.mnemonics);
+        const topicName = safeToString(note.topic) || `Topic ${index + 1}`;
 
-          <div className="p-6 space-y-6">
-            {/* Key Points */}
-            {note.keyPoints &&
-              Array.isArray(note.keyPoints) &&
-              note.keyPoints.length > 0 && (
+        return (
+          <div
+            key={index}
+            className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden hover:shadow-lg transition-all duration-300"
+          >
+            {/* Topic header */}
+            <div className="bg-orange-50 border-b-2 border-orange-200 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-sm">
+                    {index + 1}
+                  </span>
+                </div>
+                <h4 className="text-lg font-bold text-gray-800">{topicName}</h4>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Key Points */}
+              {keyPoints.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <svg
@@ -125,16 +163,16 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <h5 className="font-semibold text-gray-800">Key Points</h5>
+                    <h5 className="font-semibold text-gray-800">Key Points ({keyPoints.length})</h5>
                   </div>
                   <ul className="space-y-2">
-                    {note.keyPoints.map((point, idx) => (
+                    {keyPoints.map((point, idx) => (
                       <li
                         key={idx}
                         className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200"
                       >
-                        <span className="text-orange-500 font-bold flex-shrink-0">
-                          •
+                        <span className="flex-shrink-0 w-6 h-6 bg-orange-400 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                          {idx + 1}
                         </span>
                         <span className="text-gray-700">{point}</span>
                       </li>
@@ -143,10 +181,8 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
                 </div>
               )}
 
-            {/* Quick Facts */}
-            {note.quickFacts &&
-              Array.isArray(note.quickFacts) &&
-              note.quickFacts.length > 0 && (
+              {/* Quick Facts - Now with more content */}
+              {quickFacts.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <svg
@@ -162,10 +198,10 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <h5 className="font-semibold text-gray-800">Quick Facts</h5>
+                    <h5 className="font-semibold text-gray-800">Quick Facts ({quickFacts.length})</h5>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {note.quickFacts.map((fact, idx) => (
+                    {quickFacts.map((fact, idx) => (
                       <div
                         key={idx}
                         className="p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-start gap-2"
@@ -188,10 +224,8 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
                 </div>
               )}
 
-            {/* Mnemonics */}
-            {note.mnemonics &&
-              Array.isArray(note.mnemonics) &&
-              note.mnemonics.length > 0 && (
+              {/* Mnemonics */}
+              {mnemonics.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <svg
@@ -210,13 +244,13 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
                     <h5 className="font-semibold text-gray-800">Memory Tips</h5>
                   </div>
                   <div className="space-y-2">
-                    {note.mnemonics.map((mnemonic, idx) => (
+                    {mnemonics.map((mnemonic, idx) => (
                       <div
                         key={idx}
                         className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200"
                       >
                         <div className="flex items-start gap-3">
-                          <span className="text-2xl">💡</span>
+                          <span className="text-2xl">*</span>
                           <p className="text-gray-700 font-medium">
                             {mnemonic}
                           </p>
@@ -226,9 +260,10 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
                   </div>
                 </div>
               )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Study tips footer */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6">
@@ -249,12 +284,13 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
             </svg>
           </div>
           <div>
-            <h5 className="font-bold text-gray-800 mb-2">Study Tips</h5>
+            <h5 className="font-bold text-gray-800 mb-2">Study Tips for Last-Minute Revision</h5>
             <ul className="space-y-1 text-sm text-gray-700">
-              <li>• Review these notes multiple times for better retention</li>
+              <li>• Review these notes 2-3 times for better retention</li>
+              <li>• Focus on the Quick Facts section for rapid recall</li>
+              <li>• Use mnemonics to remember complex concepts</li>
               <li>• Test yourself using the Quiz section</li>
-              <li>• Focus on mnemonics for quick recall during exams</li>
-              <li>• Download the PDF for offline revision</li>
+              <li>• Download the PDF for offline revision on the go</li>
             </ul>
           </div>
         </div>
