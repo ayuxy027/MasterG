@@ -282,30 +282,29 @@ export class LMRService {
     switch (contentDensity) {
       case 'light':
         // Smaller documents
-        recommendedConceptCount = 5;
+        recommendedConceptCount = 8; // Fixed at 8
         recommendedRecallTopicCount = 10; // Min 10
         recommendedQuestionCount = 10;
         recommendedQuizCount = 10;
         break;
       case 'medium':
         // Medium documents
-        recommendedConceptCount = 8;
+        recommendedConceptCount = 8; // Fixed at 8
         recommendedRecallTopicCount = 12;
         recommendedQuestionCount = 12;
         recommendedQuizCount = 12;
         break;
       case 'dense':
         // Large documents
-        recommendedConceptCount = 12;
+        recommendedConceptCount = 8; // Fixed at 8
         recommendedRecallTopicCount = 15; // Max 15
         recommendedQuestionCount = 15;
         recommendedQuizCount = 15;
         break;
     }
 
-    // Fine-tune based on estimated topics
+    // Fine-tune based on estimated topics (only for recall topics and questions)
     if (estimatedTopics >= 8) {
-      recommendedConceptCount = Math.min(15, recommendedConceptCount + 3);
       recommendedRecallTopicCount = Math.min(15, recommendedRecallTopicCount + 3);
       recommendedQuestionCount = Math.min(15, recommendedQuestionCount + 2);
     }
@@ -637,15 +636,15 @@ LANGUAGE: ${languageName} | TONE: ${tone} | NO EMOJIS`,
     {"name": "Law of Segregation", "points": ["Alleles separate during meiosis", "Each gamete gets one allele", "Occurs in Anaphase I"]},
     {"name": "Dominant vs Recessive", "points": ["Dominant masks recessive", "Capital letter = dominant", "3:1 ratio in F2"]},
     {"name": "Sex Chromosomes", "points": ["XX = female, XY = male", "Father determines sex", "Y carries SRY gene"]},
-    {"name": "Genetic Ratios", "points": ["Monohybrid: 3:1 phenotypic", "Dihybrid: 9:3:3:1", "Test cross: 1:1 ratio"]},
-    {"name": "Heredity Basics", "points": ["Traits pass from parents", "Genes are units of heredity", "DNA carries genetic info"]}
+    {"name": "Monohybrid Cross", "points": ["Single trait cross", "F2 ratio is 3:1", "TT:Tt:tt = 1:2:1"]},
+    {"name": "Dihybrid Cross", "points": ["Two trait cross", "F2 ratio is 9:3:3:1", "Independent assortment"]},
+    {"name": "Test Cross", "points": ["Unknown x recessive", "Identifies genotype", "1:1 ratio if heterozygous"]},
+    {"name": "Punnett Square", "points": ["Grid for prediction", "Shows all combinations", "Calculate phenotype ratio"]},
+    {"name": "Alleles and Genes", "points": ["Alleles are gene variants", "Homozygous = same alleles", "Heterozygous = different"]}
   ]
 }
 
-MANDATORY OUTPUT:
-- keyTopics: EXACTLY ${keyTopicCount} items with UNIQUE names
-- importantConcepts: EXACTLY ${conceptCount} items, EACH with EXACTLY 3 strings in the "points" array
-- DO NOT output less than 3 points per concept!`,
+YOU MUST generate exactly 8 importantConcepts (shown above) and ${keyTopicCount} keyTopics. Do NOT stop early!`,
         isArray: false
       };
 

@@ -364,7 +364,7 @@ ${question}
                     stream: false,
                     options: {
                         temperature: 0.1, // More deterministic
-                        num_predict: 4096, // Increased significantly or use -1 for no limit
+                        num_predict: 8192, // Increased for longer JSON outputs
                     },
                 },
                 {
