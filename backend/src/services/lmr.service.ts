@@ -269,8 +269,7 @@ export class LMRService {
         response.substring(0, 1000)
       );
       throw new Error(
-        `Failed to parse AI response: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to parse AI response: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -404,17 +403,15 @@ export class LMRService {
 - List important concepts that students must understand
 - Note any significant examples or case studies`,
 
-      questions: `Extract information needed to generate ${
-        additionalParams?.count || 10
-      } Q&A pairs:
+      questions: `Extract information needed to generate ${additionalParams?.count || 10
+        } Q&A pairs:
 - Identify all factual statements that can be converted to questions
 - Note specific details, definitions, and explanations
 - List concepts that require deeper understanding
 - Include any numerical data or specific facts`,
 
-      quiz: `Extract information needed to generate ${
-        additionalParams?.count || 10
-      } MCQ questions:
+      quiz: `Extract information needed to generate ${additionalParams?.count || 10
+        } MCQ questions:
 - Identify facts that have clear correct/incorrect options
 - Note definitions with possible confusing alternatives
 - List concepts that students often misunderstand
@@ -429,12 +426,16 @@ export class LMRService {
 
     const prompt = `You are an expert content analyzer. Your task is to extract and compress the most relevant information from a document for educational content generation.
 
+NOTATION RULES (Enforce Simple Text):
+- Math: Use plain text fractions (e.g., "1/3") NOT LaTeX (e.g., "\\frac{1}{3}")
+- Chemistry: Use plain text formulas (e.g., "C6H12O6", "H2O") NOT LaTeX subscripts
+- Physics: Use simple text representation
+
 DOCUMENT CONTENT:
-${documentContent.substring(0, 15001)}${
-      documentContent.length > 15001
+${documentContent.substring(0, 15001)}${documentContent.length > 15001
         ? "\n\n[... document truncated for processing ...]"
         : ""
-    }
+      }
 
 TASK: ${taskInstructions[taskType]}
 
@@ -467,8 +468,7 @@ CRITICAL RULES:
         false
       ) as CompressedContext;
       console.log(
-        `✅ Layer 1 complete: Extracted ${
-          parsed.mainTopics?.length || 0
+        `✅ Layer 1 complete: Extracted ${parsed.mainTopics?.length || 0
         } topics, ${parsed.keyFacts?.length || 0} facts`
       );
       return parsed;
@@ -508,30 +508,32 @@ ${(compressedContext.keyFacts || []).map((f, i) => `${i + 1}. ${f}`).join("\n")}
 
 Important Concepts:
 ${(compressedContext.importantConcepts || [])
-  .map((c, i) => `${i + 1}. ${c}`)
-  .join("\n")}
+        .map((c, i) => `${i + 1}. ${c}`)
+        .join("\n")}
 
-${
-  compressedContext.relevantExamples?.length
-    ? `Examples:\n${compressedContext.relevantExamples
-        .map((e, i) => `${i + 1}. ${e}`)
-        .join("\n")}`
-    : ""
-}`;
+${compressedContext.relevantExamples?.length
+        ? `Examples:\n${compressedContext.relevantExamples
+          .map((e, i) => `${i + 1}. ${e}`)
+          .join("\n")}`
+        : ""
+      }`;
 
-    const prompt = `You are a precise JSON generator. Generate EXACTLY ${
-      schema.isArray ? "a JSON array" : "a JSON object"
-    } based on the provided content.
+    const prompt = `You are a precise JSON generator. Generate EXACTLY ${schema.isArray ? "a JSON array" : "a JSON object"
+      } based on the provided content.
+
+NOTATION RULES (Enforce Simple Text):
+- Math: Use plain text fractions (e.g., "1/3") NOT LaTeX (e.g., "\\frac{1}{3}")
+- Chemistry: Use plain text formulas (e.g., "C6H12O6", "H2O") with NO subscripts
+- General: Keep notation simple, direct, and readable as plain text.
 
 ${contextSummary}
 
 TASK: ${schema.description}
 
-${
-  additionalParams?.count
-    ? `Generate exactly ${additionalParams.count} items.`
-    : ""
-}
+${additionalParams?.count
+        ? `Generate exactly ${additionalParams.count} items.`
+        : ""
+      }
 
 Language: ${language}
 
@@ -564,8 +566,7 @@ OUTPUT THE JSON NOW:`;
 
         const parsed = this.extractAndParseJSON(response, schema.isArray);
         console.log(
-          `✅ Layer 2 complete (attempt ${attempt}): Generated ${
-            schema.isArray ? (parsed as any[]).length + " items" : "object"
+          `✅ Layer 2 complete (attempt ${attempt}): Generated ${schema.isArray ? (parsed as any[]).length + " items" : "object"
           }`
         );
         return parsed as T;
@@ -764,8 +765,7 @@ YOU MUST generate exactly 8 importantConcepts and ${keyTopicCount} keyTopics. Do
     } catch (error) {
       console.error("❌ Summary generation failed:", error);
       throw new Error(
-        `Failed to generate summary: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate summary: ${error instanceof Error ? error.message : "Unknown error"
         } `
       );
     }
@@ -910,8 +910,7 @@ ANSWER QUALITY STANDARDS:
     } catch (error) {
       console.error("❌ Q&A generation failed:", error);
       throw new Error(
-        `Failed to generate questions: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate questions: ${error instanceof Error ? error.message : "Unknown error"
         } `
       );
     }
@@ -1001,8 +1000,7 @@ IMPORTANT: Generate EXACTLY ${count} MCQ questions. NO trailing commas!`,
     } catch (error) {
       console.error("❌ Quiz generation failed:", error);
       throw new Error(
-        `Failed to generate quiz: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate quiz: ${error instanceof Error ? error.message : "Unknown error"
         } `
       );
     }
@@ -1153,8 +1151,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     } catch (error) {
       console.error("❌ Recall notes generation failed:", error);
       throw new Error(
-        `Failed to generate recall notes: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate recall notes: ${error instanceof Error ? error.message : "Unknown error"
         } `
       );
     }
@@ -1180,8 +1177,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
       };
     } catch (error) {
       throw new Error(
-        `Failed to generate content: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate content: ${error instanceof Error ? error.message : "Unknown error"
         } `
       );
     }
@@ -1298,8 +1294,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     if (targetLang === "en") return questions;
 
     console.log(
-      `🌐 Translating ${
-        questions.length
+      `🌐 Translating ${questions.length
       } questions to ${languageService.getLanguageName(targetLang)}...`
     );
 
@@ -1323,8 +1318,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     if (targetLang === "en") return quiz;
 
     console.log(
-      `🌐 Translating ${
-        quiz.length
+      `🌐 Translating ${quiz.length
       } quiz questions to ${languageService.getLanguageName(targetLang)}...`
     );
 
@@ -1351,8 +1345,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     if (targetLang === "en") return notes;
 
     console.log(
-      `🌐 Translating ${
-        notes.length
+      `🌐 Translating ${notes.length
       } recall note topics to ${languageService.getLanguageName(targetLang)}...`
     );
 
@@ -1367,8 +1360,8 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
         ),
         mnemonics: n.mnemonics
           ? await Promise.all(
-              n.mnemonics.map((m) => this.translateText(m, targetLang))
-            )
+            n.mnemonics.map((m) => this.translateText(m, targetLang))
+          )
           : undefined,
       }))
     );
