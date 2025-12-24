@@ -44,6 +44,12 @@ const LMRPage: React.FC = () => {
       setUploadedFile(file);
       setIsProcessing(true);
 
+      // Clear all previous content when uploading new file
+      setSummary(null);
+      setQuestions([]);
+      setQuiz([]);
+      setRecallNotes([]);
+
       // Upload document to backend
       const response = await LMRApi.uploadDocument(
         file,
