@@ -617,37 +617,27 @@ DO NOT use generic names like "Topic 1" or "Concept 1" - use REAL topic names!
 LANGUAGE: ${languageName} | TONE: ${tone} | NO EMOJIS`,
 
         jsonTemplate: `{
-  "introduction": "Genetics is the scientific study of heredity and variation in living organisms. Gregor Mendel, through his experiments with pea plants from 1856-1863, established the fundamental laws of inheritance. These laws explain how traits are passed from parents to offspring through discrete units called genes.",
+  "introduction": "A concise introduction summarizing the core theme of the document in 2-3 sentences. It should provide a high-level overview of the subject matter.",
   "summaryPoints": [
-    "Dominant alleles express even in heterozygous condition (Tt)",
-    "Law of Segregation: alleles separate during gamete formation",
-    "Monohybrid cross ratio is 3:1 phenotypic",
-    "Sex determination: XX = female, XY = male",
-    "Test cross identifies unknown genotype",
-    "Phenotype is observable trait, genotype is genetic makeup"
+    "Key summary point 1 covering a major idea",
+    "Key summary point 2 covering impactful facts",
+    "Key summary point 3 covering essential details",
+    "Key summary point 4 covering critical information",
+    "Key summary point 5 covering the final takeaway"
   ],
-  "conclusion": "Mendel's laws form the foundation of genetics. Remember 3:1 ratio and allele segregation.",
+  "conclusion": "A brief conclusion wrapping up the main ideas and their significance.",
   "keyTopics": [
-    {"name": "Mendel's Laws", "description": "Segregation and independent assortment govern inheritance"},
-    {"name": "Dominant Alleles", "description": "Express phenotype even when heterozygous (Tt)"},
-    {"name": "Recessive Alleles", "description": "Only express when homozygous (tt)"},
-    {"name": "Monohybrid Cross", "description": "Single trait cross with 3:1 F2 ratio"},
-    {"name": "Sex Determination", "description": "XX chromosomes = female, XY = male"},
-    {"name": "Punnett Square", "description": "Grid for predicting offspring genotypes"}
+    {"name": "Main Topic 1", "description": "Brief description of the first key topic found in the content"},
+    {"name": "Main Topic 2", "description": "Brief description of the second key topic found in the content"},
+    {"name": "Main Topic 3", "description": "Brief description of the third key topic found in the content"}
   ],
   "importantConcepts": [
-    {"name": "Law of Segregation", "points": ["Alleles separate during meiosis", "Each gamete gets one allele", "Occurs in Anaphase I"]},
-    {"name": "Dominant vs Recessive", "points": ["Dominant masks recessive", "Capital letter = dominant", "3:1 ratio in F2"]},
-    {"name": "Sex Chromosomes", "points": ["XX = female, XY = male", "Father determines sex", "Y carries SRY gene"]},
-    {"name": "Monohybrid Cross", "points": ["Single trait cross", "F2 ratio is 3:1", "TT:Tt:tt = 1:2:1"]},
-    {"name": "Dihybrid Cross", "points": ["Two trait cross", "F2 ratio is 9:3:3:1", "Independent assortment"]},
-    {"name": "Test Cross", "points": ["Unknown x recessive", "Identifies genotype", "1:1 ratio if heterozygous"]},
-    {"name": "Punnett Square", "points": ["Grid for prediction", "Shows all combinations", "Calculate phenotype ratio"]},
-    {"name": "Alleles and Genes", "points": ["Alleles are gene variants", "Homozygous = same alleles", "Heterozygous = different"]}
+    {"name": "Core Concept 1", "points": ["Detail point 1 about this concept", "Detail point 2 about this concept", "Detail point 3 about this concept"]},
+    {"name": "Core Concept 2", "points": ["Detail point 1 about this concept", "Detail point 2 about this concept", "Detail point 3 about this concept"]}
   ]
 }
 
-YOU MUST generate exactly 8 importantConcepts (shown above) and ${keyTopicCount} keyTopics. Do NOT stop early!`,
+        YOU MUST generate exactly 8 importantConcepts(shown above) and ${keyTopicCount} keyTopics.Do NOT stop early!`,
         isArray: false
       };
 
@@ -921,7 +911,7 @@ ANSWER QUALITY STANDARDS:
       const metrics = this.calculateDocumentMetrics(document.fullContent, document.pages);
       const topicCount = metrics.recommendedRecallTopicCount; // 6-15 based on document
 
-      console.log(`📊 Dynamic recall topic count: ${topicCount}`);
+      console.log(`📊 Dynamic recall topic count: ${topicCount} `);
 
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for recall notes generation
@@ -938,61 +928,42 @@ ANSWER QUALITY STANDARDS:
       // ═══════════════════════════════════════════════════════════════
       console.log(`🔄 Layer 2: Generating ${topicCount} recall note topics...`);
       const recallNotesSchema = {
-        description: `You are an NCERT/CBSE educational expert. Generate LAST-MINUTE REVISION notes.
+        description: `You are an NCERT / CBSE educational expert.Generate LAST - MINUTE REVISION notes.
 
-MANDATORY: Generate EXACTLY ${topicCount} topics from the document.
+        MANDATORY: Generate EXACTLY ${topicCount} topics from the document.
 Each topic MUST have:
-- topic: A REAL topic name (like "Mendel's Laws", not "Topic 1")
-- keyPoints: Array of 5 STRINGS (actual facts, not objects)
-- quickFacts: Array of 5 STRINGS (actual facts, not objects)
-- mnemonics: Array of 1 STRING
+      - topic: A REAL topic name(like "Mendel's Laws", not "Topic 1")
+        - keyPoints: Array of 5 STRINGS(actual facts, not objects)
+          - quickFacts: Array of 5 STRINGS(actual facts, not objects)
+            - mnemonics: Array of 1 STRING
 
-CRITICAL: keyPoints and quickFacts must be PLAIN STRINGS, not objects!
-WRONG: {"point": "text"} 
-RIGHT: "text"
+      CRITICAL: keyPoints and quickFacts must be PLAIN STRINGS, not objects!
+      WRONG: { "point": "text" }
+      RIGHT: "text"
 
 NO EMOJIS | Generate ${topicCount} topics`,
         jsonTemplate: `[
-  {
-    "topic": "Mendel's Laws",
-    "keyPoints": [
-      "Law of Dominance: dominant allele masks recessive",
-      "Law of Segregation: alleles separate during gamete formation",
-      "Law of Independent Assortment: genes inherit independently",
-      "Mendel used pea plants for his experiments",
-      "Monohybrid cross shows 3:1 ratio in F2"
-    ],
-    "quickFacts": [
-      "Mendel is father of genetics",
-      "F2 ratio is 3:1 phenotypic",
-      "Tt x Tt gives 1TT:2Tt:1tt",
-      "Dominant = capital letter",
-      "Published work in 1866"
-    ],
-    "mnemonics": ["DSI - Dominance, Segregation, Independent assortment"]
-  },
-  {
-    "topic": "Sex Determination",
-    "keyPoints": [
-      "Humans: XX = female, XY = male",
-      "Father determines sex of offspring",
-      "Y chromosome carries SRY gene",
-      "Sex-linked traits on X chromosome",
-      "Males more affected by X-linked disorders"
-    ],
-    "quickFacts": [
-      "Female gametes all carry X",
-      "Male gametes 50% X, 50% Y",
-      "Color blindness is X-linked",
-      "Haemophilia affects males more",
-      "Sex ratio is 1:1"
-    ],
-    "mnemonics": ["XY = boY, XX = girl"]
-  }
-]
-
-IMPORTANT: Generate ${topicCount} topics total. The example shows only 2 - you must generate more!
-Each keyPoint and quickFact must be a plain STRING, not an object.`,
+        {
+          "topic": "Main Topic Name",
+          "keyPoints": [
+            "Key fact or detail about this topic 1",
+            "Key fact or detail about this topic 2",
+            "Key fact or detail about this topic 3",
+            "Key fact or detail about this topic 4",
+            "Key fact or detail about this topic 5"
+          ],
+          "quickFacts": [
+            "Quick revisable fact 1",
+            "Quick revisable fact 2",
+            "Quick revisable fact 3",
+            "Quick revisable fact 4",
+            "Quick revisable fact 5"
+          ],
+          "mnemonics": [
+            "Easy to remember mnemonic phrase"
+          ]
+        }
+      ]`,
         isArray: true
       };
 
@@ -1088,7 +1059,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
 
       return translated;
     } catch (error) {
-      console.warn(`⚠️ Translation failed for text "${text.substring(0, 30)}...":`, error);
+      console.warn(`⚠️ Translation failed for text "${text.substring(0, 30)}...": `, error);
       return text; // Fallback to original if translation fails
     }
   }
@@ -1232,7 +1203,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
       content.recallNotes ? this.translateRecallNotes(content.recallNotes, targetLang) : Promise.resolve(undefined),
     ]);
 
-    console.log(`✅ Translation complete to ${languageService.getLanguageName(targetLang)}`);
+    console.log(`✅ Translation complete to ${languageService.getLanguageName(targetLang)} `);
 
     return { summary, questions, quiz, recallNotes };
   }
