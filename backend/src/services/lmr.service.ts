@@ -399,10 +399,11 @@ CRITICAL RULES:
 5. Keep each array item concise (1-2 sentences max)`;
 
     try {
-      const response = await ollamaChatService.chatCompletion(
-        [{ role: 'user', content: prompt }],
-        'json_object'
+      const result = await ollamaChatService.generateWithMaxOutput(
+        prompt,
+        2000
       );
+      const response = result.answer;
 
       const parsed = this.extractAndParseJSON(response, false) as CompressedContext;
       console.log(`✅ Layer 1 complete: Extracted ${parsed.mainTopics?.length || 0} topics, ${parsed.keyFacts?.length || 0} facts`);
@@ -475,10 +476,11 @@ OUTPUT THE JSON NOW:`;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await ollamaChatService.chatCompletion(
-          [{ role: 'user', content: prompt }],
-          'json_object'
+        const result = await ollamaChatService.generateWithMaxOutput(
+          prompt,
+          3000
         );
+        const response = result.answer;
 
         const parsed = this.extractAndParseJSON(response, schema.isArray);
         console.log(`✅ Layer 2 complete (attempt ${attempt}): Generated ${schema.isArray ? (parsed as any[]).length + ' items' : 'object'}`);
