@@ -368,6 +368,72 @@ export class LMRApi {
       throw error;
     }
   }
+
+  /**
+   * Translate LMR content to target language using NLLB-200
+   */
+  static async translateContent(
+    content: {
+      summary?: LMRSummary;
+      questions?: LMRQuestion[];
+      quiz?: LMRQuiz[];
+      recallNotes?: LMRRecallNote[];
+    },
+    targetLanguage: string
+  ): Promise<{
+    summary?: LMRSummary;
+    questions?: LMRQuestion[];
+    quiz?: LMRQuiz[];
+    recallNotes?: LMRRecallNote[];
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/lmr/translate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content,
+          targetLanguage,
+        }),
+      });
+
+      const result = await this.handleResponse<
+        LMRGenerateResponse<{
+          summary?: LMRSummary;
+          questions?: LMRQuestion[];
+          quiz?: LMRQuiz[];
+          recallNotes?: LMRRecallNote[];
+        }>
+      >(response);
+      return result.data;
+    } catch (error) {
+      console.error("Translation error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get list of supported languages for NLLB translation
+   */
+  static getSupportedLanguages(): Array<{ code: string; name: string }> {
+    return [
+      { code: "en", name: "English" },
+      { code: "hi", name: "Hindi" },
+      { code: "mr", name: "Marathi" },
+      { code: "gu", name: "Gujarati" },
+      { code: "bn", name: "Bengali" },
+      { code: "ta", name: "Tamil" },
+      { code: "te", name: "Telugu" },
+      { code: "kn", name: "Kannada" },
+      { code: "ml", name: "Malayalam" },
+      { code: "pa", name: "Punjabi" },
+      { code: "ur", name: "Urdu" },
+      { code: "or", name: "Odia" },
+      { code: "as", name: "Assamese" },
+      { code: "ne", name: "Nepali" },
+    ];
+  }
 }
 
 export default LMRApi;

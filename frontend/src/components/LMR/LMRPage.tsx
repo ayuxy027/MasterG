@@ -196,16 +196,89 @@ const LMRPage: React.FC = () => {
       setLoadingSummary(false);
     }
   };
+  // Translation state
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [currentDisplayLanguage, setCurrentDisplayLanguage] = useState("en");
 
+  /**
+   * Translate all generated content to the selected language using NLLB
+   */
+  const handleTranslate = async () => {
+    if (!fileId || selectedLanguage === currentDisplayLanguage) return;
+
+    // Check if we have any content to translate
+    const hasAnyContent = summary || questions.length > 0 || quiz.length > 0 || recallNotes.length > 0;
+    if (!hasAnyContent) {
+      setError("Generate content first before translating");
+      return;
+    }
+
+    try {
+      setIsTranslating(true);
+      setError("");
+
+      // If switching to English, regenerate content in English (original)
+      if (selectedLanguage === "en") {
+        // Reload content in English
+        setCurrentDisplayLanguage("en");
+        setSummary(null);
+        setQuestions([]);
+        setQuiz([]);
+        setRecallNotes([]);
+        // Load summary again
+        setLoadingSummary(true);
+        const summaryData = await LMRApi.generateSummary(fileId, "en", selectedTone);
+        setSummary(summaryData);
+        setLoadingSummary(false);
+        setCurrentDisplayLanguage("en");
+      } else {
+        // Translate using NLLB
+        console.log(`🌐 Translating to ${selectedLanguage}...`);
+
+        const translated = await LMRApi.translateContent(
+          {
+            summary: summary || undefined,
+            questions: questions.length > 0 ? questions : undefined,
+            quiz: quiz.length > 0 ? quiz : undefined,
+            recallNotes: recallNotes.length > 0 ? recallNotes : undefined,
+          },
+          selectedLanguage
+        );
+
+        // Update all content with translations
+        if (translated.summary) setSummary(translated.summary);
+        if (translated.questions) setQuestions(translated.questions);
+        if (translated.quiz) setQuiz(translated.quiz);
+        if (translated.recallNotes) setRecallNotes(translated.recallNotes);
+
+        setCurrentDisplayLanguage(selectedLanguage);
+      }
+
+      console.log(`✅ Content now displayed in ${selectedLanguage}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Translation failed");
+      console.error("Translation error:", err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // Expanded language list with Indian languages (NLLB supported)
   const languages = [
     { value: "en", label: "English" },
-    { value: "hi", label: "हिंदी" },
-    { value: "ta", label: "தமிழ்" },
-    { value: "te", label: "తెలుగు" },
-    { value: "bn", label: "বাংলা" },
-    { value: "mr", label: "मराठी" },
-    { value: "gu", label: "ગુજરાતી" },
-    { value: "kn", label: "ಕನ್ನಡ" },
+    { value: "hi", label: "हिंदी (Hindi)" },
+    { value: "mr", label: "मराठी (Marathi)" },
+    { value: "gu", label: "ગુજરાતી (Gujarati)" },
+    { value: "bn", label: "বাংলা (Bengali)" },
+    { value: "ta", label: "தமிழ் (Tamil)" },
+    { value: "te", label: "తెలుగు (Telugu)" },
+    { value: "kn", label: "ಕನ್ನಡ (Kannada)" },
+    { value: "ml", label: "മലയാളം (Malayalam)" },
+    { value: "pa", label: "ਪੰਜਾਬੀ (Punjabi)" },
+    { value: "ur", label: "اردو (Urdu)" },
+    { value: "or", label: "ଓଡ଼ିଆ (Odia)" },
+    { value: "as", label: "অসমীয়া (Assamese)" },
+    { value: "ne", label: "नेपाली (Nepali)" },
   ];
 
   const tones = [
@@ -402,15 +475,13 @@ const LMRPage: React.FC = () => {
                   </h2>
                 </div>
                 <div
-                  className={`border-2 border-dashed rounded-xl p-5 sm:p-6 text-center transition-all ${
-                    uploadedFile
-                      ? "border-orange-400 bg-orange-50"
-                      : "border-orange-200 hover:border-orange-400 hover:bg-orange-50"
-                  } ${
-                    hasContent
+                  className={`border-2 border-dashed rounded-xl p-5 sm:p-6 text-center transition-all ${uploadedFile
+                    ? "border-orange-400 bg-orange-50"
+                    : "border-orange-200 hover:border-orange-400 hover:bg-orange-50"
+                    } ${hasContent
                       ? "opacity-50 cursor-not-allowed"
                       : "cursor-pointer"
-                  }`}
+                    }`}
                   onClick={() =>
                     !hasContent &&
                     document.getElementById("file-upload")?.click()
@@ -499,13 +570,12 @@ const LMRPage: React.FC = () => {
                       d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
                     ></path>
                   </svg>
-                  Language
+                  Language {hasContent && <span className="text-xs text-orange-500">(Translate)</span>}
                 </label>
                 <select
                   value={selectedLanguage}
                   onChange={(e) => setSelectedLanguage(e.target.value)}
-                  disabled={hasContent}
-                  className="w-full px-3 py-2.5 bg-white border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 bg-white border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-700 transition-all"
                 >
                   {languages.map((lang) => (
                     <option key={lang.value} value={lang.value}>
@@ -513,6 +583,36 @@ const LMRPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                {/* Translate Button - shows when content exists and language differs */}
+                {hasContent && selectedLanguage !== currentDisplayLanguage && (
+                  <button
+                    onClick={handleTranslate}
+                    disabled={isTranslating}
+                    className="mt-2 w-full px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-wait flex items-center justify-center gap-2"
+                  >
+                    {isTranslating ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Translating...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                        </svg>
+                        Translate to {languages.find(l => l.value === selectedLanguage)?.label.split(' ')[0]}
+                      </>
+                    )}
+                  </button>
+                )}
+                {currentDisplayLanguage !== "en" && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Currently showing: {languages.find(l => l.value === currentDisplayLanguage)?.label}
+                  </p>
+                )}
               </div>
 
               {/* Tone Selector */}
@@ -588,13 +688,12 @@ const LMRPage: React.FC = () => {
                           !isDisabled && handleViewChange(view.id as any)
                         }
                         disabled={isDisabled}
-                        className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 rounded-full transition-all font-semibold text-xs sm:text-sm md:text-base shadow-md transform whitespace-nowrap flex-shrink-0 ${
-                          isDisabled
-                            ? "bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed"
-                            : activeView === view.id
+                        className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 rounded-full transition-all font-semibold text-xs sm:text-sm md:text-base shadow-md transform whitespace-nowrap flex-shrink-0 ${isDisabled
+                          ? "bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed"
+                          : activeView === view.id
                             ? "bg-orange-400 text-white hover:bg-orange-500 shadow-lg hover:scale-105"
                             : "bg-white text-orange-600 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300 hover:scale-105"
-                        }`}
+                          }`}
                       >
                         {view.icon}
                         <span className="hidden sm:inline">{view.label}</span>

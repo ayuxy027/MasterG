@@ -1,7 +1,10 @@
 import { ollamaChatService } from "./ollamaChat.service";
 import { vectorDBService } from "./vectordb.service";
 import { documentService } from "./document.service";
+import { nllbService } from "./nllb.service";
+import { languageService, SupportedLanguageCode } from "./language.service";
 import { LanguageCode, SUPPORTED_LANGUAGES } from "../config/constants";
+import { env } from "../config/env";
 
 // Enhanced key topic with description for quick recall
 export interface KeyTopic {
@@ -1054,6 +1057,184 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
         } `
       );
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NLLB TRANSLATION METHODS
+  // Translate generated LMR content to any supported Indian language
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Helper: Translate a single text string using NLLB
+   */
+  private async translateText(
+    text: string,
+    targetLang: SupportedLanguageCode
+  ): Promise<string> {
+    if (!text || text.trim().length === 0) return text;
+    if (targetLang === 'en') return text; // No translation needed for English
+
+    try {
+      const nllbTargetCode = languageService.toNLLBCode(targetLang);
+      // Disable caching for LMR to ensure unique translations
+      const translated = await nllbService.translate(text, {
+        srcLang: 'eng_Latn',
+        tgtLang: nllbTargetCode,
+        useCache: false, // Disable caching to prevent collisions
+      });
+
+      // Debug log - show first 50 chars of input/output
+      console.log(`📝 Translated: "${text.substring(0, 40)}..." -> "${translated.substring(0, 40)}..."`);
+
+      return translated;
+    } catch (error) {
+      console.warn(`⚠️ Translation failed for text "${text.substring(0, 30)}...":`, error);
+      return text; // Fallback to original if translation fails
+    }
+  }
+
+  /**
+   * Translate LMR Summary to target language
+   */
+  async translateSummary(
+    summary: LMRSummary,
+    targetLang: SupportedLanguageCode
+  ): Promise<LMRSummary> {
+    if (targetLang === 'en') return summary;
+
+    console.log(`🌐 Translating summary to ${languageService.getLanguageName(targetLang)}...`);
+
+    const [
+      translatedIntro,
+      translatedConclusion,
+      translatedSummary,
+      translatedPoints,
+      translatedTopics,
+      translatedConcepts,
+    ] = await Promise.all([
+      this.translateText(summary.introduction, targetLang),
+      this.translateText(summary.conclusion, targetLang),
+      summary.summary ? this.translateText(summary.summary, targetLang) : Promise.resolve(undefined),
+      Promise.all(summary.summaryPoints.map(p => this.translateText(p, targetLang))),
+      Promise.all(summary.keyTopics.map(async t => ({
+        name: await this.translateText(t.name, targetLang),
+        description: await this.translateText(t.description, targetLang),
+      }))),
+      Promise.all(summary.importantConcepts.map(async c => ({
+        name: await this.translateText(c.name, targetLang),
+        points: await Promise.all(c.points.map(p => this.translateText(p, targetLang))),
+      }))),
+    ]);
+
+    return {
+      ...summary,
+      introduction: translatedIntro,
+      conclusion: translatedConclusion,
+      summary: translatedSummary,
+      summaryPoints: translatedPoints,
+      keyTopics: translatedTopics,
+      importantConcepts: translatedConcepts,
+      language: languageService.getLanguageName(targetLang),
+    };
+  }
+
+  /**
+   * Translate LMR Questions to target language
+   */
+  async translateQuestions(
+    questions: LMRQuestion[],
+    targetLang: SupportedLanguageCode
+  ): Promise<LMRQuestion[]> {
+    if (targetLang === 'en') return questions;
+
+    console.log(`🌐 Translating ${questions.length} questions to ${languageService.getLanguageName(targetLang)}...`);
+
+    return Promise.all(questions.map(async q => ({
+      ...q,
+      question: await this.translateText(q.question, targetLang),
+      answer: await this.translateText(q.answer, targetLang),
+      subject: await this.translateText(q.subject, targetLang),
+    })));
+  }
+
+  /**
+   * Translate LMR Quiz to target language
+   */
+  async translateQuiz(
+    quiz: LMRQuiz[],
+    targetLang: SupportedLanguageCode
+  ): Promise<LMRQuiz[]> {
+    if (targetLang === 'en') return quiz;
+
+    console.log(`🌐 Translating ${quiz.length} quiz questions to ${languageService.getLanguageName(targetLang)}...`);
+
+    return Promise.all(quiz.map(async q => ({
+      ...q,
+      question: await this.translateText(q.question, targetLang),
+      options: await Promise.all(q.options.map(o => this.translateText(o, targetLang))),
+      explanation: await this.translateText(q.explanation, targetLang),
+      subject: await this.translateText(q.subject, targetLang),
+    })));
+  }
+
+  /**
+   * Translate LMR Recall Notes to target language
+   */
+  async translateRecallNotes(
+    notes: LMRRecallNote[],
+    targetLang: SupportedLanguageCode
+  ): Promise<LMRRecallNote[]> {
+    if (targetLang === 'en') return notes;
+
+    console.log(`🌐 Translating ${notes.length} recall note topics to ${languageService.getLanguageName(targetLang)}...`);
+
+    return Promise.all(notes.map(async n => ({
+      topic: await this.translateText(n.topic, targetLang),
+      keyPoints: await Promise.all(n.keyPoints.map(p => this.translateText(p, targetLang))),
+      quickFacts: await Promise.all(n.quickFacts.map(f => this.translateText(f, targetLang))),
+      mnemonics: n.mnemonics
+        ? await Promise.all(n.mnemonics.map(m => this.translateText(m, targetLang)))
+        : undefined,
+    })));
+  }
+
+  /**
+   * Main translation method - translates all LMR content to target language
+   */
+  async translateContent(
+    content: {
+      summary?: LMRSummary;
+      questions?: LMRQuestion[];
+      quiz?: LMRQuiz[];
+      recallNotes?: LMRRecallNote[];
+    },
+    targetLang: SupportedLanguageCode
+  ): Promise<{
+    summary?: LMRSummary;
+    questions?: LMRQuestion[];
+    quiz?: LMRQuiz[];
+    recallNotes?: LMRRecallNote[];
+  }> {
+    if (!env.NLLB_ENABLED) {
+      throw new Error('NLLB translation is not enabled. Set NLLB_ENABLED=true in environment.');
+    }
+
+    if (targetLang === 'en') {
+      return content; // No translation needed
+    }
+
+    console.log(`🌐 Translating all LMR content to ${languageService.getLanguageName(targetLang)}...`);
+
+    const [summary, questions, quiz, recallNotes] = await Promise.all([
+      content.summary ? this.translateSummary(content.summary, targetLang) : Promise.resolve(undefined),
+      content.questions ? this.translateQuestions(content.questions, targetLang) : Promise.resolve(undefined),
+      content.quiz ? this.translateQuiz(content.quiz, targetLang) : Promise.resolve(undefined),
+      content.recallNotes ? this.translateRecallNotes(content.recallNotes, targetLang) : Promise.resolve(undefined),
+    ]);
+
+    console.log(`✅ Translation complete to ${languageService.getLanguageName(targetLang)}`);
+
+    return { summary, questions, quiz, recallNotes };
   }
 }
 

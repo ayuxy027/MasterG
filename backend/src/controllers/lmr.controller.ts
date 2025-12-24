@@ -4,6 +4,7 @@ import { pdfGeneratorService } from "../services/pdfGenerator.service";
 import { LanguageCode } from "../config/constants";
 import { uploadController } from "./upload.controller";
 import { LMRHistoryModel } from "../models/lmr.model";
+import { SupportedLanguageCode } from "../services/language.service";
 
 export class LMRController {
   /**
@@ -425,6 +426,59 @@ export class LMRController {
         success: false,
         error:
           error instanceof Error ? error.message : "Failed to delete history",
+      });
+    }
+  }
+
+  /**
+   * Translate LMR content to target language using NLLB-200
+   */
+  async translateContent(req: Request, res: Response): Promise<void> {
+    try {
+      const { content, targetLanguage } = req.body;
+
+      if (!content) {
+        res.status(400).json({
+          success: false,
+          error: "content is required",
+        });
+        return;
+      }
+
+      if (!targetLanguage) {
+        res.status(400).json({
+          success: false,
+          error: "targetLanguage is required",
+        });
+        return;
+      }
+
+      // English doesn't need translation
+      if (targetLanguage === 'en' || targetLanguage === 'english') {
+        res.status(200).json({
+          success: true,
+          data: content,
+        });
+        return;
+      }
+
+      console.log(`🌐 Translating LMR content to ${targetLanguage}...`);
+
+      const translated = await lmrService.translateContent(
+        content,
+        targetLanguage as SupportedLanguageCode
+      );
+
+      res.status(200).json({
+        success: true,
+        data: translated,
+      });
+    } catch (error) {
+      console.error("Translation error:", error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to translate content",
       });
     }
   }
