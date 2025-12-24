@@ -54,36 +54,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     ...style,
   };
 
-  // Add custom styles for KaTeX to fix spacing
-  const katexStyleFix = `
-      .katex-display {
-        margin: 0 !important;
-        padding: 0 !important;
-        margin-bottom: 0 !important;
-      }
-      .katex-display > .katex {
-        white-space: normal !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      /* Remove extra spacing from paragraphs containing only math */
-      p:has(.katex-display) {
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-      }
-      /* Target the katex HTML elements directly */
-      .katex-html {
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      /* Remove any spacing from math blocks in markdown */
-      .markdown-content .katex-display {
-        display: block !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-    `;
+  // No inline styles needed - global CSS handles KaTeX
+  const katexStyleFix = ``;
 
   // Custom components to maintain styling consistency
   const components: Components = {

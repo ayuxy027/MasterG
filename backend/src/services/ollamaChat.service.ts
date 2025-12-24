@@ -72,23 +72,47 @@ export class OllamaChatService {
       .map((m) => `${m.role}: ${m.content.substring(0, 100)}`)
       .join("\n");
 
-    const prompt = `Classify this query strictly: "${query}"
+    const prompt = `You are a query classifier for an educational AI assistant.
 
-Documents available: ${hasDocuments ? "YES" : "NO"}
-${recentContext ? `Recent chat:\n${recentContext}\n` : ""}
-Rules:
-- GREETING: greetings, thanks, bye (needs 30 tokens)
-- SIMPLE: about me, help, gibberish, random text (needs 50-100 tokens)
-- RAG: ONLY real educational questions
-  - Simple question → 1000 tokens
-  - Medium complexity → 3000 tokens
-  - Complex/detailed → 8000 tokens
-  - Very complex → 15000 tokens
+TASK: Classify this user query and determine appropriate response length.
 
-IMPORTANT: Reject gibberish, random letters, non-educational content as SIMPLE.
+USER QUERY: "${query}"
 
-JSON only:
-{"type": "GREETING|SIMPLE|RAG", "reason": "...", "outputTokens": number}`;
+CONTEXT:
+- Documents available: ${hasDocuments ? "YES" : "NO"}
+${recentContext ? `- Recent conversation:\n${recentContext}\n` : ""}
+
+CLASSIFICATION RULES:
+
+1. GREETING - Simple social interactions (30-50 tokens needed)
+   - Examples: "hi", "hello", "thanks", "bye", "thank you"
+   - Response: Brief acknowledgment
+
+2. SIMPLE - Non-document queries or invalid content (50-150 tokens needed)
+   - Examples: "help me", "how to use", "what can you do"
+   - Invalid queries: gibberish, random characters, non-educational
+   - Response: Brief help message or rejection
+
+3. RAG - Educational questions requiring document knowledge (1000-15000 tokens)
+   - ALWAYS classify as RAG if:
+     * Query asks to explain/describe/analyze educational concepts
+     * Query contains subject matter (math, science, history, etc.)
+     * Query requests detailed information or examples
+     * Query is about learning/understanding a topic
+   - Token allocation based on complexity:
+     * Simple definition/concept: 1000-2000 tokens
+     * Moderate explanation with examples: 3000-5000 tokens  
+     * Detailed analysis/multiple concepts: 8000-12000 tokens
+     * Comprehensive deep-dive: 15000+ tokens
+
+IMPORTANT:
+- Educational queries should ALWAYS be RAG type, never SIMPLE
+- If query mentions "explain", "understand", "learn", "study" → RAG
+- If query contains academic/educational content → RAG
+- Only mark as SIMPLE if truly non-educational or invalid
+
+OUTPUT FORMAT (JSON only, no other text):
+{"type": "GREETING|SIMPLE|RAG", "reason": "brief explanation", "outputTokens": number}`;
 
     try {
       const response = await axios.post(
@@ -166,16 +190,29 @@ JSON only:
         trimmed.startsWith(g + " ") ||
         trimmed.startsWith(g + "!")
       ) {
-        return { type: "GREETING", reason: "Fallback: greeting" };
+        return {
+          type: "GREETING",
+          reason: "Fallback: greeting",
+          estimatedOutputTokens: 30,
+        };
       }
     }
 
     const simplePatterns = [/^who are you/i, /^what can you do/i, /^help$/i];
     if (simplePatterns.some((p) => p.test(trimmed))) {
-      return { type: "SIMPLE", reason: "Fallback: simple" };
+      return {
+        type: "SIMPLE",
+        reason: "Fallback: simple",
+        estimatedOutputTokens: 100,
+      };
     }
 
-    return { type: "RAG", reason: "Fallback: RAG" };
+    // Default to RAG for any educational-sounding query
+    return {
+      type: "RAG",
+      reason: "Fallback: Treat as educational query",
+      estimatedOutputTokens: this.estimateOutputTokens(queryTokens, "RAG"),
+    };
   }
 
   async generateEducationalAnswer(
@@ -295,16 +332,45 @@ Respond in ${languageName} briefly.`;
   ): Promise<string> {
     const trimmed = query.trim().toLowerCase();
 
-    // Handle gibberish/invalid queries
+    // Only reject truly invalid queries (not educational ones)
     if (this.isGibberish(trimmed)) {
-      return "I can only help with educational questions. Please ask about a specific topic or subject you'd like to learn about.";
+      return "I'm here to help with educational questions. Please ask about a specific topic or subject you'd like to learn about.";
+    }
+
+    // Check if it's an educational query that was misclassified
+    const educationalIndicators = [
+      "explain",
+      "what",
+      "how",
+      "why",
+      "when",
+      "where",
+      "define",
+      "describe",
+      "analyze",
+      "solve",
+      "calculate",
+      "understand",
+      "learn",
+      "study",
+      "concept",
+      "theory",
+      "formula",
+      "equation",
+      "process",
+      "principle",
+    ];
+
+    if (educationalIndicators.some((word) => trimmed.includes(word))) {
+      return "That's a great educational question! However, I need access to relevant documents to provide a detailed answer. Please make sure you've uploaded study materials related to this topic.";
     }
 
     const quickResponses: Record<string, string> = {
       hi: "Hello! Upload documents and ask me questions!",
       hello: "Hi! I'm ready to help with your documents.",
       thanks: "You're welcome!",
-      bye: "Goodbye!",
+      "thank you": "Happy to help!",
+      bye: "Goodbye! Come back anytime you need help with your studies.",
     };
 
     if (quickResponses[trimmed]) {
@@ -352,13 +418,17 @@ Response in ${languageName}:`;
   ): Promise<{ answer: string; thinking?: string }> {
     const promptTokens = countTokens(prompt);
 
-    const numPredict = Math.min(
-      maxOutputTokens,
-      RAG_CONSTANTS.LLM_CTX - promptTokens - RAG_CONSTANTS.SAFETY_MARGIN
+    const calculatedMaxTokens =
+      RAG_CONSTANTS.LLM_CTX - promptTokens - RAG_CONSTANTS.SAFETY_MARGIN;
+
+    // Ensure num_predict is always positive and at least 50 tokens
+    const numPredict = Math.max(
+      50,
+      Math.min(maxOutputTokens, calculatedMaxTokens)
     );
 
     console.log(
-      `🚀 Ollama Request: num_predict=${numPredict}, prompt_tokens=${promptTokens}, max_requested=${maxOutputTokens}`
+      `🚀 Ollama Request: num_predict=${numPredict}, prompt_tokens=${promptTokens}, max_requested=${maxOutputTokens}, calculated_max=${calculatedMaxTokens}`
     );
 
     try {
@@ -377,11 +447,33 @@ Response in ${languageName}:`;
         { timeout: 180000 }
       );
 
-      if (!response.data.response) {
-        throw new Error("No response from Ollama");
+      if (!response.data) {
+        console.error("❌ Ollama returned no data", {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        throw new Error("No data from Ollama");
       }
 
-      const fullResponse = response.data.response.trim();
+      // DeepSeek R1 may return content in 'thinking' field instead of 'response'
+      // when the reasoning takes up all the tokens
+      const responseText = response.data.response?.trim() || "";
+      const thinkingText = response.data.thinking?.trim() || "";
+
+      if (!responseText && !thinkingText) {
+        console.error(
+          "❌ Ollama response missing both 'response' and 'thinking' fields",
+          {
+            data: response.data,
+          }
+        );
+        throw new Error(
+          "No content from Ollama - both response and thinking fields are empty"
+        );
+      }
+
+      // If response is empty but we have thinking, use the thinking content
+      const fullResponse = responseText || thinkingText;
       const { answer, thinking } = this.parseDeepSeekResponse(fullResponse);
 
       console.log(
@@ -390,6 +482,13 @@ Response in ${languageName}:`;
 
       return { answer, thinking };
     } catch (error: any) {
+      console.error("❌ Ollama generateWithMaxOutput error:", {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+
       if (error.code === "ECONNREFUSED") {
         throw new Error("Ollama is not running. Please start Ollama service.");
       }
@@ -457,31 +556,82 @@ Keywords:`;
   private isGibberish(query: string): boolean {
     const trimmed = query.trim();
 
-    // Too short
+    // Too short (less than 2 chars)
     if (trimmed.length < 2) return true;
 
     // Only repeated characters (e.g., "aaaa", "!!!!")
     if (/^(.)\1+$/.test(trimmed)) return true;
 
-    // Random keyboard mashing (high consonant clusters)
-    const consonantClusters = trimmed.match(/[bcdfghjklmnpqrstvwxyz]{4,}/gi);
-    if (consonantClusters && consonantClusters.length > 0) return true;
+    // Only symbols or numbers
+    if (/^[^a-zA-Z]+$/.test(trimmed)) return true;
 
-    // Very low vowel ratio (< 15%)
-    const vowels = trimmed.match(/[aeiou]/gi);
-    const vowelRatio = vowels ? vowels.length / trimmed.length : 0;
-    if (trimmed.length > 4 && vowelRatio < 0.15) return true;
+    // Random keyboard mashing - but be more lenient
+    // Only flag if there are VERY long consonant clusters (6+)
+    const consonantClusters = trimmed.match(/[bcdfghjklmnpqrstvwxyz]{6,}/gi);
+    if (consonantClusters && consonantClusters.length > 2) return true;
 
-    // Check for common gibberish patterns
+    // Very low vowel ratio - only for short strings
+    // Long queries (like educational ones) can have technical terms with low vowel ratio
+    if (trimmed.length <= 10) {
+      const vowels = trimmed.match(/[aeiou]/gi);
+      const vowelRatio = vowels ? vowels.length / trimmed.length : 0;
+      if (vowelRatio < 0.1) return true;
+    }
+
+    // Check for obvious keyboard mashing (same few keys repeated)
     const gibberishPatterns = [
-      /^[a-z]{1,3}[a-z]{1,3}$/i, // asdf, fdsa, afdaf, etc
-      /^[qwerty]+$/i, // keyboard row
-      /^[asdfgh]+$/i, // keyboard row
-      /^[zxcvbn]+$/i, // keyboard row
+      /^[qwerty]{5,}$/i, // keyboard row
+      /^[asdfgh]{5,}$/i, // keyboard row
+      /^[zxcvbn]{5,}$/i, // keyboard row
+      /^[a-z]{2,3}\1+$/i, // repeated pattern like "asdasdasd"
     ];
 
     if (gibberishPatterns.some((pattern) => pattern.test(trimmed))) {
       return true;
+    }
+
+    // If query contains common educational words, it's definitely not gibberish
+    const educationalKeywords = [
+      "explain",
+      "what",
+      "how",
+      "why",
+      "when",
+      "where",
+      "who",
+      "define",
+      "describe",
+      "analyze",
+      "compare",
+      "calculate",
+      "solve",
+      "understand",
+      "learn",
+      "study",
+      "teach",
+      "tell",
+      "show",
+      "demonstrate",
+      "elaborate",
+      "detail",
+      "discuss",
+    ];
+
+    const lowerQuery = trimmed.toLowerCase();
+    if (educationalKeywords.some((keyword) => lowerQuery.includes(keyword))) {
+      return false;
+    }
+
+    // If it has proper sentence structure (words separated by spaces), likely valid
+    const words = trimmed.split(/\s+/);
+    if (words.length >= 3) {
+      // Check if at least 50% of words have reasonable length
+      const reasonableWords = words.filter(
+        (w) => w.length >= 2 && w.length <= 20
+      );
+      if (reasonableWords.length >= words.length * 0.5) {
+        return false;
+      }
     }
 
     return false;

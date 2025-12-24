@@ -16,7 +16,9 @@ export class DecisionEngineService {
     const queryForAnswer = originalQuery || retrievalQuery;
 
     try {
-      const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(retrievalQuery);
+      const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(
+        retrievalQuery
+      );
 
       const searchResults = await vectorDBService.queryChunks(
         queryEmbedding,
@@ -26,7 +28,8 @@ export class DecisionEngineService {
 
       if (!searchResults.documents || searchResults.documents.length === 0) {
         return {
-          answer: "I couldn't find relevant information in your documents. Please upload more relevant files.",
+          answer:
+            "I couldn't find relevant information in your documents. Please upload more relevant files.",
           sources: [],
           metadata: {
             chunksFound: 0,
@@ -46,23 +49,41 @@ export class DecisionEngineService {
 
       if (rerankedChunks.length === 0) {
         return {
-          answer: "The retrieved content doesn't seem relevant to your question. Try rephrasing or ask about something else.",
-          sources: [],
+          answer:
+            "I couldn't find relevant information in your documents to answer that question. Try asking about specific topics covered in the uploaded materials.",
+          sources: [], // Don't send irrelevant chunks to frontend
           metadata: {
             chunksFound: 0,
             duration: Date.now() - startTime,
             topK: RAG_CONSTANTS.RETRIEVE_K,
+            relevanceCheck: "No chunks met minimum relevance threshold",
           },
         };
       }
 
       const context = this.buildContext(rerankedChunks);
 
-      const sources = rerankedChunks.map((chunk) => ({
-        pdfName: chunk.metadata.fileName || "Document",
-        pageNo: chunk.metadata.page || 1,
-        snippet: chunk.content.substring(0, 150) + "...",
-      }));
+      // Create sources with deduplication based on pdfName + pageNo + snippet
+      const sourcesMap = new Map<
+        string,
+        { pdfName: string; pageNo: number; snippet: string }
+      >();
+
+      rerankedChunks.forEach((chunk) => {
+        const pdfName = chunk.metadata.fileName || "Document";
+        const pageNo = chunk.metadata.page || 1;
+        const snippet = chunk.content.substring(0, 150) + "...";
+
+        // Create unique key from pdfName + pageNo + first 50 chars of snippet
+        const uniqueKey = `${pdfName}|${pageNo}|${snippet.substring(0, 50)}`;
+
+        // Only add if not already present
+        if (!sourcesMap.has(uniqueKey)) {
+          sourcesMap.set(uniqueKey, { pdfName, pageNo, snippet });
+        }
+      });
+
+      const sources = Array.from(sourcesMap.values());
 
       const { ollamaChatService } = await import("./ollamaChat.service");
 
@@ -89,12 +110,16 @@ export class DecisionEngineService {
     }
   }
 
-  private buildContext(chunks: Array<{ content: string; metadata: any }>): string {
+  private buildContext(
+    chunks: Array<{ content: string; metadata: any }>
+  ): string {
     return chunks
       .map((chunk, idx) => {
         const fileName = chunk.metadata.fileName || "Document";
         const pageNo = chunk.metadata.page || 1;
-        return `[Source ${idx + 1}: ${fileName}, Page ${pageNo}]\n${chunk.content}`;
+        return `[Source ${idx + 1}: ${fileName}, Page ${pageNo}]\n${
+          chunk.content
+        }`;
       })
       .join("\n\n---\n\n");
   }

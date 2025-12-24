@@ -416,7 +416,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         }`}
                       >
                         {/* Message Content */}
-                        <div className="prose prose-sm max-w-none">
+                        <div className="max-w-none">
                           {message.role === "assistant" ? (
                             <MarkdownRenderer content={message.content} />
                           ) : (
