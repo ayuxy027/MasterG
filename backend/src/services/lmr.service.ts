@@ -20,9 +20,9 @@ export interface ImportantConcept {
 
 export interface LMRSummary {
   // Structured summary format for last-minute revision
-  introduction: string;        // Short intro paragraph (2-3 sentences)
-  summaryPoints: string[];     // Bullet points with descriptions
-  conclusion: string;          // Conclusion paragraph (1-2 sentences)
+  introduction: string; // Short intro paragraph (2-3 sentences)
+  summaryPoints: string[]; // Bullet points with descriptions
+  conclusion: string; // Conclusion paragraph (1-2 sentences)
   // Legacy field for backward compatibility
   summary?: string;
   // Enhanced fields with descriptions
@@ -60,7 +60,7 @@ export interface LMRRecallNote {
 /**
  * Task types for the two-layer AI approach
  */
-type LMRTaskType = 'summary' | 'questions' | 'quiz' | 'recallNotes';
+type LMRTaskType = "summary" | "questions" | "quiz" | "recallNotes";
 
 /**
  * Compressed context from Layer 1
@@ -82,12 +82,12 @@ interface DocumentMetrics {
   pageCount: number;
   paragraphCount: number;
   estimatedTopics: number;
-  contentDensity: 'light' | 'medium' | 'dense';
+  contentDensity: "light" | "medium" | "dense";
   // Dynamic quantities based on document analysis
-  recommendedConceptCount: number;      // 5-15 based on content
-  recommendedRecallTopicCount: number;  // 6-15 based on content
-  recommendedQuestionCount: number;     // 10-15 based on content
-  recommendedQuizCount: number;         // 10-15 based on content
+  recommendedConceptCount: number; // 5-15 based on content
+  recommendedRecallTopicCount: number; // 6-15 based on content
+  recommendedQuestionCount: number; // 10-15 based on content
+  recommendedQuizCount: number; // 10-15 based on content
 }
 
 export class LMRService {
@@ -99,26 +99,26 @@ export class LMRService {
     let cleaned = jsonString;
 
     // Remove any markdown code block markers
-    cleaned = cleaned.replace(/```json\s*/g, '');
-    cleaned = cleaned.replace(/```\s*/g, '');
+    cleaned = cleaned.replace(/```json\s*/g, "");
+    cleaned = cleaned.replace(/```\s*/g, "");
 
     // Replace Python-style None with null (multiple patterns)
-    cleaned = cleaned.replace(/:\s*None\s*([,\}\]])/g, ': null$1');
-    cleaned = cleaned.replace(/\[\s*None\s*([,\]])/g, '[null$1');
-    cleaned = cleaned.replace(/,\s*None\s*([,\}\]])/g, ', null$1');
+    cleaned = cleaned.replace(/:\s*None\s*([,\}\]])/g, ": null$1");
+    cleaned = cleaned.replace(/\[\s*None\s*([,\]])/g, "[null$1");
+    cleaned = cleaned.replace(/,\s*None\s*([,\}\]])/g, ", null$1");
 
     // Replace Python-style True/False with lowercase
-    cleaned = cleaned.replace(/:\s*True\s*([,\}\]])/g, ': true$1');
-    cleaned = cleaned.replace(/:\s*False\s*([,\}\]])/g, ': false$1');
-    cleaned = cleaned.replace(/,\s*True\s*([,\}\]])/g, ', true$1');
-    cleaned = cleaned.replace(/,\s*False\s*([,\}\]])/g, ', false$1');
+    cleaned = cleaned.replace(/:\s*True\s*([,\}\]])/g, ": true$1");
+    cleaned = cleaned.replace(/:\s*False\s*([,\}\]])/g, ": false$1");
+    cleaned = cleaned.replace(/,\s*True\s*([,\}\]])/g, ", true$1");
+    cleaned = cleaned.replace(/,\s*False\s*([,\}\]])/g, ", false$1");
 
     // Remove trailing commas before closing brackets/braces
-    cleaned = cleaned.replace(/,(\s*[\}\]])/g, '$1');
+    cleaned = cleaned.replace(/,(\s*[\}\]])/g, "$1");
 
     // Fix missing commas between array elements (common DeepSeek issue)
-    cleaned = cleaned.replace(/\}(\s*)\{/g, '},$1{');
-    cleaned = cleaned.replace(/\](\s*)\[/g, '],$1[');
+    cleaned = cleaned.replace(/\}(\s*)\{/g, "},$1{");
+    cleaned = cleaned.replace(/\](\s*)\[/g, "],$1[");
 
     // Fix missing commas between string values
     cleaned = cleaned.replace(/"(\s+)"/g, '",$1"');
@@ -133,19 +133,21 @@ export class LMRService {
   private extractAndParseJSON(response: string, isArray: boolean = false): any {
     try {
       // Remove DeepSeek thinking tags if present
-      let cleanedResponse = response.replace(/<think>[\s\S]*?<\/think>/g, '');
+      let cleanedResponse = response.replace(/<think>[\s\S]*?<\/think>/g, "");
 
       // Remove any text before the JSON starts
-      const jsonStartChar = isArray ? '[' : '{';
+      const jsonStartChar = isArray ? "[" : "{";
       const jsonStartIndex = cleanedResponse.indexOf(jsonStartChar);
       if (jsonStartIndex === -1) {
-        throw new Error(`No JSON ${isArray ? 'array' : 'object'} found in response`);
+        throw new Error(
+          `No JSON ${isArray ? "array" : "object"} found in response`
+        );
       }
       cleanedResponse = cleanedResponse.substring(jsonStartIndex);
 
       // Find the proper end of JSON by counting brackets
-      const openChar = isArray ? '[' : '{';
-      const closeChar = isArray ? ']' : '}';
+      const openChar = isArray ? "[" : "{";
+      const closeChar = isArray ? "]" : "}";
       let depth = 0;
       let inString = false;
       let escapeNext = false;
@@ -159,7 +161,7 @@ export class LMRService {
           continue;
         }
 
-        if (char === '\\') {
+        if (char === "\\") {
           escapeNext = true;
           continue;
         }
@@ -186,7 +188,7 @@ export class LMRService {
 
       if (jsonEndIndex === -1) {
         // JSON is truncated - try to repair by closing open brackets
-        console.warn('⚠️ JSON appears truncated, attempting repair...');
+        console.warn("⚠️ JSON appears truncated, attempting repair...");
         jsonStr = cleanedResponse;
 
         // Count unclosed brackets
@@ -196,14 +198,23 @@ export class LMRService {
         escapeNext = false;
 
         for (const char of jsonStr) {
-          if (escapeNext) { escapeNext = false; continue; }
-          if (char === '\\') { escapeNext = true; continue; }
-          if (char === '"') { inString = !inString; continue; }
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          if (char === "\\") {
+            escapeNext = true;
+            continue;
+          }
+          if (char === '"') {
+            inString = !inString;
+            continue;
+          }
           if (!inString) {
-            if (char === '{') openBraces++;
-            else if (char === '}') openBraces--;
-            else if (char === '[') openBrackets++;
-            else if (char === ']') openBrackets--;
+            if (char === "{") openBraces++;
+            else if (char === "}") openBraces--;
+            else if (char === "[") openBrackets++;
+            else if (char === "]") openBrackets--;
           }
         }
 
@@ -213,15 +224,17 @@ export class LMRService {
         }
 
         // Remove any trailing incomplete values
-        jsonStr = jsonStr.replace(/,\s*$/, '');
-        jsonStr = jsonStr.replace(/:\s*$/, ': null');
+        jsonStr = jsonStr.replace(/,\s*$/, "");
+        jsonStr = jsonStr.replace(/:\s*$/, ": null");
         jsonStr = jsonStr.replace(/:\s*"[^"]*$/, ': ""');
 
         // Close unclosed brackets
-        for (let i = 0; i < openBrackets; i++) jsonStr += ']';
-        for (let i = 0; i < openBraces; i++) jsonStr += '}';
+        for (let i = 0; i < openBrackets; i++) jsonStr += "]";
+        for (let i = 0; i < openBraces; i++) jsonStr += "}";
 
-        console.log(`🔧 Repaired JSON: closed ${openBrackets} brackets, ${openBraces} braces`);
+        console.log(
+          `🔧 Repaired JSON: closed ${openBrackets} brackets, ${openBraces} braces`
+        );
       } else {
         jsonStr = cleanedResponse.substring(0, jsonEndIndex);
       }
@@ -231,14 +244,26 @@ export class LMRService {
 
       // Log for debugging if sanitization changed anything
       if (jsonStr !== sanitized) {
-        console.log("🔧 JSON sanitized - original length:", jsonStr.length, "→ sanitized:", sanitized.length);
+        console.log(
+          "🔧 JSON sanitized - original length:",
+          jsonStr.length,
+          "→ sanitized:",
+          sanitized.length
+        );
       }
 
       return JSON.parse(sanitized);
     } catch (error) {
       console.error("❌ JSON extraction/parsing failed:", error);
-      console.error("Raw response (first 1000 chars):", response.substring(0, 1000));
-      throw new Error(`Failed to parse AI response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(
+        "Raw response (first 1000 chars):",
+        response.substring(0, 1000)
+      );
+      throw new Error(
+        `Failed to parse AI response: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 
@@ -248,26 +273,34 @@ export class LMRService {
    * Analyzes document to dynamically determine content quantities
    * ═══════════════════════════════════════════════════════════════════════════
    */
-  private calculateDocumentMetrics(content: string, pageCount: number = 1): DocumentMetrics {
+  private calculateDocumentMetrics(
+    content: string,
+    pageCount: number = 1
+  ): DocumentMetrics {
     // Basic text analysis
-    const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+    const wordCount = content.split(/\s+/).filter((w) => w.length > 0).length;
     const charCount = content.length;
-    const paragraphCount = content.split(/\n\n+/).filter(p => p.trim().length > 0).length;
+    const paragraphCount = content
+      .split(/\n\n+/)
+      .filter((p) => p.trim().length > 0).length;
 
     // Estimate topics based on content structure
     const headingMatches = content.match(/^#+\s+.+$|^[A-Z][^.!?]*:$/gm) || [];
-    const estimatedTopics = Math.max(3, Math.min(12, headingMatches.length || Math.ceil(paragraphCount / 3)));
+    const estimatedTopics = Math.max(
+      3,
+      Math.min(12, headingMatches.length || Math.ceil(paragraphCount / 3))
+    );
 
     // Determine content density
-    let contentDensity: 'light' | 'medium' | 'dense';
+    let contentDensity: "light" | "medium" | "dense";
     const wordsPerPage = pageCount > 0 ? wordCount / pageCount : wordCount;
 
     if (wordsPerPage < 300 || wordCount < 500) {
-      contentDensity = 'light';
+      contentDensity = "light";
     } else if (wordsPerPage < 600 || wordCount < 2000) {
-      contentDensity = 'medium';
+      contentDensity = "medium";
     } else {
-      contentDensity = 'dense';
+      contentDensity = "dense";
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -283,21 +316,21 @@ export class LMRService {
     let recommendedRecallTopicCount: number;
 
     switch (contentDensity) {
-      case 'light':
+      case "light":
         // Smaller documents
         recommendedConceptCount = 8; // Fixed at 8
         recommendedRecallTopicCount = 10; // Min 10
         recommendedQuestionCount = 10;
         recommendedQuizCount = 10;
         break;
-      case 'medium':
+      case "medium":
         // Medium documents
         recommendedConceptCount = 8; // Fixed at 8
         recommendedRecallTopicCount = 12;
         recommendedQuestionCount = 12;
         recommendedQuizCount = 12;
         break;
-      case 'dense':
+      case "dense":
         // Large documents
         recommendedConceptCount = 8; // Fixed at 8
         recommendedRecallTopicCount = 15; // Max 15
@@ -308,12 +341,19 @@ export class LMRService {
 
     // Fine-tune based on estimated topics (only for recall topics and questions)
     if (estimatedTopics >= 8) {
-      recommendedRecallTopicCount = Math.min(15, recommendedRecallTopicCount + 3);
+      recommendedRecallTopicCount = Math.min(
+        15,
+        recommendedRecallTopicCount + 3
+      );
       recommendedQuestionCount = Math.min(15, recommendedQuestionCount + 2);
     }
 
-    console.log(`📊 Document Metrics: ${wordCount} words, ${paragraphCount} paragraphs, ~${estimatedTopics} topics, density: ${contentDensity}`);
-    console.log(`📊 Dynamic Quantities: ${recommendedConceptCount} concepts, ${recommendedRecallTopicCount} recall topics, ${recommendedQuestionCount} questions`);
+    console.log(
+      `📊 Document Metrics: ${wordCount} words, ${paragraphCount} paragraphs, ~${estimatedTopics} topics, density: ${contentDensity}`
+    );
+    console.log(
+      `📊 Dynamic Quantities: ${recommendedConceptCount} concepts, ${recommendedRecallTopicCount} recall topics, ${recommendedQuestionCount} questions`
+    );
 
     return {
       wordCount,
@@ -325,7 +365,7 @@ export class LMRService {
       recommendedConceptCount,
       recommendedRecallTopicCount,
       recommendedQuestionCount,
-      recommendedQuizCount
+      recommendedQuizCount,
     };
   }
 
@@ -355,13 +395,17 @@ export class LMRService {
 - List important concepts that students must understand
 - Note any significant examples or case studies`,
 
-      questions: `Extract information needed to generate ${additionalParams?.count || 10} Q&A pairs:
+      questions: `Extract information needed to generate ${
+        additionalParams?.count || 10
+      } Q&A pairs:
 - Identify all factual statements that can be converted to questions
 - Note specific details, definitions, and explanations
 - List concepts that require deeper understanding
 - Include any numerical data or specific facts`,
 
-      quiz: `Extract information needed to generate ${additionalParams?.count || 10} MCQ questions:
+      quiz: `Extract information needed to generate ${
+        additionalParams?.count || 10
+      } MCQ questions:
 - Identify facts that have clear correct/incorrect options
 - Note definitions with possible confusing alternatives
 - List concepts that students often misunderstand
@@ -371,13 +415,17 @@ export class LMRService {
 - Identify the key topics that need to be remembered
 - Extract bullet-point worthy facts
 - Note any formulas, dates, or specific data
-- Identify patterns that could become mnemonics`
+- Identify patterns that could become mnemonics`,
     };
 
     const prompt = `You are an expert content analyzer. Your task is to extract and compress the most relevant information from a document for educational content generation.
 
 DOCUMENT CONTENT:
-${documentContent.substring(0, 15001)}${documentContent.length > 15001 ? '\n\n[... document truncated for processing ...]' : ''}
+${documentContent.substring(0, 15001)}${
+      documentContent.length > 15001
+        ? "\n\n[... document truncated for processing ...]"
+        : ""
+    }
 
 TASK: ${taskInstructions[taskType]}
 
@@ -405,16 +453,23 @@ CRITICAL RULES:
       );
       const response = result.answer;
 
-      const parsed = this.extractAndParseJSON(response, false) as CompressedContext;
-      console.log(`✅ Layer 1 complete: Extracted ${parsed.mainTopics?.length || 0} topics, ${parsed.keyFacts?.length || 0} facts`);
+      const parsed = this.extractAndParseJSON(
+        response,
+        false
+      ) as CompressedContext;
+      console.log(
+        `✅ Layer 1 complete: Extracted ${
+          parsed.mainTopics?.length || 0
+        } topics, ${parsed.keyFacts?.length || 0} facts`
+      );
       return parsed;
     } catch (error) {
-      console.error('❌ Layer 1 (Context Compression) failed:', error);
+      console.error("❌ Layer 1 (Context Compression) failed:", error);
       // Return a minimal fallback context
       return {
-        mainTopics: ['General Content'],
-        keyFacts: ['Document content available for analysis'],
-        importantConcepts: ['Main concepts from the document']
+        mainTopics: ["General Content"],
+        keyFacts: ["Document content available for analysis"],
+        importantConcepts: ["Main concepts from the document"],
       };
     }
   }
@@ -437,23 +492,37 @@ CRITICAL RULES:
   ): Promise<T> {
     const contextSummary = `
 EXTRACTED CONTENT:
-Main Topics: ${(compressedContext.mainTopics || []).join(', ')}
+Main Topics: ${(compressedContext.mainTopics || []).join(", ")}
 
 Key Facts:
-${(compressedContext.keyFacts || []).map((f, i) => `${i + 1}. ${f}`).join('\n')}
+${(compressedContext.keyFacts || []).map((f, i) => `${i + 1}. ${f}`).join("\n")}
 
 Important Concepts:
-${(compressedContext.importantConcepts || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
+${(compressedContext.importantConcepts || [])
+  .map((c, i) => `${i + 1}. ${c}`)
+  .join("\n")}
 
-${(compressedContext.relevantExamples?.length) ? `Examples:\n${compressedContext.relevantExamples.map((e, i) => `${i + 1}. ${e}`).join('\n')}` : ''}`;
+${
+  compressedContext.relevantExamples?.length
+    ? `Examples:\n${compressedContext.relevantExamples
+        .map((e, i) => `${i + 1}. ${e}`)
+        .join("\n")}`
+    : ""
+}`;
 
-    const prompt = `You are a precise JSON generator. Generate EXACTLY ${schema.isArray ? 'a JSON array' : 'a JSON object'} based on the provided content.
+    const prompt = `You are a precise JSON generator. Generate EXACTLY ${
+      schema.isArray ? "a JSON array" : "a JSON object"
+    } based on the provided content.
 
 ${contextSummary}
 
 TASK: ${schema.description}
 
-${additionalParams?.count ? `Generate exactly ${additionalParams.count} items.` : ''}
+${
+  additionalParams?.count
+    ? `Generate exactly ${additionalParams.count} items.`
+    : ""
+}
 
 Language: ${language}
 
@@ -483,20 +552,29 @@ OUTPUT THE JSON NOW:`;
         const response = result.answer;
 
         const parsed = this.extractAndParseJSON(response, schema.isArray);
-        console.log(`✅ Layer 2 complete (attempt ${attempt}): Generated ${schema.isArray ? (parsed as any[]).length + ' items' : 'object'}`);
+        console.log(
+          `✅ Layer 2 complete (attempt ${attempt}): Generated ${
+            schema.isArray ? (parsed as any[]).length + " items" : "object"
+          }`
+        );
         return parsed as T;
       } catch (error) {
-        console.warn(`⚠️ Layer 2 attempt ${attempt}/${maxRetries} failed:`, error);
-        lastError = error instanceof Error ? error : new Error('Unknown error');
+        console.warn(
+          `⚠️ Layer 2 attempt ${attempt}/${maxRetries} failed:`,
+          error
+        );
+        lastError = error instanceof Error ? error : new Error("Unknown error");
 
         // Wait briefly before retry
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }
     }
 
-    throw new Error(`Layer 2 (JSON Generation) failed after ${maxRetries} attempts: ${lastError?.message}`);
+    throw new Error(
+      `Layer 2 (JSON Generation) failed after ${maxRetries} attempts: ${lastError?.message}`
+    );
   }
 
   /**
@@ -550,7 +628,9 @@ OUTPUT THE JSON NOW:`;
     tone: string = "professional"
   ): Promise<LMRSummary> {
     try {
-      console.log('📝 Starting Summary Generation (Two-Layer AI with Dynamic Quantities)...');
+      console.log(
+        "📝 Starting Summary Generation (Two-Layer AI with Dynamic Quantities)..."
+      );
 
       // Retrieve full document content
       const document = await this.getFullDocumentContent(fileId);
@@ -559,16 +639,19 @@ OUTPUT THE JSON NOW:`;
       // ═══════════════════════════════════════════════════════════════
       // CALCULATE DOCUMENT METRICS FOR DYNAMIC CONTENT QUANTITIES
       // ═══════════════════════════════════════════════════════════════
-      const metrics = this.calculateDocumentMetrics(document.fullContent, document.pages);
+      const metrics = this.calculateDocumentMetrics(
+        document.fullContent,
+        document.pages
+      );
       const conceptCount = metrics.recommendedConceptCount; // 6-10 based on document
 
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for summary generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'summary',
+        "summary",
         languageName
       );
 
@@ -576,27 +659,11 @@ OUTPUT THE JSON NOW:`;
       // LAYER 2: Generate structured summary JSON from compressed context
       // Enhanced prompt for BEST-OF-BEST last-minute revision content
       // ═══════════════════════════════════════════════════════════════
-      console.log(`🔄 Layer 2: Generating structured summary with ${conceptCount} important concepts...`);
+      console.log(
+        `🔄 Layer 2: Generating structured summary with ${conceptCount} important concepts...`
+      );
 
-      // Build dynamic concept examples - using REAL educational content as examples
       // 3 bullet points per concept (not 5) - more concepts, fewer bullets
-      const conceptExamples = `
-    {
-      "name": "Law of Segregation",
-      "points": [
-        "Each organism has two alleles for each trait, one from each parent",
-        "During gamete formation (meiosis), allele pairs separate - each gamete gets one allele",
-        "Example: Mendel crossed Tt x Tt and got 3:1 ratio in F2 generation"
-      ]
-    },
-    {
-      "name": "Dominant and Recessive Alleles",
-      "points": [
-        "Dominant allele (capital T) expresses even when heterozygous (Tt)",
-        "Recessive allele (lowercase t) only expresses when homozygous (tt)",
-        "Example: Brown eyes (B) dominant over blue (b); Bb person has brown eyes"
-      ]
-    }`;
 
       // Calculate dynamic key topic count (6-11)
       const keyTopicCount = Math.min(11, Math.max(6, metrics.estimatedTopics));
@@ -619,38 +686,38 @@ DO NOT use generic names like "Topic 1" or "Concept 1" - use REAL topic names!
 LANGUAGE: ${languageName} | TONE: ${tone} | NO EMOJIS`,
 
         jsonTemplate: `{
-  "introduction": "Genetics is the scientific study of heredity and variation in living organisms. Gregor Mendel, through his experiments with pea plants from 1856-1863, established the fundamental laws of inheritance. These laws explain how traits are passed from parents to offspring through discrete units called genes.",
+  "introduction": "Brief 2-3 sentence introduction paragraph about the main subject.",
   "summaryPoints": [
-    "Dominant alleles express even in heterozygous condition (Tt)",
-    "Law of Segregation: alleles separate during gamete formation",
-    "Monohybrid cross ratio is 3:1 phenotypic",
-    "Sex determination: XX = female, XY = male",
-    "Test cross identifies unknown genotype",
-    "Phenotype is observable trait, genotype is genetic makeup"
+    "Key fact or concept 1",
+    "Key fact or concept 2",
+    "Key fact or concept 3",
+    "Key fact or concept 4",
+    "Key fact or concept 5",
+    "Key fact or concept 6"
   ],
-  "conclusion": "Mendel's laws form the foundation of genetics. Remember 3:1 ratio and allele segregation.",
+  "conclusion": "Brief 1-2 sentence conclusion summarizing key takeaways.",
   "keyTopics": [
-    {"name": "Mendel's Laws", "description": "Segregation and independent assortment govern inheritance"},
-    {"name": "Dominant Alleles", "description": "Express phenotype even when heterozygous (Tt)"},
-    {"name": "Recessive Alleles", "description": "Only express when homozygous (tt)"},
-    {"name": "Monohybrid Cross", "description": "Single trait cross with 3:1 F2 ratio"},
-    {"name": "Sex Determination", "description": "XX chromosomes = female, XY = male"},
-    {"name": "Punnett Square", "description": "Grid for predicting offspring genotypes"}
+    {"name": "Topic Name 1", "description": "Brief description of topic 1"},
+    {"name": "Topic Name 2", "description": "Brief description of topic 2"},
+    {"name": "Topic Name 3", "description": "Brief description of topic 3"},
+    {"name": "Topic Name 4", "description": "Brief description of topic 4"},
+    {"name": "Topic Name 5", "description": "Brief description of topic 5"},
+    {"name": "Topic Name 6", "description": "Brief description of topic 6"}
   ],
   "importantConcepts": [
-    {"name": "Law of Segregation", "points": ["Alleles separate during meiosis", "Each gamete gets one allele", "Occurs in Anaphase I"]},
-    {"name": "Dominant vs Recessive", "points": ["Dominant masks recessive", "Capital letter = dominant", "3:1 ratio in F2"]},
-    {"name": "Sex Chromosomes", "points": ["XX = female, XY = male", "Father determines sex", "Y carries SRY gene"]},
-    {"name": "Monohybrid Cross", "points": ["Single trait cross", "F2 ratio is 3:1", "TT:Tt:tt = 1:2:1"]},
-    {"name": "Dihybrid Cross", "points": ["Two trait cross", "F2 ratio is 9:3:3:1", "Independent assortment"]},
-    {"name": "Test Cross", "points": ["Unknown x recessive", "Identifies genotype", "1:1 ratio if heterozygous"]},
-    {"name": "Punnett Square", "points": ["Grid for prediction", "Shows all combinations", "Calculate phenotype ratio"]},
-    {"name": "Alleles and Genes", "points": ["Alleles are gene variants", "Homozygous = same alleles", "Heterozygous = different"]}
+    {"name": "Concept 1", "points": ["Point 1", "Point 2", "Point 3"]},
+    {"name": "Concept 2", "points": ["Point 1", "Point 2", "Point 3"]},
+    {"name": "Concept 3", "points": ["Point 1", "Point 2", "Point 3"]},
+    {"name": "Concept 4", "points": ["Point 1", "Point 2", "Point 3"]},
+    {"name": "Concept 5", "points": ["Point 1", "Point 2", "Point 3"]},
+    {"name": "Concept 6", "points": ["Point 1", "Point 2", "Point 3"]},
+    {"name": "Concept 7", "points": ["Point 1", "Point 2", "Point 3"]},
+    {"name": "Concept 8", "points": ["Point 1", "Point 2", "Point 3"]}
   ]
 }
 
-YOU MUST generate exactly 8 importantConcepts (shown above) and ${keyTopicCount} keyTopics. Do NOT stop early!`,
-        isArray: false
+YOU MUST generate exactly 8 importantConcepts and ${keyTopicCount} keyTopics. Do NOT stop early!`,
+        isArray: false,
       };
 
       const result = await this.generateJSONFromContext<{
@@ -659,32 +726,36 @@ YOU MUST generate exactly 8 importantConcepts (shown above) and ${keyTopicCount}
         conclusion: string;
         keyTopics: { name: string; description: string }[];
         importantConcepts: { name: string; points: string[] }[];
-      }>(compressedContext, 'summary', languageName, summarySchema);
+      }>(compressedContext, "summary", languageName, summarySchema);
 
-      console.log('✅ Structured summary generation complete!');
+      console.log("✅ Structured summary generation complete!");
 
       // Build backward-compatible summary string from structured data
-      const legacySummary = `${result.introduction} \n\n${result.summaryPoints.map(p => `• ${p}`).join('\n')} \n\n${result.conclusion} `;
+      const legacySummary = `${result.introduction} \n\n${result.summaryPoints
+        .map((p) => `• ${p}`)
+        .join("\n")} \n\n${result.conclusion} `;
 
       return {
-        introduction: result.introduction || '',
+        introduction: result.introduction || "",
         summaryPoints: result.summaryPoints || [],
-        conclusion: result.conclusion || '',
+        conclusion: result.conclusion || "",
         summary: legacySummary,
         keyTopics: (result.keyTopics || []).map((t: any) => ({
-          name: typeof t === 'string' ? t : (t.name || 'Topic'),
-          description: typeof t === 'string' ? '' : (t.description || '')
+          name: typeof t === "string" ? t : t.name || "Topic",
+          description: typeof t === "string" ? "" : t.description || "",
         })),
         importantConcepts: (result.importantConcepts || []).map((c: any) => ({
-          name: typeof c === 'string' ? c : (c.name || 'Concept'),
-          points: typeof c === 'string' ? [c] : (c.points || [])
+          name: typeof c === "string" ? c : c.name || "Concept",
+          points: typeof c === "string" ? [c] : c.points || [],
         })),
         language: languageName,
       };
     } catch (error) {
-      console.error('❌ Summary generation failed:', error);
+      console.error("❌ Summary generation failed:", error);
       throw new Error(
-        `Failed to generate summary: ${error instanceof Error ? error.message : "Unknown error"} `
+        `Failed to generate summary: ${
+          error instanceof Error ? error.message : "Unknown error"
+        } `
       );
     }
   }
@@ -700,7 +771,9 @@ YOU MUST generate exactly 8 importantConcepts (shown above) and ${keyTopicCount}
     count: number = 10
   ): Promise<LMRQuestion[]> {
     try {
-      console.log('❓ Starting Q&A Generation (Two-Layer AI with Dynamic Quantities)...');
+      console.log(
+        "❓ Starting Q&A Generation (Two-Layer AI with Dynamic Quantities)..."
+      );
 
       const document = await this.getFullDocumentContent(fileId);
       const languageName = SUPPORTED_LANGUAGES[language];
@@ -708,19 +781,24 @@ YOU MUST generate exactly 8 importantConcepts (shown above) and ${keyTopicCount}
       // ═══════════════════════════════════════════════════════════════
       // CALCULATE DOCUMENT METRICS FOR DYNAMIC QUESTION COUNT
       // ═══════════════════════════════════════════════════════════════
-      const metrics = this.calculateDocumentMetrics(document.fullContent, document.pages);
+      const metrics = this.calculateDocumentMetrics(
+        document.fullContent,
+        document.pages
+      );
       const dynamicCount = metrics.recommendedQuestionCount; // 10-15 based on document
       const actualCount = Math.max(count, dynamicCount); // Use higher of provided or recommended
 
-      console.log(`📊 Dynamic question count: ${actualCount} (provided: ${count}, recommended: ${dynamicCount})`);
+      console.log(
+        `📊 Dynamic question count: ${actualCount} (provided: ${count}, recommended: ${dynamicCount})`
+      );
 
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for question generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'questions',
+        "questions",
         languageName,
         { count: actualCount }
       );
@@ -729,7 +807,9 @@ YOU MUST generate exactly 8 importantConcepts (shown above) and ${keyTopicCount}
       // LAYER 2: Generate questions JSON from compressed context
       // Enhanced prompt for BEST-OF-BEST exam preparation questions
       // ═══════════════════════════════════════════════════════════════
-      console.log(`🔄 Layer 2: Generating ${actualCount} high - quality questions...`);
+      console.log(
+        `🔄 Layer 2: Generating ${actualCount} high - quality questions...`
+      );
 
       // Calculate difficulty distribution
       const easyCount = Math.round(actualCount * 0.3);
@@ -793,18 +873,20 @@ ANSWER QUALITY STANDARDS:
       ]
 
       CRITICAL: Generate EXACTLY ${actualCount} questions covering diverse topics from the document.`,
-        isArray: true
+        isArray: true,
       };
 
       const questions = await this.generateJSONFromContext<any[]>(
         compressedContext,
-        'questions',
+        "questions",
         languageName,
         questionsSchema,
         { count: actualCount }
       );
 
-      console.log(`✅ Q & A generation complete! Generated ${questions.length} questions`);
+      console.log(
+        `✅ Q & A generation complete! Generated ${questions.length} questions`
+      );
 
       return questions.map((q: any, index: number) => ({
         id: index + 1,
@@ -815,9 +897,11 @@ ANSWER QUALITY STANDARDS:
         pageReference: q.pageReference,
       }));
     } catch (error) {
-      console.error('❌ Q&A generation failed:', error);
+      console.error("❌ Q&A generation failed:", error);
       throw new Error(
-        `Failed to generate questions: ${error instanceof Error ? error.message : "Unknown error"} `
+        `Failed to generate questions: ${
+          error instanceof Error ? error.message : "Unknown error"
+        } `
       );
     }
   }
@@ -832,7 +916,7 @@ ANSWER QUALITY STANDARDS:
     count: number = 10
   ): Promise<LMRQuiz[]> {
     try {
-      console.log('📋 Starting Quiz Generation (Two-Layer AI)...');
+      console.log("📋 Starting Quiz Generation (Two-Layer AI)...");
 
       const document = await this.getFullDocumentContent(fileId);
       const languageName = SUPPORTED_LANGUAGES[language];
@@ -840,10 +924,10 @@ ANSWER QUALITY STANDARDS:
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for quiz generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'quiz',
+        "quiz",
         languageName,
         { count }
       );
@@ -851,7 +935,7 @@ ANSWER QUALITY STANDARDS:
       // ═══════════════════════════════════════════════════════════════
       // LAYER 2: Generate quiz JSON from compressed context
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 2: Generating quiz JSON...');
+      console.log("🔄 Layer 2: Generating quiz JSON...");
       const quizSchema = {
         description: `Generate ${count} multiple - choice questions(MCQs).Each question must have exactly 4 options with one correct answer.Mix difficulty levels and include explanations.`,
         jsonTemplate: `[
@@ -872,18 +956,18 @@ ANSWER QUALITY STANDARDS:
           "subject": "Subject name"
         }
       ]`,
-        isArray: true
+        isArray: true,
       };
 
       const quizzes = await this.generateJSONFromContext<any[]>(
         compressedContext,
-        'quiz',
+        "quiz",
         languageName,
         quizSchema,
         { count }
       );
 
-      console.log('✅ Quiz generation complete!');
+      console.log("✅ Quiz generation complete!");
 
       return quizzes.map((q: any, index: number) => ({
         id: index + 1,
@@ -895,9 +979,11 @@ ANSWER QUALITY STANDARDS:
         subject: q.subject || "General",
       }));
     } catch (error) {
-      console.error('❌ Quiz generation failed:', error);
+      console.error("❌ Quiz generation failed:", error);
       throw new Error(
-        `Failed to generate quiz: ${error instanceof Error ? error.message : "Unknown error"} `
+        `Failed to generate quiz: ${
+          error instanceof Error ? error.message : "Unknown error"
+        } `
       );
     }
   }
@@ -912,7 +998,9 @@ ANSWER QUALITY STANDARDS:
     language: LanguageCode
   ): Promise<LMRRecallNote[]> {
     try {
-      console.log('🧠 Starting Recall Notes Generation (Two-Layer AI with Dynamic Topics)...');
+      console.log(
+        "🧠 Starting Recall Notes Generation (Two-Layer AI with Dynamic Topics)..."
+      );
 
       const document = await this.getFullDocumentContent(fileId);
       const languageName = SUPPORTED_LANGUAGES[language];
@@ -920,7 +1008,10 @@ ANSWER QUALITY STANDARDS:
       // ═══════════════════════════════════════════════════════════════
       // CALCULATE DOCUMENT METRICS FOR DYNAMIC TOPIC COUNT
       // ═══════════════════════════════════════════════════════════════
-      const metrics = this.calculateDocumentMetrics(document.fullContent, document.pages);
+      const metrics = this.calculateDocumentMetrics(
+        document.fullContent,
+        document.pages
+      );
       const topicCount = metrics.recommendedRecallTopicCount; // 6-15 based on document
 
       console.log(`📊 Dynamic recall topic count: ${topicCount}`);
@@ -928,10 +1019,10 @@ ANSWER QUALITY STANDARDS:
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for recall notes generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'recallNotes',
+        "recallNotes",
         languageName
       );
 
@@ -956,80 +1047,95 @@ RIGHT: "text"
 NO EMOJIS | Generate ${topicCount} topics`,
         jsonTemplate: `[
   {
-    "topic": "Mendel's Laws",
+    "topic": "Main Topic Name 1",
     "keyPoints": [
-      "Law of Dominance: dominant allele masks recessive",
-      "Law of Segregation: alleles separate during gamete formation",
-      "Law of Independent Assortment: genes inherit independently",
-      "Mendel used pea plants for his experiments",
-      "Monohybrid cross shows 3:1 ratio in F2"
+      "Important point about this topic",
+      "Second key point to remember",
+      "Third essential fact",
+      "Fourth critical detail",
+      "Fifth key concept"
     ],
     "quickFacts": [
-      "Mendel is father of genetics",
-      "F2 ratio is 3:1 phenotypic",
-      "Tt x Tt gives 1TT:2Tt:1tt",
-      "Dominant = capital letter",
-      "Published work in 1866"
+      "Quick fact 1",
+      "Quick fact 2",
+      "Quick fact 3",
+      "Quick fact 4",
+      "Quick fact 5"
     ],
-    "mnemonics": ["DSI - Dominance, Segregation, Independent assortment"]
+    "mnemonics": ["Memory aid or mnemonic for this topic"]
   },
   {
-    "topic": "Sex Determination",
+    "topic": "Main Topic Name 2",
     "keyPoints": [
-      "Humans: XX = female, XY = male",
-      "Father determines sex of offspring",
-      "Y chromosome carries SRY gene",
-      "Sex-linked traits on X chromosome",
-      "Males more affected by X-linked disorders"
+      "Important point about this topic",
+      "Second key point to remember",
+      "Third essential fact",
+      "Fourth critical detail",
+      "Fifth key concept"
     ],
     "quickFacts": [
-      "Female gametes all carry X",
-      "Male gametes 50% X, 50% Y",
-      "Color blindness is X-linked",
-      "Haemophilia affects males more",
-      "Sex ratio is 1:1"
+      "Quick fact 1",
+      "Quick fact 2",
+      "Quick fact 3",
+      "Quick fact 4",
+      "Quick fact 5"
     ],
-    "mnemonics": ["XY = boY, XX = girl"]
+    "mnemonics": ["Memory aid or mnemonic for this topic"]
   }
 ]
 
 IMPORTANT: Generate ${topicCount} topics total. The example shows only 2 - you must generate more!
 Each keyPoint and quickFact must be a plain STRING, not an object.`,
-        isArray: true
+        isArray: true,
       };
 
       const notes = await this.generateJSONFromContext<any[]>(
         compressedContext,
-        'recallNotes',
+        "recallNotes",
         languageName,
         recallNotesSchema
       );
 
-      console.log('✅ Comprehensive recall notes generation complete!');
+      console.log("✅ Comprehensive recall notes generation complete!");
 
       // Helper function to normalize array items to strings (fixes [object Object] bug)
       const normalizeToStringArray = (items: any[]): string[] => {
         if (!Array.isArray(items)) return [];
-        return items.map(item => {
-          if (typeof item === 'string') return item;
-          if (typeof item === 'object' && item !== null) {
-            // Extract meaningful string from object - try common property names
-            return item.text || item.content || item.point || item.fact || item.value || item.description || JSON.stringify(item);
-          }
-          return String(item);
-        }).filter(item => item && item !== '{}' && item !== 'null' && item !== 'undefined');
+        return items
+          .map((item) => {
+            if (typeof item === "string") return item;
+            if (typeof item === "object" && item !== null) {
+              // Extract meaningful string from object - try common property names
+              return (
+                item.text ||
+                item.content ||
+                item.point ||
+                item.fact ||
+                item.value ||
+                item.description ||
+                JSON.stringify(item)
+              );
+            }
+            return String(item);
+          })
+          .filter(
+            (item) =>
+              item && item !== "{}" && item !== "null" && item !== "undefined"
+          );
       };
 
       return notes.map((n: any) => ({
-        topic: typeof n.topic === 'string' ? n.topic : (n.topic?.name || 'Topic'),
+        topic: typeof n.topic === "string" ? n.topic : n.topic?.name || "Topic",
         keyPoints: normalizeToStringArray(n.keyPoints || []),
         quickFacts: normalizeToStringArray(n.quickFacts || []),
         mnemonics: normalizeToStringArray(n.mnemonics || []),
       }));
     } catch (error) {
-      console.error('❌ Recall notes generation failed:', error);
+      console.error("❌ Recall notes generation failed:", error);
       throw new Error(
-        `Failed to generate recall notes: ${error instanceof Error ? error.message : "Unknown error"} `
+        `Failed to generate recall notes: ${
+          error instanceof Error ? error.message : "Unknown error"
+        } `
       );
     }
   }
@@ -1053,9 +1159,9 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
         recallNotes,
       };
     } catch (error) {
-
       throw new Error(
-        `Failed to generate content: ${error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate content: ${
+          error instanceof Error ? error.message : "Unknown error"
         } `
       );
     }
@@ -1074,23 +1180,31 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     targetLang: SupportedLanguageCode
   ): Promise<string> {
     if (!text || text.trim().length === 0) return text;
-    if (targetLang === 'en') return text; // No translation needed for English
+    if (targetLang === "en") return text; // No translation needed for English
 
     try {
       const nllbTargetCode = languageService.toNLLBCode(targetLang);
       // Disable caching for LMR to ensure unique translations
       const translated = await nllbService.translate(text, {
-        srcLang: 'eng_Latn',
+        srcLang: "eng_Latn",
         tgtLang: nllbTargetCode,
         useCache: false, // Disable caching to prevent collisions
       });
 
       // Debug log - show first 50 chars of input/output
-      console.log(`📝 Translated: "${text.substring(0, 40)}..." -> "${translated.substring(0, 40)}..."`);
+      console.log(
+        `📝 Translated: "${text.substring(
+          0,
+          40
+        )}..." -> "${translated.substring(0, 40)}..."`
+      );
 
       return translated;
     } catch (error) {
-      console.warn(`⚠️ Translation failed for text "${text.substring(0, 30)}...":`, error);
+      console.warn(
+        `⚠️ Translation failed for text "${text.substring(0, 30)}...":`,
+        error
+      );
       return text; // Fallback to original if translation fails
     }
   }
@@ -1102,9 +1216,13 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     summary: LMRSummary,
     targetLang: SupportedLanguageCode
   ): Promise<LMRSummary> {
-    if (targetLang === 'en') return summary;
+    if (targetLang === "en") return summary;
 
-    console.log(`🌐 Translating summary to ${languageService.getLanguageName(targetLang)}...`);
+    console.log(
+      `🌐 Translating summary to ${languageService.getLanguageName(
+        targetLang
+      )}...`
+    );
 
     const [
       translatedIntro,
@@ -1116,16 +1234,26 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     ] = await Promise.all([
       this.translateText(summary.introduction, targetLang),
       this.translateText(summary.conclusion, targetLang),
-      summary.summary ? this.translateText(summary.summary, targetLang) : Promise.resolve(undefined),
-      Promise.all(summary.summaryPoints.map(p => this.translateText(p, targetLang))),
-      Promise.all(summary.keyTopics.map(async t => ({
-        name: await this.translateText(t.name, targetLang),
-        description: await this.translateText(t.description, targetLang),
-      }))),
-      Promise.all(summary.importantConcepts.map(async c => ({
-        name: await this.translateText(c.name, targetLang),
-        points: await Promise.all(c.points.map(p => this.translateText(p, targetLang))),
-      }))),
+      summary.summary
+        ? this.translateText(summary.summary, targetLang)
+        : Promise.resolve(undefined),
+      Promise.all(
+        summary.summaryPoints.map((p) => this.translateText(p, targetLang))
+      ),
+      Promise.all(
+        summary.keyTopics.map(async (t) => ({
+          name: await this.translateText(t.name, targetLang),
+          description: await this.translateText(t.description, targetLang),
+        }))
+      ),
+      Promise.all(
+        summary.importantConcepts.map(async (c) => ({
+          name: await this.translateText(c.name, targetLang),
+          points: await Promise.all(
+            c.points.map((p) => this.translateText(p, targetLang))
+          ),
+        }))
+      ),
     ]);
 
     return {
@@ -1147,16 +1275,22 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     questions: LMRQuestion[],
     targetLang: SupportedLanguageCode
   ): Promise<LMRQuestion[]> {
-    if (targetLang === 'en') return questions;
+    if (targetLang === "en") return questions;
 
-    console.log(`🌐 Translating ${questions.length} questions to ${languageService.getLanguageName(targetLang)}...`);
+    console.log(
+      `🌐 Translating ${
+        questions.length
+      } questions to ${languageService.getLanguageName(targetLang)}...`
+    );
 
-    return Promise.all(questions.map(async q => ({
-      ...q,
-      question: await this.translateText(q.question, targetLang),
-      answer: await this.translateText(q.answer, targetLang),
-      subject: await this.translateText(q.subject, targetLang),
-    })));
+    return Promise.all(
+      questions.map(async (q) => ({
+        ...q,
+        question: await this.translateText(q.question, targetLang),
+        answer: await this.translateText(q.answer, targetLang),
+        subject: await this.translateText(q.subject, targetLang),
+      }))
+    );
   }
 
   /**
@@ -1166,17 +1300,25 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     quiz: LMRQuiz[],
     targetLang: SupportedLanguageCode
   ): Promise<LMRQuiz[]> {
-    if (targetLang === 'en') return quiz;
+    if (targetLang === "en") return quiz;
 
-    console.log(`🌐 Translating ${quiz.length} quiz questions to ${languageService.getLanguageName(targetLang)}...`);
+    console.log(
+      `🌐 Translating ${
+        quiz.length
+      } quiz questions to ${languageService.getLanguageName(targetLang)}...`
+    );
 
-    return Promise.all(quiz.map(async q => ({
-      ...q,
-      question: await this.translateText(q.question, targetLang),
-      options: await Promise.all(q.options.map(o => this.translateText(o, targetLang))),
-      explanation: await this.translateText(q.explanation, targetLang),
-      subject: await this.translateText(q.subject, targetLang),
-    })));
+    return Promise.all(
+      quiz.map(async (q) => ({
+        ...q,
+        question: await this.translateText(q.question, targetLang),
+        options: await Promise.all(
+          q.options.map((o) => this.translateText(o, targetLang))
+        ),
+        explanation: await this.translateText(q.explanation, targetLang),
+        subject: await this.translateText(q.subject, targetLang),
+      }))
+    );
   }
 
   /**
@@ -1186,18 +1328,30 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     notes: LMRRecallNote[],
     targetLang: SupportedLanguageCode
   ): Promise<LMRRecallNote[]> {
-    if (targetLang === 'en') return notes;
+    if (targetLang === "en") return notes;
 
-    console.log(`🌐 Translating ${notes.length} recall note topics to ${languageService.getLanguageName(targetLang)}...`);
+    console.log(
+      `🌐 Translating ${
+        notes.length
+      } recall note topics to ${languageService.getLanguageName(targetLang)}...`
+    );
 
-    return Promise.all(notes.map(async n => ({
-      topic: await this.translateText(n.topic, targetLang),
-      keyPoints: await Promise.all(n.keyPoints.map(p => this.translateText(p, targetLang))),
-      quickFacts: await Promise.all(n.quickFacts.map(f => this.translateText(f, targetLang))),
-      mnemonics: n.mnemonics
-        ? await Promise.all(n.mnemonics.map(m => this.translateText(m, targetLang)))
-        : undefined,
-    })));
+    return Promise.all(
+      notes.map(async (n) => ({
+        topic: await this.translateText(n.topic, targetLang),
+        keyPoints: await Promise.all(
+          n.keyPoints.map((p) => this.translateText(p, targetLang))
+        ),
+        quickFacts: await Promise.all(
+          n.quickFacts.map((f) => this.translateText(f, targetLang))
+        ),
+        mnemonics: n.mnemonics
+          ? await Promise.all(
+              n.mnemonics.map((m) => this.translateText(m, targetLang))
+            )
+          : undefined,
+      }))
+    );
   }
 
   /**
@@ -1218,23 +1372,41 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
     recallNotes?: LMRRecallNote[];
   }> {
     if (!env.NLLB_ENABLED) {
-      throw new Error('NLLB translation is not enabled. Set NLLB_ENABLED=true in environment.');
+      throw new Error(
+        "NLLB translation is not enabled. Set NLLB_ENABLED=true in environment."
+      );
     }
 
-    if (targetLang === 'en') {
+    if (targetLang === "en") {
       return content; // No translation needed
     }
 
-    console.log(`🌐 Translating all LMR content to ${languageService.getLanguageName(targetLang)}...`);
+    console.log(
+      `🌐 Translating all LMR content to ${languageService.getLanguageName(
+        targetLang
+      )}...`
+    );
 
     const [summary, questions, quiz, recallNotes] = await Promise.all([
-      content.summary ? this.translateSummary(content.summary, targetLang) : Promise.resolve(undefined),
-      content.questions ? this.translateQuestions(content.questions, targetLang) : Promise.resolve(undefined),
-      content.quiz ? this.translateQuiz(content.quiz, targetLang) : Promise.resolve(undefined),
-      content.recallNotes ? this.translateRecallNotes(content.recallNotes, targetLang) : Promise.resolve(undefined),
+      content.summary
+        ? this.translateSummary(content.summary, targetLang)
+        : Promise.resolve(undefined),
+      content.questions
+        ? this.translateQuestions(content.questions, targetLang)
+        : Promise.resolve(undefined),
+      content.quiz
+        ? this.translateQuiz(content.quiz, targetLang)
+        : Promise.resolve(undefined),
+      content.recallNotes
+        ? this.translateRecallNotes(content.recallNotes, targetLang)
+        : Promise.resolve(undefined),
     ]);
 
-    console.log(`✅ Translation complete to ${languageService.getLanguageName(targetLang)}`);
+    console.log(
+      `✅ Translation complete to ${languageService.getLanguageName(
+        targetLang
+      )}`
+    );
 
     return { summary, questions, quiz, recallNotes };
   }
