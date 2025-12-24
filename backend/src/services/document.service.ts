@@ -16,7 +16,7 @@ export interface FileInfo {
 const pageDocumentSchema = new mongoose.Schema({
   fileId: { type: String, required: true, unique: true, index: true },
   fileName: { type: String, required: true },
-  mimeType: { type: String, default: 'application/pdf' },
+  mimeType: { type: String, default: "application/pdf" },
   userId: { type: String, required: true },
   sessionId: { type: String, required: true },
   language: { type: String },
@@ -35,7 +35,7 @@ const PageDocument = mongoose.model("PageDocument", pageDocumentSchema);
 const documentSchema = new mongoose.Schema({
   fileId: { type: String, required: true, unique: true },
   fileName: { type: String, required: true },
-  mimeType: { type: String, default: 'application/pdf' },
+  mimeType: { type: String, default: "application/pdf" },
   fullContent: { type: String, required: true },
   userId: { type: String, required: true },
   sessionId: { type: String, required: true },
@@ -84,7 +84,7 @@ export class DocumentService {
       const pageDocument = {
         fileId,
         fileName,
-        mimeType: mimeType || 'application/pdf',
+        mimeType: mimeType || "application/pdf",
         userId,
         sessionId,
         language,
@@ -203,7 +203,7 @@ export class DocumentService {
       await Document.create({
         fileId,
         fileName,
-        mimeType: mimeType || 'application/octet-stream',
+        mimeType: mimeType || "application/octet-stream",
         fullContent: fullContent.trim(),
         userId,
         sessionId,
@@ -217,8 +217,6 @@ export class DocumentService {
       throw new Error("Failed to store document");
     }
   }
-
-
 
   /**
    * Legacy: Get full document content by fileId
@@ -246,7 +244,7 @@ export class DocumentService {
         const fullText = pageDoc.pages
           .sort((a, b) => a.pageNumber - b.pageNumber)
           .map((p) => p.pageContent)
-          .join('\n\n--- Page Break ---\n\n');
+          .join("\n\n--- Page Break ---\n\n");
         return fullText;
       }
 
@@ -345,7 +343,7 @@ export class DocumentService {
         return {
           fileId: pageDoc.fileId,
           fileName: pageDoc.fileName,
-          mimeType: (pageDoc as any).mimeType || 'application/pdf',
+          mimeType: (pageDoc as any).mimeType || "application/pdf",
           userId: pageDoc.userId,
           sessionId: pageDoc.sessionId,
           pageCount: pageDoc.pages?.length || 1,
@@ -360,7 +358,7 @@ export class DocumentService {
         return {
           fileId: doc.fileId,
           fileName: doc.fileName,
-          mimeType: (doc as any).mimeType || 'application/pdf',
+          mimeType: (doc as any).mimeType || "application/pdf",
           userId: doc.userId,
           sessionId: doc.sessionId,
           pageCount: 1,

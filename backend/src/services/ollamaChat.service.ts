@@ -249,27 +249,32 @@ OUTPUT FORMAT (JSON only, no other text):
         : "";
 
     const prompt = hasDocuments
-      ? `You are MasterJi, an expert educational AI.
+      ? `You are MasterJi, an expert educational AI assistant.
 
-CONTEXT:
+I have already extracted and provided relevant information from the user's uploaded documents below. This context contains the actual content from their files (PDFs, DOCX, images, etc.).
+
+EXTRACTED DOCUMENT CONTENT:
 ${documentContext}
 
-SOURCES:
+DOCUMENT SOURCES (already extracted and available):
 ${sourcesString}
 
-HISTORY:
+CONVERSATION HISTORY:
 ${chatContextString}
 
-QUESTION: ${question}
+STUDENT'S QUESTION: ${question}
 
-RULES:
-1. Answer ONLY from context
-2. Be thorough and educational
-3. Use simple language
-4. Cite sources as [Source X]
-5. Respond in ${languageName}
+CRITICAL INSTRUCTIONS:
+1. The context above IS the actual content from the user's documents - you have full access to it
+2. Answer the question using ONLY the information provided in the context above
+3. Never say "I cannot access documents" - the documents are already processed and extracted above
+4. Be thorough, educational, and helpful
+5. Use simple, clear language appropriate for students
+6. When referencing information, cite sources as [Source X]
+7. Respond in ${languageName}
+8. If the context doesn't contain relevant information, say "The uploaded documents don't contain information about [topic]"
 
-ANSWER (in ${languageName}):`
+YOUR ANSWER (in ${languageName}):`
       : `You are MasterJi, an educational AI.
 
 No relevant documents found.
@@ -282,13 +287,12 @@ QUESTION: ${question}
 Respond in ${languageName} briefly.`;
 
     const promptTokens = countTokens(prompt);
-    const maxNew = Math.max(
-      RAG_CONSTANTS.MAX_OUT_MIN,
-      Math.min(
-        RAG_CONSTANTS.MAX_OUT_MAX,
-        RAG_CONSTANTS.LLM_CTX - promptTokens - RAG_CONSTANTS.SAFETY_MARGIN
-      )
-    );
+
+    // DeepSeek R1 recommended settings for descriptive reasoning
+    // num_predict: 8192-16384 for long Chain of Thought explanations
+    // num_ctx: 32768 to hold both input and output
+    const numPredict = 8192; // Allow for detailed reasoning and explanations
+    const numCtx = RAG_CONSTANTS.LLM_CTX; // 32768
 
     try {
       const response = await axios.post(
@@ -299,7 +303,8 @@ Respond in ${languageName} briefly.`;
           stream: false,
           options: {
             temperature: RAG_CONSTANTS.TEMP_RAG,
-            num_predict: maxNew,
+            num_predict: numPredict,
+            num_ctx: numCtx,
             top_p: 0.95,
           },
         },

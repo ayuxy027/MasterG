@@ -30,7 +30,11 @@ export class AsyncRAGOrchestratorService {
 
       if (!hasDocuments) {
         const { ollamaChatService } = await import("./ollamaChat.service");
-        const simpleAnswer = await ollamaChatService.handleSimpleQuery(query, "en", chatHistory);
+        const simpleAnswer = await ollamaChatService.handleSimpleQuery(
+          query,
+          "en",
+          chatHistory
+        );
 
         return {
           answer: simpleAnswer,
@@ -48,14 +52,14 @@ export class AsyncRAGOrchestratorService {
       const { ollamaChatService } = await import("./ollamaChat.service");
       const keywords = await ollamaChatService.extractKeywords(query);
 
-      const retrievalQuery = keywords.length > 0
-        ? `${query} ${keywords.join(" ")}`
-        : query;
+      const retrievalQuery =
+        keywords.length > 0 ? `${query} ${keywords.join(" ")}` : query;
 
       const result = await decisionEngineService.handleRAGQuery(
         retrievalQuery,
         chatHistory,
-        chromaCollectionName,
+        userId,
+        sessionId,
         query
       );
 

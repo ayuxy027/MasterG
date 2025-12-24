@@ -46,7 +46,10 @@ export class UploadController {
 
       // Step 1: Extract text using universal text extractor (handles ALL file types)
       try {
-        const extractionResult = await textExtractorService.extract(file.path, file.mimetype);
+        const extractionResult = await textExtractorService.extract(
+          file.path,
+          file.mimetype
+        );
         // console.log(
         //   `📄 Extracted ${extractionResult.pageCount || 1} page(s) from ${file.originalname}`
         // );
@@ -55,7 +58,8 @@ export class UploadController {
         const fullDocumentContent = extractionResult.text;
 
         // Detect document language from full content
-        const documentLanguageDetection = languageService.detectLanguage(fullDocumentContent);
+        const documentLanguageDetection =
+          languageService.detectLanguage(fullDocumentContent);
         // console.log(
         //   `🌐 Detected document language: ${documentLanguageDetection.language} (${documentLanguageDetection.languageCode})`
         // );
@@ -76,7 +80,7 @@ export class UploadController {
             userId,
             sessionId,
             documentLanguageDetection.languageCode,
-            file.mimetype  // Pass mimeType
+            file.mimetype // Pass mimeType
           );
           // console.log(`✅ Page-wise storage complete for ${file.originalname}`);
 
@@ -103,7 +107,7 @@ export class UploadController {
             userId,
             sessionId,
             documentLanguageDetection.languageCode,
-            file.mimetype  // Pass mimeType
+            file.mimetype // Pass mimeType
           );
 
           const chunks = await chunkingService.createChunks(
@@ -116,13 +120,16 @@ export class UploadController {
           allChunks.push(...chunks);
         }
       } catch (extractError: any) {
-        console.error(`❌ Text extraction failed for ${file.originalname}:`, extractError.message);
+        console.error(
+          `❌ Text extraction failed for ${file.originalname}:`,
+          extractError.message
+        );
 
         // Clean up temp file
         try {
-          const fs = await import('fs/promises');
+          const fs = await import("fs/promises");
           await fs.unlink(file.path);
-        } catch { }
+        } catch {}
 
         res.status(400).json({
           success: false,
@@ -159,7 +166,7 @@ export class UploadController {
       // Step 5: Store file permanently for preview (instead of deleting)
       // console.log("📁 Storing file for preview...");
       const storedFile = await fileStorageService.storeFile(
-        fileId,  // Pass the same fileId used for MongoDB
+        fileId, // Pass the same fileId used for MongoDB
         file.path,
         userId,
         sessionId,
@@ -170,17 +177,27 @@ export class UploadController {
 
       // Step 6: Convert PPT/PPTX to PDF for preview (if LibreOffice available)
       let previewPdfPath: string | null = null;
-      const isPPT = file.mimetype.includes('powerpoint') ||
-        file.mimetype.includes('presentation') ||
-        file.originalname.toLowerCase().endsWith('.pptx') ||
-        file.originalname.toLowerCase().endsWith('.ppt');
+      const isPPT =
+        file.mimetype.includes("powerpoint") ||
+        file.mimetype.includes("presentation") ||
+        file.originalname.toLowerCase().endsWith(".pptx") ||
+        file.originalname.toLowerCase().endsWith(".ppt");
 
       if (isPPT) {
-        console.log('📊 Converting PPT to PDF for preview...');
+        console.log("📊 Converting PPT to PDF for preview...");
         try {
-          const { pptConversionService } = await import('../services/pptConversion.service');
-          const sessionPath = storedFile.filePath.substring(0, storedFile.filePath.lastIndexOf('/')) ||
-            storedFile.filePath.substring(0, storedFile.filePath.lastIndexOf('\\'));
+          const { pptConversionService } = await import(
+            "../services/pptConversion.service"
+          );
+          const sessionPath =
+            storedFile.filePath.substring(
+              0,
+              storedFile.filePath.lastIndexOf("/")
+            ) ||
+            storedFile.filePath.substring(
+              0,
+              storedFile.filePath.lastIndexOf("\\")
+            );
 
           const result = await pptConversionService.convertAndStore(
             storedFile.filePath,
@@ -192,17 +209,19 @@ export class UploadController {
             previewPdfPath = result.pdfPath;
             console.log(`✅ PPT preview PDF ready: ${previewPdfPath}`);
           } else {
-            console.log('⚠️ PPT conversion skipped (LibreOffice not available), using text preview');
+            console.log(
+              "⚠️ PPT conversion skipped (LibreOffice not available), using text preview"
+            );
           }
         } catch (convError: any) {
-          console.error('PPT conversion error:', convError.message);
+          console.error("PPT conversion error:", convError.message);
           // Continue without PDF preview
         }
       }
 
       // Clean up temp file (the original is now copied to storage)
       try {
-        const fs = await import('fs/promises');
+        const fs = await import("fs/promises");
         await fs.unlink(file.path);
       } catch {
         // Temp file already cleaned or doesn't exist
@@ -215,11 +234,17 @@ export class UploadController {
         chunksCreated: allChunks.length,
         message: "File processed successfully",
         // @ts-ignore - Adding fileUrl for preview
-        fileUrl: `/api/files/${fileId}?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}`,
+        fileUrl: `/api/files/${fileId}?userId=${encodeURIComponent(
+          userId
+        )}&sessionId=${encodeURIComponent(sessionId)}`,
         mimeType: file.mimetype,
         // @ts-ignore - Adding preview info
         hasPreviewPdf: !!previewPdfPath,
-        previewUrl: previewPdfPath ? `/api/files/${fileId}/preview?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}` : null,
+        previewUrl: previewPdfPath
+          ? `/api/files/${fileId}/preview?userId=${encodeURIComponent(
+              userId
+            )}&sessionId=${encodeURIComponent(sessionId)}`
+          : null,
       };
 
       console.log(
@@ -233,7 +258,7 @@ export class UploadController {
       // Clean up uploaded file on error
       if (req.file && req.file.path) {
         try {
-          const fs = await import('fs/promises');
+          const fs = await import("fs/promises");
           await fs.unlink(req.file.path);
           console.log("🗑️  Cleaned up uploaded file after error");
         } catch (cleanupError) {
