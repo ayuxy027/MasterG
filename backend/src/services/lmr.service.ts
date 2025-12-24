@@ -113,15 +113,24 @@ export class LMRService {
     cleaned = cleaned.replace(/,\s*True\s*([,\}\]])/g, ", true$1");
     cleaned = cleaned.replace(/,\s*False\s*([,\}\]])/g, ", false$1");
 
-    // Remove trailing commas before closing brackets/braces
-    cleaned = cleaned.replace(/,(\s*[\}\]])/g, "$1");
+    // Remove trailing commas before closing brackets/braces (multiple passes)
+    // This needs to run multiple times to handle nested structures
+    for (let i = 0; i < 3; i++) {
+      cleaned = cleaned.replace(/,(\s*[\}\]])/g, "$1");
+    }
+
+    // Fix specific pattern: ],} -> }] (remove comma between array close and object close)
+    cleaned = cleaned.replace(/\],(\s*)\}/g, "]$1}");
+    
+    // Fix specific pattern: },] -> }] (remove comma between object close and array close)
+    cleaned = cleaned.replace(/\},(\s*)\]/g, "}$1]");
 
     // Fix missing commas between array elements (common DeepSeek issue)
     cleaned = cleaned.replace(/\}(\s*)\{/g, "},$1{");
     cleaned = cleaned.replace(/\](\s*)\[/g, "],$1[");
 
-    // Fix missing commas between string values
-    cleaned = cleaned.replace(/"(\s+)"/g, '",$1"');
+    // Fix missing commas between string values (but not within strings)
+    cleaned = cleaned.replace(/"\s*\n\s*"/g, '",\n"');
 
     return cleaned;
   }
@@ -532,11 +541,13 @@ ${schema.jsonTemplate}
 CRITICAL RULES:
 1. Output ONLY valid JSON - absolutely NO text before or after the JSON
 2. Use double quotes for ALL strings
-3. NO trailing commas
+3. NO trailing commas anywhere (not after arrays, objects, or properties)
 4. Use "null" NOT "None", "true" NOT "True", "false" NOT "False"
 5. Ensure the JSON is complete and properly closed
 6. Each string value must be properly escaped
 7. DO NOT include any explanation, markdown, or code blocks
+8. Array closing format: ["item1", "item2"] NOT ["item1", "item2"],
+9. Object closing format: {"key": "value"} NOT {"key": "value",}
 
 OUTPUT THE JSON NOW:`;
 
@@ -937,7 +948,14 @@ ANSWER QUALITY STANDARDS:
       // ═══════════════════════════════════════════════════════════════
       console.log("🔄 Layer 2: Generating quiz JSON...");
       const quizSchema = {
-        description: `Generate ${count} multiple - choice questions(MCQs).Each question must have exactly 4 options with one correct answer.Mix difficulty levels and include explanations.`,
+        description: `Generate ${count} multiple-choice questions (MCQs). Each question must have exactly 4 options with one correct answer. Mix difficulty levels and include explanations.
+
+CRITICAL JSON RULES:
+1. NO trailing commas after arrays or objects
+2. Each object MUST end with } NOT },
+3. "options" array ends with ] NOT ],
+4. Proper comma placement between object properties
+5. correctAnswer must be a NUMBER (0-3), not a string`,
         jsonTemplate: `[
         {
           "question": "Clear question text",
@@ -955,7 +973,9 @@ ANSWER QUALITY STANDARDS:
           "difficulty": "Medium",
           "subject": "Subject name"
         }
-      ]`,
+      ]
+
+IMPORTANT: Generate EXACTLY ${count} MCQ questions. NO trailing commas!`,
         isArray: true,
       };
 
