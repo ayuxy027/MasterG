@@ -32,6 +32,13 @@ interface EnvConfig {
   OLLAMA_CHAT_MODEL: string;
   OLLAMA_EMBED_MODEL: string;
 
+  // Legacy external APIs (kept for type compatibility; not used in fully-local mode)
+  OLLAMA_MODEL: string;
+  GEMMA_API_KEY: string;
+
+  // Groq API (for cloud mode - optional)
+  GROQ_API_KEY: string;
+
   // NLLB-200 Configuration (translation service)
   NLLB_ENABLED: boolean;
 
@@ -72,6 +79,13 @@ export const env: EnvConfig = {
   OLLAMA_URL: "http://localhost:11434",
   OLLAMA_CHAT_MODEL: "deepseek-r1:1.5b",
   OLLAMA_EMBED_MODEL: "embeddinggemma:latest",
+
+  // Legacy external APIs (not actively used in local-only mode)
+  OLLAMA_MODEL: "deepseek-r1:1.5b",
+  GEMMA_API_KEY: process.env.GEMMA_API_KEY || "",
+
+  // Groq API (for cloud mode - optional)
+  GROQ_API_KEY: process.env.GROQ_API_KEY || "",
 
   // NLLB-200 Configuration (translation)
   NLLB_ENABLED: true,

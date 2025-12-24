@@ -565,6 +565,22 @@ const BoardPage: React.FC = () => {
     const noteHeight = 200;
     const spacing = 30;
 
+    // Map each AI action to a distinct sticky note color for visual differentiation
+    const getActionColor = (actionType: CardAction): string => {
+      switch (actionType) {
+        case "summarize":
+          return "#E0F2FE"; // light blue
+        case "actionPoints":
+          return "#DCFCE7"; // light green
+        case "mindMap":
+          return "#F5E1FF"; // soft purple
+        case "flashcards":
+          return "#FEF3C7"; // warm yellow
+        default:
+          return "#FFE4B5"; // fallback peach
+      }
+    };
+
     // Convert action cards to sticky notes
     const updateActionStickyNotes = (cardsToUpdate: CardData[]) => {
       const totalWidth = cardsToUpdate.length * noteWidth + (cardsToUpdate.length - 1) * spacing;
@@ -594,7 +610,7 @@ const BoardPage: React.FC = () => {
               x: startX + index * (noteWidth + spacing),
               y: canvasCenterY + 200,
               text: noteText,
-              color: '#FFE4B5',
+              color: getActionColor(action),
               width: noteWidth,
               height: noteHeight,
               enableMarkdown: false,
@@ -631,7 +647,7 @@ const BoardPage: React.FC = () => {
             x: canvasCenterX - 160,
             y: canvasCenterY + 150,
             text: content,
-            color: '#FFE4B5',
+            color: getActionColor(action),
             width: 320,
             height: action === 'actionPoints' ? 280 : 220,
             enableMarkdown: false,

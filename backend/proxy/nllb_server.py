@@ -68,14 +68,82 @@ _model_cache: Optional[tuple] = None
 
 
 def strip_markdown(text: str) -> str:
-  """Remove markdown formatting before translation"""
+  """
+  Remove markdown formatting before translation, but PRESERVE LaTeX math formulas.
+  
+  CRITICAL FOR STITCH INTEGRATION:
+  - LaTeX formulas ($...$ and $$...$$) MUST be preserved exactly during NLLB translation
+  - This ensures math formulas render correctly after translation
+  - Works with all content lengths (short/medium/long)
+  
+  Process:
+  1. Extract LaTeX formulas to placeholders (preserves them from markdown stripping)
+  2. Remove markdown formatting
+  3. Restore LaTeX formulas from placeholders
+  
+  LaTeX formulas ($...$ and $$...$$) are preserved exactly as they are.
+  """
+  # CRITICAL: Preserve LaTeX math formulas first (before any other processing)
+  # Extract all LaTeX math blocks and replace with placeholders
+  math_placeholders = {}
+  placeholder_counter = 0
+  
+  # Preserve display math ($$...$$) - can span multiple lines
+  def replace_display_math(match):
+    nonlocal placeholder_counter
+    placeholder = f"__LATEX_DISPLAY_{placeholder_counter}__"
+    placeholder_counter += 1
+    math_placeholders[placeholder] = match.group(0)  # Keep the full $$...$$
+    return placeholder
+  
+  # Preserve inline math ($...$) - single line only
+  def replace_inline_math(match):
+    nonlocal placeholder_counter
+    placeholder = f"__LATEX_INLINE_{placeholder_counter}__"
+    placeholder_counter += 1
+    math_placeholders[placeholder] = match.group(0)  # Keep the full $...$
+    return placeholder
+  
+  # Extract display math first ($$...$$) - must handle multiline
+  text = re.sub(r'\$\$[\s\S]*?\$\$', replace_display_math, text)
+  
+  # Also handle LaTeX-style display math \[...\] (convert to $$...$$ format)
+  def replace_latex_display_math(match):
+    nonlocal placeholder_counter
+    placeholder = f"__LATEX_DISPLAY_{placeholder_counter}__"
+    placeholder_counter += 1
+    # Convert \[...\] to $$...$$ format
+    math_content = match.group(1)
+    math_placeholders[placeholder] = f"$${math_content}$$"
+    return placeholder
+  
+  text = re.sub(r'\\\[([\s\S]*?)\\\]', replace_latex_display_math, text)
+  
+  # Extract inline math ($...$) - but avoid matching $$ as start of display math
+  # Use negative lookbehind/lookahead to ensure we don't match $$ as two $...$
+  text = re.sub(r'(?<!\$)\$(?!\$)([^$\n]+?)\$(?!\$)', replace_inline_math, text)
+  
+  # Also handle LaTeX-style inline math \(...\) (convert to $...$ format)
+  def replace_latex_inline_math(match):
+    nonlocal placeholder_counter
+    placeholder = f"__LATEX_INLINE_{placeholder_counter}__"
+    placeholder_counter += 1
+    # Convert \(...\) to $...$ format
+    math_content = match.group(1)
+    math_placeholders[placeholder] = f"${math_content}$"
+    return placeholder
+  
+  text = re.sub(r'\\\(([^)]+?)\\\)', replace_latex_inline_math, text)
+  
+  # Now remove markdown formatting (LaTeX is safely stored in placeholders)
   # Remove markdown headers
   text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-  # Remove bold/italic
+  # Remove bold/italic (but be careful not to match LaTeX placeholders)
   text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
   text = re.sub(r'\*([^*]+)\*', r'\1', text)
   text = re.sub(r'__([^_]+)__', r'\1', text)
-  text = re.sub(r'_([^_]+)_', r'\1', text)
+  # Only remove italic underscore if it's not part of a LaTeX placeholder
+  text = re.sub(r'(?<!__LATEX_)_([^_\n]+?)_(?!__)', r'\1', text)
   # Remove horizontal rules
   text = re.sub(r'^---+\s*$', '', text, flags=re.MULTILINE)
   text = re.sub(r'^===+\s*$', '', text, flags=re.MULTILINE)
@@ -89,6 +157,11 @@ def strip_markdown(text: str) -> str:
   # Remove leading/trailing whitespace per line
   lines = [line.strip() for line in text.split('\n')]
   text = '\n'.join(lines)
+  
+  # CRITICAL: Restore LaTeX math formulas from placeholders
+  for placeholder, math_formula in math_placeholders.items():
+    text = text.replace(placeholder, math_formula)
+  
   return text.strip()
 
 
@@ -311,13 +384,26 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
     """Process a single batch and return (batch_idx, translations)"""
     batch_translations = []
     try:
+      # OPTIMIZATION: Adaptive max_length based on text length
+      # Estimate token count (rough: ~4 chars per token for most languages)
+      max_batch_length = max(len(text) for text in batch)
+      estimated_tokens = max_batch_length // 4
+      
+      # Adaptive max_length: Short=256, Medium=512, Long=1024
+      if estimated_tokens < 50:
+        adaptive_max_length = 256  # Short: faster inference
+      elif estimated_tokens < 200:
+        adaptive_max_length = 512  # Medium: current default
+      else:
+        adaptive_max_length = 1024  # Long: prevent truncation, better quality
+      
       # Tokenize entire batch at once
       inputs = tokenizer(
         batch,
         return_tensors="pt",
         padding=True,
         truncation=True,
-        max_length=512,
+        max_length=adaptive_max_length,
       )
       
       # Move to device
@@ -331,7 +417,7 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
         outputs = model.generate(
           **inputs,
           forced_bos_token_id=tgt_lang_id,
-          max_length=512,
+          max_length=adaptive_max_length,
           num_beams=beam_size,
           use_cache=True,
           early_stopping=True,
@@ -357,15 +443,19 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
       sys.stderr.write(f"Warning: Batch translation failed, processing individually: {e}\n")
       for sentence in batch:
         try:
+          # Adaptive max_length for individual sentences
+          estimated_tokens = len(sentence) // 4
+          adaptive_max_length = 256 if estimated_tokens < 50 else (512 if estimated_tokens < 200 else 1024)
+          
           # Fallback to single-sentence processing
-          inputs = tokenizer(sentence, return_tensors="pt")
+          inputs = tokenizer(sentence, return_tensors="pt", max_length=adaptive_max_length, truncation=True)
           inputs = {k: v.to(device) for k, v in inputs.items()}
           
           with torch.inference_mode():
             outputs = model.generate(
               **inputs,
               forced_bos_token_id=tgt_lang_id,
-              max_length=512,
+              max_length=adaptive_max_length,
               num_beams=1 if device == "cpu" else 2,
               use_cache=True,
               early_stopping=True,
@@ -516,13 +606,18 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
     batch = units[batch_idx:batch_idx + batch_size]
     
     try:
+      # OPTIMIZATION: Adaptive max_length based on text length
+      max_batch_length = max(len(text) for text in batch)
+      estimated_tokens = max_batch_length // 4
+      adaptive_max_length = 256 if estimated_tokens < 50 else (512 if estimated_tokens < 200 else 1024)
+      
       # Tokenize entire batch
       inputs = tokenizer(
         batch,
         return_tensors="pt",
         padding=True,
         truncation=True,
-        max_length=512,
+        max_length=adaptive_max_length,
       )
       
       inputs = {k: v.to(device) for k, v in inputs.items()}
@@ -532,7 +627,7 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
         outputs = model.generate(
           **inputs,
           forced_bos_token_id=tgt_lang_id,
-          max_length=512,
+          max_length=adaptive_max_length,
           num_beams=beam_size,
           use_cache=True,
           early_stopping=True,
@@ -570,14 +665,18 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
       for i, sentence in enumerate(batch):
         idx = batch_idx + i
         try:
-          inputs = tokenizer(sentence, return_tensors="pt")
+          # Adaptive max_length for individual sentences
+          estimated_tokens = len(sentence) // 4
+          adaptive_max_length = 256 if estimated_tokens < 50 else (512 if estimated_tokens < 200 else 1024)
+          
+          inputs = tokenizer(sentence, return_tensors="pt", max_length=adaptive_max_length, truncation=True)
           inputs = {k: v.to(device) for k, v in inputs.items()}
           
           with torch.inference_mode():
             outputs = model.generate(
               **inputs,
               forced_bos_token_id=tgt_lang_id,
-              max_length=512,
+              max_length=adaptive_max_length,
               num_beams=beam_size,
               use_cache=True,
               early_stopping=True,
