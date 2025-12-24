@@ -121,7 +121,7 @@ export class LMRService {
 
     // Fix specific pattern: ],} -> }] (remove comma between array close and object close)
     cleaned = cleaned.replace(/\],(\s*)\}/g, "]$1}");
-    
+
     // Fix specific pattern: },] -> }] (remove comma between object close and array close)
     cleaned = cleaned.replace(/\},(\s*)\]/g, "}$1]");
 
