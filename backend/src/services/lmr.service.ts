@@ -39,7 +39,7 @@ export interface LMRRecallNote {
 /**
  * Task types for the two-layer AI approach
  */
-type LMRTaskType = 'summary' | 'questions' | 'quiz' | 'recallNotes';
+type LMRTaskType = "summary" | "questions" | "quiz" | "recallNotes";
 
 /**
  * Compressed context from Layer 1
@@ -61,26 +61,26 @@ export class LMRService {
     let cleaned = jsonString;
 
     // Remove any markdown code block markers
-    cleaned = cleaned.replace(/```json\s*/g, '');
-    cleaned = cleaned.replace(/```\s*/g, '');
+    cleaned = cleaned.replace(/```json\s*/g, "");
+    cleaned = cleaned.replace(/```\s*/g, "");
 
     // Replace Python-style None with null (multiple patterns)
-    cleaned = cleaned.replace(/:\s*None\s*([,\}\]])/g, ': null$1');
-    cleaned = cleaned.replace(/\[\s*None\s*([,\]])/g, '[null$1');
-    cleaned = cleaned.replace(/,\s*None\s*([,\}\]])/g, ', null$1');
+    cleaned = cleaned.replace(/:\s*None\s*([,\}\]])/g, ": null$1");
+    cleaned = cleaned.replace(/\[\s*None\s*([,\]])/g, "[null$1");
+    cleaned = cleaned.replace(/,\s*None\s*([,\}\]])/g, ", null$1");
 
     // Replace Python-style True/False with lowercase
-    cleaned = cleaned.replace(/:\s*True\s*([,\}\]])/g, ': true$1');
-    cleaned = cleaned.replace(/:\s*False\s*([,\}\]])/g, ': false$1');
-    cleaned = cleaned.replace(/,\s*True\s*([,\}\]])/g, ', true$1');
-    cleaned = cleaned.replace(/,\s*False\s*([,\}\]])/g, ', false$1');
+    cleaned = cleaned.replace(/:\s*True\s*([,\}\]])/g, ": true$1");
+    cleaned = cleaned.replace(/:\s*False\s*([,\}\]])/g, ": false$1");
+    cleaned = cleaned.replace(/,\s*True\s*([,\}\]])/g, ", true$1");
+    cleaned = cleaned.replace(/,\s*False\s*([,\}\]])/g, ", false$1");
 
     // Remove trailing commas before closing brackets/braces
-    cleaned = cleaned.replace(/,(\s*[\}\]])/g, '$1');
+    cleaned = cleaned.replace(/,(\s*[\}\]])/g, "$1");
 
     // Fix missing commas between array elements (common DeepSeek issue)
-    cleaned = cleaned.replace(/\}(\s*)\{/g, '},$1{');
-    cleaned = cleaned.replace(/\](\s*)\[/g, '],$1[');
+    cleaned = cleaned.replace(/\}(\s*)\{/g, "},$1{");
+    cleaned = cleaned.replace(/\](\s*)\[/g, "],$1[");
 
     // Fix missing commas between string values
     cleaned = cleaned.replace(/"(\s+)"/g, '",$1"');
@@ -94,7 +94,7 @@ export class LMRService {
   private extractAndParseJSON(response: string, isArray: boolean = false): any {
     try {
       // Remove DeepSeek thinking tags if present
-      let cleanedResponse = response.replace(/<think>[\s\S]*?<\/think>/g, '');
+      let cleanedResponse = response.replace(/<think>[\s\S]*?<\/think>/g, "");
 
       // Extract JSON pattern
       const pattern = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
@@ -112,14 +112,26 @@ export class LMRService {
 
       // Log for debugging if sanitization changed anything
       if (raw !== sanitized) {
-        console.log("🔧 JSON sanitized - original length:", raw.length, "→ sanitized:", sanitized.length);
+        console.log(
+          "🔧 JSON sanitized - original length:",
+          raw.length,
+          "→ sanitized:",
+          sanitized.length
+        );
       }
 
       return JSON.parse(sanitized);
     } catch (error) {
       console.error("❌ JSON extraction/parsing failed:", error);
-      console.error("Raw response (first 1000 chars):", response.substring(0, 1000));
-      throw new Error(`Failed to parse AI response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(
+        "Raw response (first 1000 chars):",
+        response.substring(0, 1000)
+      );
+      throw new Error(
+        `Failed to parse AI response: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 
@@ -149,13 +161,17 @@ export class LMRService {
 - List important concepts that students must understand
 - Note any significant examples or case studies`,
 
-      questions: `Extract information needed to generate ${additionalParams?.count || 10} Q&A pairs:
+      questions: `Extract information needed to generate ${
+        additionalParams?.count || 10
+      } Q&A pairs:
 - Identify all factual statements that can be converted to questions
 - Note specific details, definitions, and explanations
 - List concepts that require deeper understanding
 - Include any numerical data or specific facts`,
 
-      quiz: `Extract information needed to generate ${additionalParams?.count || 10} MCQ questions:
+      quiz: `Extract information needed to generate ${
+        additionalParams?.count || 10
+      } MCQ questions:
 - Identify facts that have clear correct/incorrect options
 - Note definitions with possible confusing alternatives
 - List concepts that students often misunderstand
@@ -165,13 +181,17 @@ export class LMRService {
 - Identify the key topics that need to be remembered
 - Extract bullet-point worthy facts
 - Note any formulas, dates, or specific data
-- Identify patterns that could become mnemonics`
+- Identify patterns that could become mnemonics`,
     };
 
     const prompt = `You are an expert content analyzer. Your task is to extract and compress the most relevant information from a document for educational content generation.
 
 DOCUMENT CONTENT:
-${documentContent.substring(0, 15001)}${documentContent.length > 15001 ? '\n\n[... document truncated for processing ...]' : ''}
+${documentContent.substring(0, 15001)}${
+      documentContent.length > 15001
+        ? "\n\n[... document truncated for processing ...]"
+        : ""
+    }
 
 TASK: ${taskInstructions[taskType]}
 
@@ -193,21 +213,29 @@ CRITICAL RULES:
 5. Keep each array item concise (1-2 sentences max)`;
 
     try {
-      const response = await ollamaChatService.chatCompletion(
-        [{ role: 'user', content: prompt }],
-        'json_object'
+      const result = await ollamaChatService.generateWithMaxOutput(
+        prompt,
+        2000
       );
+      const response = result.answer;
 
-      const parsed = this.extractAndParseJSON(response, false) as CompressedContext;
-      console.log(`✅ Layer 1 complete: Extracted ${parsed.mainTopics?.length || 0} topics, ${parsed.keyFacts?.length || 0} facts`);
+      const parsed = this.extractAndParseJSON(
+        response,
+        false
+      ) as CompressedContext;
+      console.log(
+        `✅ Layer 1 complete: Extracted ${
+          parsed.mainTopics?.length || 0
+        } topics, ${parsed.keyFacts?.length || 0} facts`
+      );
       return parsed;
     } catch (error) {
-      console.error('❌ Layer 1 (Context Compression) failed:', error);
+      console.error("❌ Layer 1 (Context Compression) failed:", error);
       // Return a minimal fallback context
       return {
-        mainTopics: ['General Content'],
-        keyFacts: ['Document content available for analysis'],
-        importantConcepts: ['Main concepts from the document']
+        mainTopics: ["General Content"],
+        keyFacts: ["Document content available for analysis"],
+        importantConcepts: ["Main concepts from the document"],
       };
     }
   }
@@ -230,23 +258,37 @@ CRITICAL RULES:
   ): Promise<T> {
     const contextSummary = `
 EXTRACTED CONTENT:
-Main Topics: ${compressedContext.mainTopics.join(', ')}
+Main Topics: ${compressedContext.mainTopics.join(", ")}
 
 Key Facts:
-${compressedContext.keyFacts.map((f, i) => `${i + 1}. ${f}`).join('\n')}
+${compressedContext.keyFacts.map((f, i) => `${i + 1}. ${f}`).join("\n")}
 
 Important Concepts:
-${compressedContext.importantConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+${compressedContext.importantConcepts
+  .map((c, i) => `${i + 1}. ${c}`)
+  .join("\n")}
 
-${compressedContext.relevantExamples?.length ? `Examples:\n${compressedContext.relevantExamples.map((e, i) => `${i + 1}. ${e}`).join('\n')}` : ''}`;
+${
+  compressedContext.relevantExamples?.length
+    ? `Examples:\n${compressedContext.relevantExamples
+        .map((e, i) => `${i + 1}. ${e}`)
+        .join("\n")}`
+    : ""
+}`;
 
-    const prompt = `You are a precise JSON generator. Generate EXACTLY ${schema.isArray ? 'a JSON array' : 'a JSON object'} based on the provided content.
+    const prompt = `You are a precise JSON generator. Generate EXACTLY ${
+      schema.isArray ? "a JSON array" : "a JSON object"
+    } based on the provided content.
 
 ${contextSummary}
 
 TASK: ${schema.description}
 
-${additionalParams?.count ? `Generate exactly ${additionalParams.count} items.` : ''}
+${
+  additionalParams?.count
+    ? `Generate exactly ${additionalParams.count} items.`
+    : ""
+}
 
 Language: ${language}
 
@@ -269,26 +311,36 @@ OUTPUT THE JSON NOW:`;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await ollamaChatService.chatCompletion(
-          [{ role: 'user', content: prompt }],
-          'json_object'
+        const result = await ollamaChatService.generateWithMaxOutput(
+          prompt,
+          3000
         );
+        const response = result.answer;
 
         const parsed = this.extractAndParseJSON(response, schema.isArray);
-        console.log(`✅ Layer 2 complete (attempt ${attempt}): Generated ${schema.isArray ? (parsed as any[]).length + ' items' : 'object'}`);
+        console.log(
+          `✅ Layer 2 complete (attempt ${attempt}): Generated ${
+            schema.isArray ? (parsed as any[]).length + " items" : "object"
+          }`
+        );
         return parsed as T;
       } catch (error) {
-        console.warn(`⚠️ Layer 2 attempt ${attempt}/${maxRetries} failed:`, error);
-        lastError = error instanceof Error ? error : new Error('Unknown error');
+        console.warn(
+          `⚠️ Layer 2 attempt ${attempt}/${maxRetries} failed:`,
+          error
+        );
+        lastError = error instanceof Error ? error : new Error("Unknown error");
 
         // Wait briefly before retry
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }
     }
 
-    throw new Error(`Layer 2 (JSON Generation) failed after ${maxRetries} attempts: ${lastError?.message}`);
+    throw new Error(
+      `Layer 2 (JSON Generation) failed after ${maxRetries} attempts: ${lastError?.message}`
+    );
   }
 
   /**
@@ -341,7 +393,7 @@ OUTPUT THE JSON NOW:`;
     tone: string = "professional"
   ): Promise<LMRSummary> {
     try {
-      console.log('📝 Starting Summary Generation (Two-Layer AI)...');
+      console.log("📝 Starting Summary Generation (Two-Layer AI)...");
 
       // Retrieve full document content
       const document = await this.getFullDocumentContent(fileId);
@@ -350,17 +402,17 @@ OUTPUT THE JSON NOW:`;
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for summary generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'summary',
+        "summary",
         languageName
       );
 
       // ═══════════════════════════════════════════════════════════════
       // LAYER 2: Generate summary JSON from compressed context
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 2: Generating summary JSON...');
+      console.log("🔄 Layer 2: Generating summary JSON...");
       const summarySchema = {
         description: `Generate a comprehensive educational summary with a ${tone} tone. Create a detailed overview covering all major aspects of the content.`,
         jsonTemplate: `{
@@ -368,16 +420,16 @@ OUTPUT THE JSON NOW:`;
   "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5"],
   "importantConcepts": ["Concept 1", "Concept 2", "Concept 3", "Concept 4", "Concept 5"]
 }`,
-        isArray: false
+        isArray: false,
       };
 
       const result = await this.generateJSONFromContext<{
         summary: string;
         keyTopics: string[];
         importantConcepts: string[];
-      }>(compressedContext, 'summary', languageName, summarySchema);
+      }>(compressedContext, "summary", languageName, summarySchema);
 
-      console.log('✅ Summary generation complete!');
+      console.log("✅ Summary generation complete!");
 
       return {
         summary: result.summary,
@@ -386,9 +438,11 @@ OUTPUT THE JSON NOW:`;
         language: languageName,
       };
     } catch (error) {
-      console.error('❌ Summary generation failed:', error);
+      console.error("❌ Summary generation failed:", error);
       throw new Error(
-        `Failed to generate summary: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate summary: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
     }
   }
@@ -403,7 +457,7 @@ OUTPUT THE JSON NOW:`;
     count: number = 10
   ): Promise<LMRQuestion[]> {
     try {
-      console.log('❓ Starting Q&A Generation (Two-Layer AI)...');
+      console.log("❓ Starting Q&A Generation (Two-Layer AI)...");
 
       const document = await this.getFullDocumentContent(fileId);
       const languageName = SUPPORTED_LANGUAGES[language];
@@ -411,10 +465,10 @@ OUTPUT THE JSON NOW:`;
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for question generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'questions',
+        "questions",
         languageName,
         { count }
       );
@@ -422,7 +476,7 @@ OUTPUT THE JSON NOW:`;
       // ═══════════════════════════════════════════════════════════════
       // LAYER 2: Generate questions JSON from compressed context
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 2: Generating questions JSON...');
+      console.log("🔄 Layer 2: Generating questions JSON...");
       const questionsSchema = {
         description: `Generate ${count} high-quality educational Q&A pairs. Mix difficulty levels: 30% Easy, 50% Medium, 20% Hard. Each question should test understanding of the content.`,
         jsonTemplate: `[
@@ -441,18 +495,18 @@ OUTPUT THE JSON NOW:`;
     "pageReference": null
   }
 ]`,
-        isArray: true
+        isArray: true,
       };
 
       const questions = await this.generateJSONFromContext<any[]>(
         compressedContext,
-        'questions',
+        "questions",
         languageName,
         questionsSchema,
         { count }
       );
 
-      console.log('✅ Q&A generation complete!');
+      console.log("✅ Q&A generation complete!");
 
       return questions.map((q: any, index: number) => ({
         id: index + 1,
@@ -463,9 +517,11 @@ OUTPUT THE JSON NOW:`;
         pageReference: q.pageReference,
       }));
     } catch (error) {
-      console.error('❌ Q&A generation failed:', error);
+      console.error("❌ Q&A generation failed:", error);
       throw new Error(
-        `Failed to generate questions: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate questions: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
     }
   }
@@ -480,7 +536,7 @@ OUTPUT THE JSON NOW:`;
     count: number = 10
   ): Promise<LMRQuiz[]> {
     try {
-      console.log('📋 Starting Quiz Generation (Two-Layer AI)...');
+      console.log("📋 Starting Quiz Generation (Two-Layer AI)...");
 
       const document = await this.getFullDocumentContent(fileId);
       const languageName = SUPPORTED_LANGUAGES[language];
@@ -488,10 +544,10 @@ OUTPUT THE JSON NOW:`;
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for quiz generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'quiz',
+        "quiz",
         languageName,
         { count }
       );
@@ -499,7 +555,7 @@ OUTPUT THE JSON NOW:`;
       // ═══════════════════════════════════════════════════════════════
       // LAYER 2: Generate quiz JSON from compressed context
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 2: Generating quiz JSON...');
+      console.log("🔄 Layer 2: Generating quiz JSON...");
       const quizSchema = {
         description: `Generate ${count} multiple-choice questions (MCQs). Each question must have exactly 4 options with one correct answer. Mix difficulty levels and include explanations.`,
         jsonTemplate: `[
@@ -520,18 +576,18 @@ OUTPUT THE JSON NOW:`;
     "subject": "Subject name"
   }
 ]`,
-        isArray: true
+        isArray: true,
       };
 
       const quizzes = await this.generateJSONFromContext<any[]>(
         compressedContext,
-        'quiz',
+        "quiz",
         languageName,
         quizSchema,
         { count }
       );
 
-      console.log('✅ Quiz generation complete!');
+      console.log("✅ Quiz generation complete!");
 
       return quizzes.map((q: any, index: number) => ({
         id: index + 1,
@@ -543,9 +599,11 @@ OUTPUT THE JSON NOW:`;
         subject: q.subject || "General",
       }));
     } catch (error) {
-      console.error('❌ Quiz generation failed:', error);
+      console.error("❌ Quiz generation failed:", error);
       throw new Error(
-        `Failed to generate quiz: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate quiz: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
     }
   }
@@ -559,7 +617,7 @@ OUTPUT THE JSON NOW:`;
     language: LanguageCode
   ): Promise<LMRRecallNote[]> {
     try {
-      console.log('🧠 Starting Recall Notes Generation (Two-Layer AI)...');
+      console.log("🧠 Starting Recall Notes Generation (Two-Layer AI)...");
 
       const document = await this.getFullDocumentContent(fileId);
       const languageName = SUPPORTED_LANGUAGES[language];
@@ -567,17 +625,17 @@ OUTPUT THE JSON NOW:`;
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for recall notes generation
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 1: Compressing document context...');
+      console.log("🔄 Layer 1: Compressing document context...");
       const compressedContext = await this.compressContextForTask(
         document.fullContent,
-        'recallNotes',
+        "recallNotes",
         languageName
       );
 
       // ═══════════════════════════════════════════════════════════════
       // LAYER 2: Generate recall notes JSON from compressed context
       // ═══════════════════════════════════════════════════════════════
-      console.log('🔄 Layer 2: Generating recall notes JSON...');
+      console.log("🔄 Layer 2: Generating recall notes JSON...");
       const recallNotesSchema = {
         description: `Generate concise, memorable recall notes organized by topics. Include key points (3-5 per topic), quick facts, and helpful mnemonics for exam preparation.`,
         jsonTemplate: `[
@@ -594,17 +652,17 @@ OUTPUT THE JSON NOW:`;
     "mnemonics": []
   }
 ]`,
-        isArray: true
+        isArray: true,
       };
 
       const notes = await this.generateJSONFromContext<any[]>(
         compressedContext,
-        'recallNotes',
+        "recallNotes",
         languageName,
         recallNotesSchema
       );
 
-      console.log('✅ Recall notes generation complete!');
+      console.log("✅ Recall notes generation complete!");
 
       return notes.map((n: any) => ({
         topic: n.topic,
@@ -613,9 +671,11 @@ OUTPUT THE JSON NOW:`;
         mnemonics: n.mnemonics || [],
       }));
     } catch (error) {
-      console.error('❌ Recall notes generation failed:', error);
+      console.error("❌ Recall notes generation failed:", error);
       throw new Error(
-        `Failed to generate recall notes: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate recall notes: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
     }
   }
@@ -639,9 +699,9 @@ OUTPUT THE JSON NOW:`;
         recallNotes,
       };
     } catch (error) {
-
       throw new Error(
-        `Failed to generate content: ${error instanceof Error ? error.message : "Unknown error"
+        `Failed to generate content: ${
+          error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }

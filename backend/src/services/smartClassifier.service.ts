@@ -6,25 +6,25 @@ import { ChatMessage } from "../types";
  */
 
 export interface ClassificationResult {
-    needsRAG: boolean;
-    directAnswer?: string; // If needsRAG=false, this contains the answer
-    retrievalPrompt?: string; // If needsRAG=true, optimized prompt for RAG
-    reasoning?: string; // Why this decision was made
+  needsRAG: boolean;
+  directAnswer?: string; // If needsRAG=false, this contains the answer
+  retrievalPrompt?: string; // If needsRAG=true, optimized prompt for RAG
+  reasoning?: string; // Why this decision was made
 }
 
 export class SmartClassifierService {
-    /**
-     * Main classification method - sends query to DeepSeek for smart routing
-     */
-    async classifyAndRoute(
-        query: string,
-        chatHistory: ChatMessage[]
-    ): Promise<ClassificationResult> {
-        const startTime = Date.now();
+  /**
+   * Main classification method - sends query to DeepSeek for smart routing
+   */
+  async classifyAndRoute(
+    query: string,
+    chatHistory: ChatMessage[]
+  ): Promise<ClassificationResult> {
+    const startTime = Date.now();
 
-        // Smart Classifier analyzing
+    // Smart Classifier analyzing
 
-        const systemPrompt = `You are a smart query classifier for an educational RAG chatbot.
+    const systemPrompt = `You are a smart query classifier for an educational RAG chatbot.
 
 Your job is to analyze the user's query and decide:
 
@@ -75,141 +75,140 @@ User: "who are you?"
 
 Now analyze this query:`;
 
-        try {
-            // Call Ollama using chatCompletion
-            const response = await ollamaChatService.chatCompletion(
-                [
-                    {
-                        role: "system",
-                        content: systemPrompt,
-                    },
-                    ...chatHistory.slice(-3).map((msg) => ({
-                        role: msg.role,
-                        content: msg.content,
-                    })),
-                    {
-                        role: "user",
-                        content: `Query to classify: "${query}"`,
-                    },
-                ],
-                "json_object"
-            );
+    try {
+      // Build conversation prompt
+      const chatContext = chatHistory
+        .slice(-3)
+        .map((msg) => `${msg.role}: ${msg.content}`)
+        .join("\n");
 
-            // Raw classifier response received
+      const fullPrompt = `${systemPrompt}\n\n${
+        chatContext ? `Context:\n${chatContext}\n\n` : ""
+      }Query to classify: "${query}"\n\nRespond with JSON only.`;
 
-            // Parse JSON response
-            const result = this.parseClassifierResponse(response);
+      // Call Ollama using generateWithMaxOutput
+      const result = await ollamaChatService.generateWithMaxOutput(
+        fullPrompt,
+        500
+      );
+      const response = result.answer;
 
-            const duration = Date.now() - startTime;
-            console.log(
-                `✅ Classification complete in ${duration}ms: ${result.needsRAG ? "RAG" : "DIRECT"
-                }`
-            );
+      // Raw classifier response received
 
-            return result;
-        } catch (error: any) {
-            console.error("❌ Classifier error:", error.message);
+      // Parse JSON response
+      const result = this.parseClassifierResponse(response);
 
-            // Fallback: Use simple rule-based classification
-            return this.fallbackClassification(query);
-        }
+      const duration = Date.now() - startTime;
+      console.log(
+        `✅ Classification complete in ${duration}ms: ${
+          result.needsRAG ? "RAG" : "DIRECT"
+        }`
+      );
+
+      return result;
+    } catch (error: any) {
+      console.error("❌ Classifier error:", error.message);
+
+      // Fallback: Use simple rule-based classification
+      return this.fallbackClassification(query);
+    }
+  }
+
+  /**
+   * Parse DeepSeek's JSON response
+   */
+  private parseClassifierResponse(response: string): ClassificationResult {
+    try {
+      // Extract JSON from response (handle markdown code blocks)
+      let jsonStr = response.trim();
+
+      // Remove markdown code blocks if present
+      jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+
+      // Remove any text before/after JSON
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
+
+      const parsed = JSON.parse(jsonStr);
+
+      return {
+        needsRAG: Boolean(parsed.needsRAG),
+        directAnswer: parsed.directAnswer || undefined,
+        retrievalPrompt: parsed.retrievalPrompt || undefined,
+        reasoning: parsed.reasoning || undefined,
+      };
+    } catch (error) {
+      console.warn("⚠️  Failed to parse JSON, using fallback");
+      throw error; // Will trigger fallback
+    }
+  }
+
+  /**
+   * Fallback classification if DeepSeek fails
+   */
+  private fallbackClassification(query: string): ClassificationResult {
+    const trimmed = query.trim().toLowerCase();
+
+    // Simple patterns for direct answers
+    const greetings = [
+      "hi",
+      "hello",
+      "hey",
+      "hola",
+      "namaste",
+      "good morning",
+      "good afternoon",
+      "good evening",
+      "thanks",
+      "thank you",
+      "bye",
+      "goodbye",
+    ];
+
+    const metaQuestions = [
+      "who are you",
+      "what can you do",
+      "what are you",
+      "help",
+      "how do you work",
+    ];
+
+    // Check greetings
+    if (
+      greetings.some(
+        (g) =>
+          trimmed === g ||
+          trimmed.startsWith(g + " ") ||
+          trimmed.startsWith(g + "!")
+      )
+    ) {
+      return {
+        needsRAG: false,
+        directAnswer:
+          "Hello! I'm MasterJi, your educational AI assistant. Upload documents and ask me questions about them!",
+        reasoning: "Greeting detected",
+      };
     }
 
-    /**
-     * Parse DeepSeek's JSON response
-     */
-    private parseClassifierResponse(response: string): ClassificationResult {
-        try {
-            // Extract JSON from response (handle markdown code blocks)
-            let jsonStr = response.trim();
-
-            // Remove markdown code blocks if present
-            jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?/g, "");
-
-            // Remove any text before/after JSON
-            const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                jsonStr = jsonMatch[0];
-            }
-
-            const parsed = JSON.parse(jsonStr);
-
-            return {
-                needsRAG: Boolean(parsed.needsRAG),
-                directAnswer: parsed.directAnswer || undefined,
-                retrievalPrompt: parsed.retrievalPrompt || undefined,
-                reasoning: parsed.reasoning || undefined,
-            };
-        } catch (error) {
-            console.warn("⚠️  Failed to parse JSON, using fallback");
-            throw error; // Will trigger fallback
-        }
+    // Check meta questions
+    if (metaQuestions.some((q) => trimmed.includes(q))) {
+      return {
+        needsRAG: false,
+        directAnswer:
+          "I'm MasterJi, an AI-powered educational assistant. I help you understand your study materials by answering questions based on your uploaded documents. Just upload PDFs or images and ask me anything!",
+        reasoning: "Meta question detected",
+      };
     }
 
-    /**
-     * Fallback classification if DeepSeek fails
-     */
-    private fallbackClassification(query: string): ClassificationResult {
-        const trimmed = query.trim().toLowerCase();
-
-        // Simple patterns for direct answers
-        const greetings = [
-            "hi",
-            "hello",
-            "hey",
-            "hola",
-            "namaste",
-            "good morning",
-            "good afternoon",
-            "good evening",
-            "thanks",
-            "thank you",
-            "bye",
-            "goodbye",
-        ];
-
-        const metaQuestions = [
-            "who are you",
-            "what can you do",
-            "what are you",
-            "help",
-            "how do you work",
-        ];
-
-        // Check greetings
-        if (
-            greetings.some(
-                (g) =>
-                    trimmed === g ||
-                    trimmed.startsWith(g + " ") ||
-                    trimmed.startsWith(g + "!")
-            )
-        ) {
-            return {
-                needsRAG: false,
-                directAnswer:
-                    "Hello! I'm MasterJi, your educational AI assistant. Upload documents and ask me questions about them!",
-                reasoning: "Greeting detected",
-            };
-        }
-
-        // Check meta questions
-        if (metaQuestions.some((q) => trimmed.includes(q))) {
-            return {
-                needsRAG: false,
-                directAnswer:
-                    "I'm MasterJi, an AI-powered educational assistant. I help you understand your study materials by answering questions based on your uploaded documents. Just upload PDFs or images and ask me anything!",
-                reasoning: "Meta question detected",
-            };
-        }
-
-        // Default: Needs RAG
-        return {
-            needsRAG: true,
-            retrievalPrompt: query, // Use original query as-is
-            reasoning: "Default RAG routing",
-        };
-    }
+    // Default: Needs RAG
+    return {
+      needsRAG: true,
+      retrievalPrompt: query, // Use original query as-is
+      reasoning: "Default RAG routing",
+    };
+  }
 }
 
 export const smartClassifierService = new SmartClassifierService();
