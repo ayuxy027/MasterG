@@ -1,5 +1,5 @@
 import React from "react";
-import { LMRSummary } from "../../services/lmrApi";
+import { LMRSummary, KeyTopic, ImportantConcept } from "../../services/lmrApi";
 
 interface MaterialsTabProps {
   summary: LMRSummary | null;
@@ -30,6 +30,28 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
     );
   }
 
+  // Helper to safely get topic display
+  const getTopicName = (topic: KeyTopic | string): string => {
+    if (typeof topic === 'string') return topic;
+    return topic?.name || 'Topic';
+  };
+
+  const getTopicDescription = (topic: KeyTopic | string): string => {
+    if (typeof topic === 'string') return '';
+    return topic?.description || '';
+  };
+
+  // Helper to safely get concept display
+  const getConceptName = (concept: ImportantConcept | string): string => {
+    if (typeof concept === 'string') return concept;
+    return concept?.name || 'Concept';
+  };
+
+  const getConceptPoints = (concept: ImportantConcept | string): string[] => {
+    if (typeof concept === 'string') return [concept];
+    return concept?.points || [];
+  };
+
   return (
     <div>
       {!summary ? (
@@ -55,7 +77,7 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Main Summary */}
+          {/* Structured Summary - Last Minute Revision Format */}
           <div className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden shadow-md">
             <div className="bg-gradient-to-r from-orange-50 to-orange-100 border-b-2 border-orange-200 px-6 py-4">
               <h4 className="font-bold text-gray-800 text-xl flex items-center gap-2">
@@ -72,20 +94,62 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   ></path>
                 </svg>
-                Document Summary
+                Last Minute Summary
               </h4>
               <p className="text-sm text-gray-600 mt-1">
-                Generated in {summary.language}
+                Generated in {summary.language} • Quick revision format
               </p>
             </div>
-            <div className="p-6">
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {summary.summary}
-              </p>
+            <div className="p-6 space-y-4">
+              {/* Introduction */}
+              {summary.introduction && (
+                <div className="bg-orange-50 rounded-lg p-4 border-l-4 border-orange-400">
+                  <p className="text-gray-700 leading-relaxed font-medium">
+                    {summary.introduction}
+                  </p>
+                </div>
+              )}
+
+              {/* Summary Points - Bullet List */}
+              {summary.summaryPoints && summary.summaryPoints.length > 0 && (
+                <div className="space-y-2">
+                  <h5 className="font-semibold text-gray-800 flex items-center gap-2">
+                    Key Summary Points
+                  </h5>
+                  <ul className="space-y-2">
+                    {summary.summaryPoints.map((point, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <span className="text-orange-500 font-bold flex-shrink-0">•</span>
+                        <span className="text-gray-700">{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Conclusion */}
+              {summary.conclusion && (
+                <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-400">
+                  <h5 className="font-semibold text-gray-800 mb-2">Conclusion</h5>
+                  <p className="text-gray-700 leading-relaxed">
+                    {summary.conclusion}
+                  </p>
+                </div>
+              )}
+
+              {/* Fallback to legacy summary if structured format not available */}
+              {!summary.introduction && !summary.summaryPoints?.length && summary.summary && (
+                <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                  {summary.summary}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Key Topics */}
+          {/* Key Topics with Descriptions */}
           <div className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden shadow-md">
             <div className="bg-orange-50 border-b-2 border-orange-200 px-6 py-4">
               <h4 className="font-bold text-gray-800 text-lg flex items-center gap-2">
@@ -104,25 +168,37 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
                 </svg>
                 Key Topics
               </h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Each topic with a quick recall description
+              </p>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-4">
                 {summary.keyTopics.map((topic, idx) => (
                   <div
                     key={idx}
-                    className="flex items-start gap-3 p-4 bg-orange-50 rounded-lg border border-orange-200"
+                    className="flex items-start gap-4 p-4 bg-orange-50 rounded-lg border border-orange-200 hover:shadow-md transition-shadow"
                   >
-                    <span className="flex-shrink-0 w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                    <span className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                       {idx + 1}
                     </span>
-                    <span className="text-gray-700 font-medium">{topic}</span>
+                    <div className="flex-1">
+                      <h5 className="text-gray-800 font-semibold text-lg">
+                        {getTopicName(topic)}
+                      </h5>
+                      {getTopicDescription(topic) && (
+                        <p className="text-gray-600 text-sm mt-1">
+                          {getTopicDescription(topic)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Important Concepts */}
+          {/* Important Concepts with 5 Bullet Points Each */}
           <div className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden shadow-md">
             <div className="bg-orange-50 border-b-2 border-orange-200 px-6 py-4">
               <h4 className="font-bold text-gray-800 text-lg flex items-center gap-2">
@@ -141,28 +217,68 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
                 </svg>
                 Important Concepts
               </h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Each concept with 3 key bullet points for quick understanding
+              </p>
             </div>
             <div className="p-6">
-              <div className="space-y-3">
-                {summary.importantConcepts.map((concept, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg border border-blue-200"
-                  >
-                    <svg
-                      className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
+              <div className="space-y-6">
+                {summary.importantConcepts.map((concept, idx) => {
+                  const conceptName = getConceptName(concept);
+                  const conceptPoints = getConceptPoints(concept);
+
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-blue-50 rounded-xl border-2 border-blue-200 overflow-hidden"
                     >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-gray-700">{concept}</span>
-                  </div>
-                ))}
+                      {/* Concept Header */}
+                      <div className="bg-blue-100 px-5 py-3 border-b border-blue-200">
+                        <div className="flex items-center gap-3">
+                          <svg
+                            className="w-5 h-5 text-blue-600 flex-shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <h5 className="font-bold text-blue-800 text-lg">
+                            {conceptName}
+                          </h5>
+                        </div>
+                      </div>
+
+                      {/* Concept Points */}
+                      <div className="p-4">
+                        {conceptPoints.length > 0 ? (
+                          <ul className="space-y-2">
+                            {conceptPoints.map((point, pointIdx) => (
+                              <li
+                                key={pointIdx}
+                                className="flex items-start gap-3 p-2"
+                              >
+                                <span className="flex-shrink-0 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                  {pointIdx + 1}
+                                </span>
+                                <span className="text-gray-700 text-sm">
+                                  {typeof point === 'string' ? point : JSON.stringify(point)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-gray-600 text-sm italic">
+                            {typeof concept === 'string' ? concept : 'No detailed points available'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

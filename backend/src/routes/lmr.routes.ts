@@ -82,4 +82,11 @@ router.get("/history", lmrController.getHistory.bind(lmrController));
  */
 router.delete("/history/:id", lmrController.deleteHistory.bind(lmrController));
 
+/**
+ * POST /api/lmr/translate
+ * Translate LMR content to target language using NLLB-200
+ * Body: { content: { summary?, questions?, quiz?, recallNotes? }, targetLanguage: string }
+ */
+router.post("/translate", lmrController.translateContent.bind(lmrController));
+
 export default router;

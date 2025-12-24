@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
-import { Zap, Wrench, Brain, Database, Building2, Flame } from 'lucide-react';
+import { Zap, Wrench, Brain, Database, Building2, Flame, Plus, Minus } from 'lucide-react';
 
 interface Benchmark {
   name: string;
@@ -62,8 +62,71 @@ const benchmarks: Benchmark[] = [
   }
 ];
 
+const CORE_REQUIREMENTS = [
+  {
+    title: "Script Accuracy Assurance",
+    description: "Guarantee correct usage of characters, numbers, and symbols for complex subjects such as mathematics and science across all supported scripts"
+  },
+  {
+    title: "Age-Appropriate Scaling",
+    description: "Adapt curriculum topics (e.g., Photosynthesis) to grade levels (Class 3, 8, 12) with appropriate depth, vocabulary, and examples"
+  },
+  {
+    title: "Cultural Relevance Embedding",
+    description: "Integrate region-specific festivals, stories, and local references while maintaining a pan-Indian educational perspective"
+  },
+  {
+    title: "Code-Mixing Fluency",
+    description: "Seamlessly handle mixed-language content (e.g., Hindi-English, Punjabi-English) without losing readability or comprehension"
+  },
+  {
+    title: "Curriculum Alignment",
+    description: "Strictly adhere to NCERT, CBSE, and state board standards with factual accuracy above 95%"
+  },
+  {
+    title: "Accessibility Support",
+    description: "Provide learning-friendly outputs for students with dyslexia, visual impairments, or other learning challenges"
+  },
+  {
+    title: "Offline Optimization",
+    description: "Run efficiently on low-resource devices (4–8 GB RAM), ensuring smooth operation in low-connectivity or offline rural settings"
+  }
+];
+
+const RequirementCard = ({ title, description, className = "" }: { title: string, description: string, className?: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div
+      className={`bg-white rounded-xl shadow-sm border-2 ${isOpen ? 'border-orange-400/60 shadow-md bg-orange-50/30' : 'border-orange-100/60'} transition-all duration-300 overflow-hidden cursor-pointer hover:shadow-md hover:border-orange-300/60 group ${className}`}
+      onClick={() => setIsOpen(!isOpen)}
+    >
+      <div className="p-5 flex items-center justify-between gap-4">
+        <h4 className={`font-bold text-lg leading-tight ${isOpen ? 'text-orange-800' : 'text-gray-800'} group-hover:text-orange-700 transition-colors`}>
+          {title}
+        </h4>
+        <svg
+          className={`w-5 h-5 text-orange-400 transition-transform duration-300 transform flex-shrink-0 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      <div className={`px-5 overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-40 pb-5 opacity-100' : 'max-h-0 opacity-0'}`}>
+        <p className="text-gray-600 text-sm leading-relaxed border-t border-orange-100/60 pt-3">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const PitchPage = () => {
   const [visibleBenchmarks, setVisibleBenchmarks] = useState<number[]>([]);
+  const [isCrisisExpanded, setIsCrisisExpanded] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showJourney, setShowJourney] = useState(true);
   const problemRef = useRef<HTMLDivElement>(null);
@@ -142,29 +205,51 @@ const PitchPage = () => {
             The Challenge
           </h2>
           <div className="prose prose-lg max-w-none">
-            <div className="bg-orange-50/60 border-l-4 border-orange-400/60 p-6 rounded-r-lg mb-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                Multilingual Content Generation Crisis
-              </h3>
-              <p className="text-gray-700 mb-4">
-                Design a lightweight, multilingual AI system to generate educational content across all 22 scheduled Indian languages, including key regional dialects like Bhojpuri and Santali.
-              </p>
-              <p className="text-gray-700 mb-4">
-                Rural Indian students face significant barriers in accessing quality educational content in their native languages. Current educational AI systems are predominantly English-focused and fail to serve the linguistic diversity of India's student population.
-              </p>
+            <div className="bg-orange-50/60 border-l-4 border-orange-400/60 p-6 rounded-r-lg mb-8 transition-all duration-300">
+              <div
+                className="flex items-center justify-between cursor-pointer group"
+                onClick={() => setIsCrisisExpanded(!isCrisisExpanded)}
+              >
+                {/* Spacer to balance the flex container for true centering of the title */}
+                <div className="w-10"></div>
+
+                <h3 className="text-2xl font-bold text-center text-gray-900 group-hover:text-orange-700 transition-colors flex-1">
+                  Multilingual Content Generation Crisis
+                </h3>
+
+                <button className="p-2 rounded-full hover:bg-orange-200/50 text-orange-600 transition-colors flex-shrink-0 w-10 flex justify-end">
+                  {isCrisisExpanded ? (
+                    <Minus className="w-6 h-6" strokeWidth={2.5} />
+                  ) : (
+                    <Plus className="w-6 h-6" strokeWidth={2.5} />
+                  )}
+                </button>
+              </div>
+
+              <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isCrisisExpanded ? 'max-h-[500px] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
+                <div className="text-center px-4">
+                  <p className="text-gray-700 mb-4">
+                    Design a lightweight, multilingual AI system to generate educational content across all 22 scheduled Indian languages, including key regional dialects like Bhojpuri and Santali.
+                  </p>
+                  <p className="text-gray-700 mb-4">
+                    Rural Indian students face significant barriers in accessing quality educational content in their native languages. Current educational AI systems are predominantly English-focused and fail to serve the linguistic diversity of India's student population.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-4 text-gray-700">
-              <h4 className="text-xl font-bold text-gray-900">Core Requirements:</h4>
-              <ul className="space-y-3 list-disc list-inside">
-                <li><strong>Script Accuracy Assurance</strong> - Guarantee correct usage of characters, numbers, and symbols for complex subjects such as mathematics and science across all supported scripts</li>
-                <li><strong>Age-Appropriate Scaling</strong> - Adapt curriculum topics (e.g., Photosynthesis) to different grade levels (Class 3, 8, 12) with appropriate depth, vocabulary, and examples</li>
-                <li><strong>Cultural Relevance Embedding</strong> - Integrate region-specific festivals, stories, and local references while maintaining a pan-Indian educational perspective</li>
-                <li><strong>Code-Mixing Fluency</strong> - Seamlessly handle mixed-language content (e.g., Hindi-English, Punjabi-English) without losing readability or comprehension</li>
-                <li><strong>Curriculum Alignment</strong> - Strictly adhere to NCERT, CBSE, and state board standards with factual accuracy above 95%</li>
-                <li><strong>Accessibility Support</strong> - Provide learning-friendly outputs for students with dyslexia, visual impairments, or other learning challenges</li>
-                <li><strong>Offline Optimization</strong> - Run efficiently on low-resource devices (4–8 GB RAM), ensuring smooth operation in low-connectivity or offline rural settings</li>
-              </ul>
+            <div className="space-y-6 text-gray-700">
+              <h4 className="text-xl font-bold text-gray-900 text-center mb-2">Core Requirements:</h4>
+              <div className="grid md:grid-cols-2 gap-4 items-start">
+                {CORE_REQUIREMENTS.map((req, index) => (
+                  <RequirementCard
+                    key={index}
+                    title={req.title}
+                    description={req.description}
+                    className={index === CORE_REQUIREMENTS.length - 1 ? "md:col-span-2" : ""}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -180,7 +265,7 @@ const PitchPage = () => {
             Requirements Were Tough
           </p>
 
-          <div ref={benchmarksRef} className="space-y-6">
+          <div ref={benchmarksRef} className="grid md:grid-cols-2 gap-6">
             {benchmarks.map((benchmark, index) => (
               <div
                 key={index}

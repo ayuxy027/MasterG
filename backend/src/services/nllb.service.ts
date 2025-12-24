@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import fs from "fs";
 import { env } from "../config/env";
+import { v4 as uuidv4 } from "uuid";
 
 export interface NLLBTranslateOptions {
   srcLang: string; // e.g. eng_Latn
@@ -10,13 +11,24 @@ export interface NLLBTranslateOptions {
   useCache?: boolean; // Whether to use cache (default: true)
 }
 
+// Pending request interface for queue
+interface PendingRequest {
+  resolve: (value: { success: boolean; translated?: string; error?: string }) => void;
+  requestId: string;
+}
+
 export class NLLBService {
   private scriptPath: string;
   private modelPath: string;
   private pythonExecutable: string;
-  private pythonProcess: ChildProcess | null = null; // Persistent Python process
-  private translationCache: Map<string, string> = new Map(); // Simple in-memory cache
-  private readonly CACHE_MAX_SIZE = 1000; // Limit cache size
+  private pythonProcess: ChildProcess | null = null;
+  private translationCache: Map<string, string> = new Map();
+  private readonly CACHE_MAX_SIZE = 1000;
+
+  // Request queue to handle concurrent translations properly
+  private requestQueue: PendingRequest[] = [];
+  private isProcessing: boolean = false;
+  private stdoutBuffer: string = "";
 
   constructor() {
     this.scriptPath = path.resolve(
@@ -34,8 +46,7 @@ export class NLLBService {
       "models",
       "nllb-200-distilled-600M"
     );
-    // Use venv python - CRITICAL for torch and other dependencies
-    // On Windows, venv uses Scripts/python.exe; on Unix/Mac, it's bin/python
+
     const isWindows = process.platform === "win32";
     const venvPython = path.resolve(
       __dirname,
@@ -46,16 +57,15 @@ export class NLLBService {
       isWindows ? "Scripts" : "bin",
       isWindows ? "python.exe" : "python"
     );
-    // Always prioritize venv python if it exists (has torch and all deps)
+
     if (fs.existsSync(venvPython)) {
       this.pythonExecutable = venvPython;
       console.log(`✅ Using NLLB venv Python: ${venvPython}`);
     } else {
       this.pythonExecutable = env.PYTHON_EXECUTABLE || "python3";
-      console.warn(`⚠️  NLLB venv not found at ${venvPython}, using ${this.pythonExecutable}. Translation may fail without proper dependencies.`);
+      console.warn(`⚠️  NLLB venv not found at ${venvPython}, using ${this.pythonExecutable}`);
     }
 
-    // Start persistent Python server only if enabled
     if (env.NLLB_ENABLED) {
       this.startServer();
     }
@@ -63,7 +73,7 @@ export class NLLBService {
 
   private startServer() {
     if (this.pythonProcess) {
-      return; // Already running
+      return;
     }
 
     const spawnEnv = {
@@ -75,10 +85,7 @@ export class NLLBService {
     };
 
     if (!fs.existsSync(this.modelPath)) {
-      console.warn(
-        `⚠️  NLLB model directory not found at ${this.modelPath}. ` +
-        "Download the model to this exact absolute path before starting the server."
-      );
+      console.warn(`⚠️  NLLB model directory not found at ${this.modelPath}`);
     }
 
     console.log("🚀 Starting NLLB-200 persistent server...");
@@ -87,10 +94,14 @@ export class NLLBService {
       env: spawnEnv,
     });
 
+    // Handle stdout - process responses
+    this.pythonProcess.stdout.on("data", (data: Buffer) => {
+      this.handleStdout(data);
+    });
+
     this.pythonProcess.stderr.on("data", (data: Buffer) => {
       const msg = data.toString();
-      // Log server messages to stderr (model loading, etc.)
-      if (msg.includes("Loading") || msg.includes("ready") || msg.includes("error")) {
+      if (msg.includes("Loading") || msg.includes("ready") || msg.includes("error") || msg.includes("✅")) {
         console.log(`[NLLB] ${msg.trim()}`);
       }
     });
@@ -98,12 +109,14 @@ export class NLLBService {
     this.pythonProcess.on("error", (err: Error) => {
       console.error("❌ NLLB server error:", err);
       this.pythonProcess = null;
+      this.rejectAllPending("NLLB server error");
     });
 
     this.pythonProcess.on("exit", (code: number) => {
       console.warn(`⚠️  NLLB server exited with code ${code}`);
       this.pythonProcess = null;
-      // Attempt to restart after a delay
+      this.rejectAllPending("NLLB server exited");
+
       if (env.NLLB_ENABLED) {
         setTimeout(() => {
           if (!this.pythonProcess) {
@@ -116,28 +129,69 @@ export class NLLBService {
   }
 
   /**
-   * Generate cache key from text and language options
-   * OPTIMIZATION: Use hash for better cache key distribution and memory efficiency
+   * Handle stdout data - parse responses and resolve pending requests IN ORDER
    */
-  private getCacheKey(text: string, options: NLLBTranslateOptions): string {
-    // Use simple hash function for better cache key distribution
-    // This prevents cache key collisions and reduces memory usage
-    let hash = 0;
-    const keyString = `${options.srcLang}:${options.tgtLang}:${text}`;
-    for (let i = 0; i < keyString.length; i++) {
-      const char = keyString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+  private handleStdout(data: Buffer) {
+    this.stdoutBuffer += data.toString();
+
+    // Process complete lines
+    let newlineIndex = this.stdoutBuffer.indexOf("\n");
+    while (newlineIndex !== -1) {
+      const line = this.stdoutBuffer.slice(0, newlineIndex).trim();
+      this.stdoutBuffer = this.stdoutBuffer.slice(newlineIndex + 1);
+
+      if (line.length > 0) {
+        try {
+          const parsed = JSON.parse(line);
+
+          // Pop the first pending request (FIFO order)
+          const pending = this.requestQueue.shift();
+          if (pending) {
+            pending.resolve(parsed);
+          } else {
+            console.warn("⚠️ Received response but no pending request");
+          }
+        } catch (err) {
+          console.error("❌ Invalid JSON from NLLB server:", line.substring(0, 100));
+          // Still pop the pending request and reject it
+          const pending = this.requestQueue.shift();
+          if (pending) {
+            pending.resolve({ success: false, error: "Invalid JSON from NLLB server" });
+          }
+        }
+      }
+
+      newlineIndex = this.stdoutBuffer.indexOf("\n");
     }
-    return `nllb:${Math.abs(hash).toString(36)}:${keyString.length}`;
   }
 
   /**
-   * Clear cache if it exceeds max size
+   * Reject all pending requests (on error)
    */
+  private rejectAllPending(errorMessage: string) {
+    while (this.requestQueue.length > 0) {
+      const pending = this.requestQueue.shift();
+      if (pending) {
+        pending.resolve({ success: false, error: errorMessage });
+      }
+    }
+  }
+
+  private getCacheKey(text: string, options: NLLBTranslateOptions): string {
+    const keyString = `${options.srcLang}:${options.tgtLang}:${text}`;
+    let hash = 2166136261;
+    for (let i = 0; i < keyString.length; i++) {
+      hash ^= keyString.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    const textLen = text.length;
+    const firstChar = text.charCodeAt(0) || 0;
+    const lastChar = text.charCodeAt(text.length - 1) || 0;
+    return `nllb:${Math.abs(hash >>> 0).toString(36)}:${textLen}:${firstChar}:${lastChar}`;
+  }
+
   private manageCache(): void {
     if (this.translationCache.size > this.CACHE_MAX_SIZE) {
-      // Remove oldest 20% of entries (simple LRU approximation)
       const entriesToRemove = Math.floor(this.CACHE_MAX_SIZE * 0.2);
       const keys = Array.from(this.translationCache.keys());
       for (let i = 0; i < entriesToRemove; i++) {
@@ -164,12 +218,10 @@ export class NLLBService {
       }
     }
 
-    const result = await this.runPython(text, options);
+    const result = await this.sendRequest(text, options);
 
     if (!result.success || !result.translated) {
-      throw new Error(
-        result.error || "NLLB translation failed for unknown reasons"
-      );
+      throw new Error(result.error || "NLLB translation failed");
     }
 
     // Store in cache
@@ -183,10 +235,65 @@ export class NLLBService {
   }
 
   /**
-   * Stream translation sentence-by-sentence.
-   *
-   * This expects the Python server to emit one JSON object per line:
-   *  { success, type: "chunk" | "complete" | "error", index?, total?, translated? }
+   * Send a translation request - uses queue for proper ordering
+   */
+  private async sendRequest(
+    text: string,
+    options: NLLBTranslateOptions
+  ): Promise<{ success: boolean; translated?: string; error?: string }> {
+    return new Promise((resolve) => {
+      // Ensure server is running
+      if (!this.pythonProcess) {
+        this.startServer();
+        setTimeout(() => {
+          if (!this.pythonProcess) {
+            resolve({ success: false, error: "NLLB server failed to start" });
+            return;
+          }
+          this.queueRequest(text, options, resolve);
+        }, 3000);
+        return;
+      }
+
+      this.queueRequest(text, options, resolve);
+    });
+  }
+
+  /**
+   * Add request to queue and send to Python
+   */
+  private queueRequest(
+    text: string,
+    options: NLLBTranslateOptions,
+    resolve: (value: { success: boolean; translated?: string; error?: string }) => void
+  ) {
+    const requestId = uuidv4();
+
+    // Add to queue FIRST
+    this.requestQueue.push({ resolve, requestId });
+
+    // Then send to Python
+    const payload = JSON.stringify({
+      text,
+      src_lang: options.srcLang,
+      tgt_lang: options.tgtLang,
+      batch_size: options.batchSize || undefined,
+    }) + "\n";
+
+    try {
+      this.pythonProcess!.stdin.write(payload);
+    } catch (error) {
+      // Remove from queue if send failed
+      const idx = this.requestQueue.findIndex(r => r.requestId === requestId);
+      if (idx !== -1) {
+        this.requestQueue.splice(idx, 1);
+      }
+      resolve({ success: false, error: "Failed to send to NLLB server" });
+    }
+  }
+
+  /**
+   * Stream translation - not used by LMR but kept for compatibility
    */
   async streamTranslate(
     text: string,
@@ -200,190 +307,14 @@ export class NLLBService {
       error?: string;
     }) => void
   ): Promise<void> {
-    if (!env.NLLB_ENABLED) {
-      onChunk({
-        success: false,
-        type: "error",
-        error: "NLLB-200 is not enabled. Set NLLB_ENABLED=true to enable.",
-      });
-      return;
-    }
-
-    // Ensure server is running
-    await new Promise<void>((resolve) => {
-      if (!this.pythonProcess) {
-        this.startServer();
-        setTimeout(() => resolve(), 2000);
-      } else {
-        resolve();
-      }
+    // For streaming, use same queue mechanism
+    const result = await this.translate(text, options);
+    onChunk({
+      success: true,
+      type: "complete",
+      translated: result,
     });
-
-    if (!this.pythonProcess) {
-      onChunk({
-        success: false,
-        type: "error",
-        error: "NLLB server is not running",
-      });
-      return;
-    }
-
-    return new Promise<void>((resolve) => {
-      const payload = JSON.stringify({
-        text,
-        src_lang: options.srcLang,
-        tgt_lang: options.tgtLang,
-        stream: true,
-        batch_size: options.batchSize || undefined, // Auto-detect if not specified
-      }) + "\n";
-
-      let stdoutBuffer = "";
-
-      const dataHandler = (data: Buffer) => {
-        stdoutBuffer += data.toString();
-
-        // Process all complete lines
-        let newlineIndex = stdoutBuffer.indexOf("\n");
-        while (newlineIndex !== -1) {
-          const line = stdoutBuffer.slice(0, newlineIndex).trim();
-          stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
-
-          if (line.length > 0) {
-            try {
-              const parsed = JSON.parse(line);
-              onChunk(parsed);
-
-              if (parsed.type === "complete" || parsed.type === "error") {
-                this.pythonProcess!.stdout.removeListener("data", dataHandler);
-                resolve();
-                return;
-              }
-            } catch (err) {
-              onChunk({
-                success: false,
-                type: "error",
-                error:
-                  err instanceof Error
-                    ? `Invalid JSON from NLLB server: ${err.message}`
-                    : "Invalid JSON from NLLB server",
-              });
-              this.pythonProcess!.stdout.removeListener("data", dataHandler);
-              resolve();
-              return;
-            }
-          }
-
-          newlineIndex = stdoutBuffer.indexOf("\n");
-        }
-      };
-
-      this.pythonProcess!.stdout.on("data", dataHandler);
-
-      // Send request
-      this.pythonProcess!.stdin.write(payload);
-    });
-  }
-
-  private runPython(
-    text: string,
-    options: NLLBTranslateOptions
-  ): Promise<{ success: boolean; translated?: string; error?: string }> {
-    return new Promise((resolve) => {
-      // Ensure server is running
-      if (!this.pythonProcess) {
-        this.startServer();
-        // Wait a bit for server to start
-        setTimeout(() => {
-          if (!this.pythonProcess) {
-            resolve({
-              success: false,
-              error: "NLLB server failed to start",
-            });
-            return;
-          }
-          this.sendRequest(text, options, resolve);
-        }, 2000);
-        return;
-      }
-
-      this.sendRequest(text, options, resolve);
-    });
-  }
-
-  private sendRequest(
-    text: string,
-    options: NLLBTranslateOptions,
-    resolve: (value: { success: boolean; translated?: string; error?: string }) => void
-  ) {
-    // ROBUST: Ensure server is running, start if needed
-    if (!this.pythonProcess) {
-      this.startServer();
-      // Wait a bit longer for server to be ready
-      setTimeout(() => {
-        if (!this.pythonProcess) {
-          resolve({
-            success: false,
-            error: "NLLB server failed to start. Please check Python environment.",
-          });
-          return;
-        }
-        this.sendRequest(text, options, resolve);
-      }, 3000); // Increased wait time
-      return;
-    }
-
-    const payload = JSON.stringify({
-      text,
-      src_lang: options.srcLang,
-      tgt_lang: options.tgtLang,
-      batch_size: options.batchSize || undefined, // Auto-detect if not specified
-    }) + "\n";
-
-    let stdoutBuffer = "";
-
-    const dataHandler = (data: Buffer) => {
-      stdoutBuffer += data.toString();
-      // Check if we have a complete JSON response (ends with newline)
-      if (stdoutBuffer.includes("\n")) {
-        const lines = stdoutBuffer.split("\n");
-        const responseLine = lines[0];
-        stdoutBuffer = lines.slice(1).join("\n");
-
-        this.pythonProcess!.stdout.removeListener("data", dataHandler);
-        this.pythonProcess!.stderr.removeListener("data", errorHandler);
-
-        try {
-          const parsed = JSON.parse(responseLine);
-          resolve(parsed);
-        } catch (err: any) {
-          resolve({
-            success: false,
-            error: `Invalid JSON from NLLB server: ${err.message}. Output: ${responseLine.substring(0, 200)}`,
-          });
-        }
-      }
-    };
-
-    const errorHandler = (data: Buffer) => {
-      const stderr = data.toString();
-      // Only treat as fatal error if it's a Traceback or Fatal error
-      // Ignore "Warning" messages - those are expected and handled gracefully
-      if (stderr.includes("Traceback") || stderr.includes("Fatal error") || (stderr.includes("Error") && !stderr.includes("Warning"))) {
-        this.pythonProcess!.stderr.removeListener("data", errorHandler);
-        resolve({
-          success: false,
-          error: `NLLB server error: ${stderr.substring(0, 500)}`,
-        });
-      }
-    };
-
-    this.pythonProcess.stdout.on("data", dataHandler);
-    this.pythonProcess.stderr.on("data", errorHandler);
-
-    // Send request
-    this.pythonProcess.stdin.write(payload);
   }
 }
 
 export const nllbService = new NLLBService();
-
