@@ -1,4 +1,4 @@
-# MasterG 📚
+# MasterG 🧑‍🏫
 Welcome to **MasterG** 📚
 
 ## Project Overview  
