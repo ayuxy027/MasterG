@@ -6,6 +6,7 @@ import Card from './Card';
 import MinimizedNavbar from './MinimizedNavbar';
 import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus, boardSessionApi } from '../../services/boardApi';
 import { stitchAPI } from '../../services/stitchApi';
+import Banner from '../../../Banner';
 
 // ============================================================================
 // TYPES
@@ -1058,6 +1059,11 @@ const BoardPage: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
+      {/* Banner at the top - scrolls away */}
+      <div className="absolute top-0 left-0 right-0 z-[60]">
+        <Banner />
+      </div>
+
       {/* Background - fixed dot grid, only pans */}
       <DottedBackground offsetX={viewOffset.x} offsetY={viewOffset.y} />
 
