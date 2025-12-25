@@ -58,8 +58,7 @@ export class AsyncRAGOrchestratorService {
       const result = await decisionEngineService.handleRAGQuery(
         retrievalQuery,
         chatHistory,
-        userId,
-        sessionId,
+        chromaCollectionName,
         query
       );
 

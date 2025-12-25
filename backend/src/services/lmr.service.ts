@@ -1398,7 +1398,6 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
         : Promise.resolve(undefined),
     ]);
 
-<<<<<<< HEAD
     console.log(
       `✅ Translation complete to ${languageService.getLanguageName(
         targetLang

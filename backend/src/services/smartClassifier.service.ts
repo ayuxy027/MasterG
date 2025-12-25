@@ -87,25 +87,25 @@ Now analyze this query:`;
       }Query to classify: "${query}"\n\nRespond with JSON only.`;
 
       // Call Ollama using generateWithMaxOutput
-      const result = await ollamaChatService.generateWithMaxOutput(
+      const ollamaResult = await ollamaChatService.generateWithMaxOutput(
         fullPrompt,
         500
       );
-      const response = result.answer;
+      const response = ollamaResult.answer;
 
       // Raw classifier response received
 
       // Parse JSON response
-      const result = this.parseClassifierResponse(response);
+      const classificationResult = this.parseClassifierResponse(response);
 
       const duration = Date.now() - startTime;
       console.log(
         `✅ Classification complete in ${duration}ms: ${
-          result.needsRAG ? "RAG" : "DIRECT"
+          classificationResult.needsRAG ? "RAG" : "DIRECT"
         }`
       );
 
-      return result;
+      return classificationResult;
     } catch (error: any) {
       console.error("❌ Classifier error:", error.message);
 
