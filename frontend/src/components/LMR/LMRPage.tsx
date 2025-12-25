@@ -44,11 +44,13 @@ const LMRPage: React.FC = () => {
       setUploadedFile(file);
       setIsProcessing(true);
 
-      // Clear all previous content when uploading new file
+      // 🔄 CRITICAL: Clear all previous content when uploading a NEW document
+      // This prevents stale data from the previous document from persisting
       setSummary(null);
       setQuestions([]);
       setQuiz([]);
       setRecallNotes([]);
+      setFileId(""); // Clear old fileId immediately
 
       // Upload document to backend
       const response = await LMRApi.uploadDocument(

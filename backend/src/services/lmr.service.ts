@@ -1032,7 +1032,7 @@ IMPORTANT: Generate EXACTLY ${count} MCQ questions. NO trailing commas!`,
       );
       const topicCount = metrics.recommendedRecallTopicCount; // 6-15 based on document
 
-      console.log(`📊 Dynamic recall topic count: ${topicCount}`);
+      console.log(`📊 Dynamic recall topic count: ${topicCount} `);
 
       // ═══════════════════════════════════════════════════════════════
       // LAYER 1: Compress document context for recall notes generation
@@ -1049,41 +1049,24 @@ IMPORTANT: Generate EXACTLY ${count} MCQ questions. NO trailing commas!`,
       // ═══════════════════════════════════════════════════════════════
       console.log(`🔄 Layer 2: Generating ${topicCount} recall note topics...`);
       const recallNotesSchema = {
-        description: `You are an NCERT/CBSE educational expert. Generate LAST-MINUTE REVISION notes.
+        description: `You are an NCERT / CBSE educational expert.Generate LAST - MINUTE REVISION notes.
 
-MANDATORY: Generate EXACTLY ${topicCount} topics from the document.
+        MANDATORY: Generate EXACTLY ${topicCount} topics from the document.
 Each topic MUST have:
-- topic: A REAL topic name (like "Mendel's Laws", not "Topic 1")
-- keyPoints: Array of 5 STRINGS (actual facts, not objects)
-- quickFacts: Array of 5 STRINGS (actual facts, not objects)
-- mnemonics: Array of 1 STRING
+      - topic: A REAL topic name(like "Mendel's Laws", not "Topic 1")
+        - keyPoints: Array of 5 STRINGS(actual facts, not objects)
+          - quickFacts: Array of 5 STRINGS(actual facts, not objects)
+            - mnemonics: Array of 1 STRING
 
-CRITICAL: keyPoints and quickFacts must be PLAIN STRINGS, not objects!
-WRONG: {"point": "text"} 
-RIGHT: "text"
+      CRITICAL: keyPoints and quickFacts must be PLAIN STRINGS, not objects!
+      WRONG: { "point": "text" }
+      RIGHT: "text"
 
 NO EMOJIS | Generate ${topicCount} topics`,
         jsonTemplate: `[
+<<<<<<< HEAD
   {
     "topic": "Main Topic Name 1",
-    "keyPoints": [
-      "Important point about this topic",
-      "Second key point to remember",
-      "Third essential fact",
-      "Fourth critical detail",
-      "Fifth key concept"
-    ],
-    "quickFacts": [
-      "Quick fact 1",
-      "Quick fact 2",
-      "Quick fact 3",
-      "Quick fact 4",
-      "Quick fact 5"
-    ],
-    "mnemonics": ["Memory aid or mnemonic for this topic"]
-  },
-  {
-    "topic": "Main Topic Name 2",
     "keyPoints": [
       "Important point about this topic",
       "Second key point to remember",
@@ -1415,6 +1398,7 @@ Each keyPoint and quickFact must be a plain STRING, not an object.`,
         : Promise.resolve(undefined),
     ]);
 
+<<<<<<< HEAD
     console.log(
       `✅ Translation complete to ${languageService.getLanguageName(
         targetLang

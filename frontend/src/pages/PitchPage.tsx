@@ -714,6 +714,15 @@ const PitchPage = () => {
             </div>
           </div>
 
+          {/* Closing Line */}
+          <div className={`mt-20 text-center transform transition-all duration-1000 delay-[2000ms] ${showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+            <div className="flex flex-col items-center justify-center gap-4">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 leading-tight py-2">
+                "Let's turn on Airplane Mode,<br />and let's get started."
+              </h2>
+            </div>
+          </div>
+
           {/* Navigation Buttons */}
           <div className={`mt-16 mb-8 transform transition-all duration-1000 delay-1700 ${showJourney ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
             }`}>
