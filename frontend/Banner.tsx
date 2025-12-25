@@ -11,7 +11,7 @@ const Banner: React.FC<BannerProps> = ({ isVisible = true }) => (
         }`}
     >
         <p className="flex-shrink-0">
-            <span className="hidden sm:inline">This project is 100% offline and needs local setup to be booted. </span>
+            <span className="hidden sm:inline">MasterG is 100% offline and needs local setup to be booted. </span>
             <span className="sm:hidden">100% offline - needs local setup</span>
         </p>
         <a
@@ -20,7 +20,7 @@ const Banner: React.FC<BannerProps> = ({ isVisible = true }) => (
             target="_blank"
             rel="noopener noreferrer"
         >
-            Setup MasterG locally
+            Setup Locally
             <svg
                 width={14}
                 height={14}
