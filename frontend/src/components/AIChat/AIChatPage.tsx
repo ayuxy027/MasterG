@@ -28,6 +28,7 @@ const AIChatPage: React.FC = () => {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [bannerVisible, setBannerVisible] = useState(true);
 
   // Chat State
   const [messages, setMessages] = useState<MessageUI[]>([]);
@@ -57,6 +58,17 @@ const AIChatPage: React.FC = () => {
       loadSessionMessages(currentSessionId);
     }
   }, [currentSessionId]);
+
+  // Handle banner fade on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setBannerVisible(scrollY < 50);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const loadSessions = async () => {
     setSessionsLoading(true);
@@ -210,10 +222,8 @@ const AIChatPage: React.FC = () => {
 
   return (
     <div className="flex flex-col overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30" style={{ height: '100dvh' }}>
-      {/* Banner at the top - scrolls away */}
-      <div className="relative z-[60] flex-shrink-0">
-        <Banner />
-      </div>
+      {/* Banner at the top - fades on scroll */}
+      <Banner isVisible={bannerVisible} />
       {/* Fixed Navbar - Renders the fixed navbar */}
       <div className="fixed top-[40px] sm:top-[44px] left-0 right-0 z-50">
         <Navbar />

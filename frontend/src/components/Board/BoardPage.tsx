@@ -84,6 +84,7 @@ const BoardPage: React.FC = () => {
 
   // Navbar
   const [isNavbarExpanded, setIsNavbarExpanded] = useState(false);
+  const [bannerVisible, setBannerVisible] = useState(true);
 
   // Space key for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -1057,12 +1058,24 @@ const BoardPage: React.FC = () => {
   // RENDER
   // ============================================================================
 
+  // Handle banner fade on scroll (for canvas panning)
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      // Fade banner when panning/zooming
+      if (Math.abs(e.deltaY) > 10 || Math.abs(e.deltaX) > 10) {
+        setBannerVisible(false);
+        setTimeout(() => setBannerVisible(true), 2000); // Show again after 2s of no interaction
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel);
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
-      {/* Banner at the top - scrolls away */}
-      <div className="absolute top-0 left-0 right-0 z-[60]">
-        <Banner />
-      </div>
+      {/* Banner at the top - fades on interaction */}
+      <Banner isVisible={bannerVisible} />
 
       {/* Background - fixed dot grid, only pans */}
       <DottedBackground offsetX={viewOffset.x} offsetY={viewOffset.y} />
