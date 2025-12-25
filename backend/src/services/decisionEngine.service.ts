@@ -1,105 +1,112 @@
-import { ollamaChatService } from "./ollamaChat.service";
 import { ollamaEmbeddingService } from "./ollamaEmbedding.service";
 import { vectorDBService } from "./vectordb.service";
+import { rerankerService } from "./reranker.service";
+import { countTokens } from "../utils/tokenCounter";
+import { RAG_CONSTANTS } from "../config/ragConstants";
 import { ChatMessage } from "../types";
 
-/**
- * Decision Engine
- */
 export class DecisionEngineService {
-  private readonly SIMILARITY_THRESHOLD = 0.5;
-
   /**
-   * Get optimal TOP_K based on query complexity
-   * Simple queries need fewer chunks, complex queries need more
+   * Extract mentioned document names from query with @ syntax
+   * @document.pdf = strict search ONLY in that document
+   * Regular mentions also detected as fallback
    */
-  private getOptimalTopK(query: string): number {
-    const words = query.trim().split(/\s+/).length;
-    const hasQuestionWords = /\b(what|how|why|when|where|who|explain|describe|compare|analyze)\b/i.test(query);
-    const hasMultipleConcepts = /\b(and|or|also|additionally|furthermore)\b/i.test(query);
+  private extractMentionedDocuments(query: string): {
+    documents: string[];
+    isStrict: boolean;
+    cleanQuery: string;
+  } {
+    const mentionedDocs: string[] = [];
+    let isStrict = false;
+    let cleanQuery = query;
 
-    // Simple query: fewer chunks needed
-    if (words <= 5 && !hasQuestionWords) {
-      return 5;
+    // Pattern 1: @document.ext (STRICT mode) - supports ANY file extension
+    const strictPattern = /@([a-zA-Z0-9_\-\.]+)/gi;
+    let match;
+    while ((match = strictPattern.exec(query)) !== null) {
+      let docName = match[1];
+      // If no extension, try as-is (will fuzzy match later)
+      mentionedDocs.push(docName);
+      isStrict = true;
+      // Remove @ mentions from query
+      cleanQuery = cleanQuery.replace(match[0], "").trim();
     }
 
-    // Medium query: standard retrieval
-    if (words <= 15 && !hasMultipleConcepts) {
-      return 8;
+    console.log(
+      `🔍 Extracted ${isStrict ? "STRICT" : "regular"} documents:`,
+      mentionedDocs
+    );
+
+    // If strict mode detected, return immediately
+    if (isStrict) {
+      return { documents: mentionedDocs, isStrict: true, cleanQuery };
     }
 
-    // Complex query: more context needed
-    return 12;
-  }
-
-  /**
-   * Extract metadata filters from query (e.g., file mentions, page numbers)
-   */
-  private extractMetadataFilters(query: string): any {
-    const filters: any = {};
-
-    // Check for page number mentions
-    const pageMatch = query.match(/page\s+(\d+)/i);
-    if (pageMatch) {
-      filters.page = parseInt(pageMatch[1]);
+    // Pattern 2: "in document.pdf" or "from file.pdf" (regular mode)
+    const pattern1 =
+      /(?:in|from|according to|based on|refer to|check|see)\s+(?:document|file|pdf)?\s*([a-zA-Z0-9_\-\.]+\.pdf)/gi;
+    while ((match = pattern1.exec(query)) !== null) {
+      mentionedDocs.push(match[1]);
     }
 
-    // Check for page range mentions
-    const rangeMatch = query.match(/pages?\s+(\d+)\s*(?:to|-)\s*(\d+)/i);
-    if (rangeMatch) {
-      filters.page = {
-        $gte: parseInt(rangeMatch[1]),
-        $lte: parseInt(rangeMatch[2]),
-      };
-    }
-
-    return Object.keys(filters).length > 0 ? { where: filters } : undefined;
-  }
-
-  /**
-   * Reorder chunks to combat "lost in the middle" problem
-   * Places most relevant chunks at start and end for better attention
-   */
-  private reorderChunksForAttention(
-    chunks: Array<{ content: string; metadata: any; score: number }>
-  ): Array<{ content: string; metadata: any; score: number }> {
-    if (chunks.length <= 2) {
-      return chunks; // No reordering needed
-    }
-
-    const reordered: typeof chunks = [];
-    const sorted = [...chunks].sort((a, b) => b.score - a.score);
-
-    let left = 0;
-    let right = sorted.length - 1;
-    let useLeft = true;
-
-    // Interleave: Best, Worst, 2nd Best, 2nd Worst, ...
-    while (left <= right) {
-      if (useLeft) {
-        reordered.push(sorted[left++]);
-      } else {
-        reordered.push(sorted[right--]);
+    // Pattern 3: Direct mention of .pdf files (regular mode)
+    const pattern2 = /([a-zA-Z0-9_\-\.]+\.pdf)/gi;
+    while ((match = pattern2.exec(query)) !== null) {
+      if (!mentionedDocs.includes(match[1])) {
+        mentionedDocs.push(match[1]);
       }
-      useLeft = !useLeft;
     }
 
-    console.log('🔄 Reordered chunks for better attention:');
-    reordered.forEach((chunk, idx) => {
-      console.log(`  Position ${idx + 1}: Score ${chunk.score.toFixed(3)}`);
-    });
-
-    return reordered;
+    return { documents: mentionedDocs, isStrict: false, cleanQuery };
   }
 
   /**
-   * Handle RAG query - retrieve context and generate answer
-   * 
-   * @param retrievalQuery - Optimized query for retrieval (from smart classifier)
-   * @param chatHistory - Chat conversation history
-   * @param chromaCollectionName - Collection to search in
-   * @param originalQuery - Original user query (for answer generation)
+   * Get fileIds for mentioned document names
    */
+  private async getFileIdsForDocuments(
+    documentNames: string[],
+    collectionName: string
+  ): Promise<string[]> {
+    try {
+      const allFiles = await vectorDBService.getUniqueFiles(collectionName);
+      console.log(
+        `📚 Available files in collection:`,
+        allFiles.map((f) => `"${f.fileName}" (${f.fileId})`)
+      );
+
+      const fileIds: string[] = [];
+
+      documentNames.forEach((docName) => {
+        const lowerDocName = docName.toLowerCase();
+        console.log(`🔎 Looking for matches for: "${docName}"`);
+
+        // Match by filename (case-insensitive, partial match)
+        const matchedFiles = allFiles.filter(
+          (file) =>
+            file.fileName.toLowerCase().includes(lowerDocName) ||
+            lowerDocName.includes(file.fileName.toLowerCase())
+        );
+
+        console.log(
+          `✅ Found ${matchedFiles.length} matches:`,
+          matchedFiles.map((f) => f.fileName)
+        );
+
+        matchedFiles.forEach((file) => {
+          if (!fileIds.includes(file.fileId)) {
+            fileIds.push(file.fileId);
+          }
+        });
+      });
+
+      console.log(`🎯 Final fileIds to filter:`, fileIds);
+      return fileIds;
+    } catch (error) {
+      console.error("Error getting fileIds for documents:", error);
+      return [];
+    }
+  }
+
   async handleRAGQuery(
     retrievalQuery: string,
     chatHistory: ChatMessage[],
@@ -107,67 +114,189 @@ export class DecisionEngineService {
     originalQuery?: string
   ): Promise<{ answer: string; sources: any[]; metadata: any }> {
     const startTime = Date.now();
+    const queryForAnswer = originalQuery || retrievalQuery;
 
     try {
-      // Use original query for display, retrieval query for search
-      const queryForAnswer = originalQuery || retrievalQuery;
+      // Check if user mentioned specific documents with @ syntax
+      const {
+        documents: mentionedDocs,
+        isStrict,
+        cleanQuery,
+      } = this.extractMentionedDocuments(queryForAnswer);
 
-      // OPTIMIZATION 1: Adaptive TOP_K based on query complexity
-      const topK = this.getOptimalTopK(retrievalQuery);
-      console.log(`📊 Using adaptive TOP_K = ${topK} for query: "${retrievalQuery.substring(0, 50)}..."`);
+      let fileIdsFilter: string[] | undefined;
+      let searchQuery = isStrict ? cleanQuery : retrievalQuery;
 
-      // OPTIMIZATION 2: Extract metadata filters from query
-      const metadataFilters = this.extractMetadataFilters(retrievalQuery);
-      if (metadataFilters) {
-        console.log('🔍 Applying metadata filters:', metadataFilters);
+      if (mentionedDocs.length > 0) {
+        const strictLabel = isStrict ? "STRICT (@)" : "mentioned";
+        console.log(
+          `📄 User ${strictLabel} specific documents: ${mentionedDocs.join(
+            ", "
+          )}`
+        );
+
+        fileIdsFilter = await this.getFileIdsForDocuments(
+          mentionedDocs,
+          chromaCollectionName
+        );
+
+        if (fileIdsFilter.length > 0) {
+          console.log(
+            `✅ ${isStrict ? "STRICTLY" : ""} Filtering search to ${
+              fileIdsFilter.length
+            } document(s)`
+          );
+        } else {
+          console.log(
+            `⚠️ No matching documents found for: ${mentionedDocs.join(", ")}`
+          );
+
+          // In strict mode, fail immediately if document not found
+          if (isStrict) {
+            return {
+              answer: `❌ Document not found: ${mentionedDocs.join(
+                ", "
+              )}. Please check the document name and try again. Use @documentname to strictly search in a specific document.`,
+              sources: [],
+              metadata: {
+                chunksFound: 0,
+                duration: Date.now() - startTime,
+                topK: RAG_CONSTANTS.RETRIEVE_K,
+                documentFilter: mentionedDocs,
+                strictMode: true,
+                error: "Document not found",
+              },
+            };
+          }
+        }
       }
 
-      // Step 1: Generate query embedding using Ollama
       const queryEmbedding = await ollamaEmbeddingService.generateEmbedding(
-        retrievalQuery
+        searchQuery
       );
 
-      // Step 2: Retrieve relevant chunks from ChromaDB with adaptive TOP_K
-      const searchResults = await vectorDBService.queryChunks(
-        queryEmbedding,
-        topK,  // Dynamic instead of fixed
-        chromaCollectionName,
-        metadataFilters  // Apply filters if found
-      );
+      // Use filtered query ONLY if documents found and filter active
+      const searchResults =
+        fileIdsFilter && fileIdsFilter.length > 0
+          ? await vectorDBService.queryChunksWithFilter(
+              queryEmbedding,
+              RAG_CONSTANTS.RETRIEVE_K,
+              chromaCollectionName,
+              fileIdsFilter
+            )
+          : await vectorDBService.queryChunks(
+              queryEmbedding,
+              RAG_CONSTANTS.RETRIEVE_K,
+              chromaCollectionName
+            );
 
-      // Step 3: Filter chunks by similarity
-      const relevantChunks = this.filterChunks(searchResults);
+      if (!searchResults.documents || searchResults.documents.length === 0) {
+        const noResultsMessage =
+          fileIdsFilter && fileIdsFilter.length > 0
+            ? `❌ No relevant information found in ${
+                isStrict ? "STRICT search of" : ""
+              } document(s): ${mentionedDocs.join(", ")}. ${
+                isStrict
+                  ? "Try different keywords or remove @ for broader search."
+                  : "Please check document names or try different topics."
+              }`
+            : "I couldn't find relevant information in your documents. Please upload more relevant files.";
 
-      if (relevantChunks.length === 0) {
         return {
-          answer:
-            "I couldn't find relevant information in your documents for this question. Try rephrasing or ask about something else in the documents.",
+          answer: noResultsMessage,
           sources: [],
           metadata: {
             chunksFound: 0,
             duration: Date.now() - startTime,
-            topK,
+            topK: RAG_CONSTANTS.RETRIEVE_K,
+            documentFilter:
+              mentionedDocs.length > 0 ? mentionedDocs : undefined,
+            strictMode: isStrict,
           },
         };
       }
 
-      // OPTIMIZATION 3: Reorder chunks for better attention
-      const reorderedChunks = this.reorderChunksForAttention(relevantChunks);
-
-      // Build context from reordered chunks
-      const context = this.buildContext(reorderedChunks);
-
-      // Build sources from reordered chunks (top 5 for better visibility)
-      const sources = reorderedChunks.slice(0, 5).map((chunk) => ({
-        pdfName: chunk.metadata.fileName || "Document",
-        pageNo: chunk.metadata.page || 1,
-        snippet: chunk.content.substring(0, 150) + "...",
+      const candidateChunks = searchResults.documents.map((doc, idx) => ({
+        content: doc,
+        metadata: searchResults.metadatas[idx],
+        distance: searchResults.distances[idx],
       }));
 
-      // Step 4: Generate answer using Ollama with optimized context
+      // Debug: Log what documents were actually retrieved
+      if (fileIdsFilter && fileIdsFilter.length > 0) {
+        const retrievedFileIds = new Set(
+          candidateChunks.map((c) => c.metadata.fileId)
+        );
+        const retrievedFileNames = new Set(
+          candidateChunks.map((c) => c.metadata.fileName)
+        );
+        console.log(
+          `🔍 Retrieved ${candidateChunks.length} chunks from fileIds:`,
+          Array.from(retrievedFileIds)
+        );
+        console.log(
+          `📄 File names in results:`,
+          Array.from(retrievedFileNames)
+        );
+      }
+
+      const rerankedChunks = rerankerService.rerank(candidateChunks, 3);
+
+      // STRICT MODE: Filter out any chunks not from requested documents
+      let finalChunks = rerankedChunks;
+      if (isStrict && fileIdsFilter && fileIdsFilter.length > 0) {
+        finalChunks = rerankedChunks.filter((chunk) =>
+          fileIdsFilter.includes(chunk.metadata.fileId)
+        );
+        console.log(
+          `🔒 STRICT MODE: Filtered ${rerankedChunks.length} → ${finalChunks.length} chunks (only from requested docs)`
+        );
+      }
+
+      if (finalChunks.length === 0) {
+        return {
+          answer:
+            "I couldn't find relevant information in your documents to answer that question. Try asking about specific topics covered in the uploaded materials.",
+          sources: [], // Don't send irrelevant chunks to frontend
+          metadata: {
+            chunksFound: 0,
+            duration: Date.now() - startTime,
+            topK: RAG_CONSTANTS.RETRIEVE_K,
+            relevanceCheck: "No chunks met minimum relevance threshold",
+            strictMode: isStrict,
+          },
+        };
+      }
+
+      const context = this.buildContext(finalChunks);
+
+      // Create sources with deduplication based on pdfName + pageNo + snippet
+      const sourcesMap = new Map<
+        string,
+        { pdfName: string; pageNo: number; snippet: string }
+      >();
+
+      finalChunks.forEach((chunk) => {
+        const pdfName = chunk.metadata.fileName || "Document";
+        const pageNo = chunk.metadata.page || 1;
+        const snippet = chunk.content.substring(0, 150) + "...";
+
+        // Create unique key from pdfName + pageNo + first 50 chars of snippet
+        const uniqueKey = `${pdfName}|${pageNo}|${snippet.substring(0, 50)}`;
+
+        // Only add if not already present
+        if (!sourcesMap.has(uniqueKey)) {
+          sourcesMap.set(uniqueKey, { pdfName, pageNo, snippet });
+        }
+      });
+
+      const sources = Array.from(sourcesMap.values());
+
+      const { ollamaChatService } = await import("./ollamaChat.service");
+
       const response = await ollamaChatService.generateEducationalAnswer(
         context,
-        chatHistory,
+        chatHistory.slice(-RAG_CONSTANTS.HISTORY_TURNS),
         queryForAnswer,
         "en",
         sources
@@ -177,53 +306,29 @@ export class DecisionEngineService {
         answer: response.answer,
         sources,
         metadata: {
-          chunksFound: relevantChunks.length,
-          topK,
+          chunksFound: finalChunks.length,
+          topK: RAG_CONSTANTS.RETRIEVE_K,
           duration: Date.now() - startTime,
           thinking: response.thinking,
+          documentFilter: mentionedDocs.length > 0 ? mentionedDocs : undefined,
+          strictMode: isStrict,
         },
       };
     } catch (error: any) {
-      console.error("❌ RAG query error:", error.message);
       throw error;
     }
   }
 
-  /**
-   * Filter chunks by similarity score
-   */
-  private filterChunks(searchResults: {
-    documents: string[];
-    metadatas: any[];
-    distances: number[];
-  }): Array<{ content: string; metadata: any; score: number }> {
-    if (!searchResults.documents || searchResults.documents.length === 0) {
-      return [];
-    }
-
-    return searchResults.documents
-      .map((doc, idx) => ({
-        content: doc,
-        metadata: searchResults.metadatas[idx],
-        distance: searchResults.distances[idx],
-        score: 1 - searchResults.distances[idx],
-      }))
-      .filter((chunk) => chunk.score >= this.SIMILARITY_THRESHOLD)
-      .sort((a, b) => b.score - a.score);
-  }
-
-  /**
-   * Build context string from chunks
-   */
   private buildContext(
     chunks: Array<{ content: string; metadata: any }>
   ): string {
     return chunks
-      .slice(0, 15)
       .map((chunk, idx) => {
         const fileName = chunk.metadata.fileName || "Document";
         const pageNo = chunk.metadata.page || 1;
-        return `[Source ${idx + 1}: ${fileName}, Page ${pageNo}]\n${chunk.content}`;
+        return `[Source ${idx + 1}: ${fileName}, Page ${pageNo}]\n${
+          chunk.content
+        }`;
       })
       .join("\n\n---\n\n");
   }

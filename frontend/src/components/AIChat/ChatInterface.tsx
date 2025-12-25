@@ -7,7 +7,13 @@ import {
   translateMessage,
 } from "../../services/chatApi";
 import { INDIAN_LANGUAGES } from "../../constants/appConstants";
-import type { MessageUI, UploadProgress, FileListItem, MentionedFile, SourceCitation } from "../../types/chat";
+import type {
+  MessageUI,
+  UploadProgress,
+  FileListItem,
+  MentionedFile,
+  SourceCitation,
+} from "../../types/chat";
 import MarkdownRenderer from "../ui/MarkdownRenderer";
 import Accordion from "../ui/Accordion";
 import { MessageSkeleton } from "../ui/Skeleton";
@@ -78,7 +84,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (inputValue.trim() === "" || isLoading) return;
 
     // Get mentioned file IDs for filtering
-    const mentionedFileIds = selectedMentions.map(m => m.fileId);
+    const mentionedFileIds = selectedMentions.map((m) => m.fileId);
     const messageContent = inputValue.trim();
     const shouldGenerateName = isFirstMessage && messages.length === 0;
 
@@ -122,18 +128,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             prev.map((msg) =>
               msg.id === assistantMessageId
                 ? {
-                  ...msg,
-                  content: chunk.type === "text" && chunk.content
-                    ? msg.content + chunk.content
-                    : msg.content,
-                  streamingLayer: chunk.type === "layer" && chunk.layer
-                    ? chunk.layer
-                    : msg.streamingLayer,
-                  sources: chunk.type === "source" && chunk.source
-                    ? [...(msg.sources || []), chunk.source]
-                    : msg.sources,
-                  isStreaming: chunk.type !== "done" && chunk.type !== "error",
-                }
+                    ...msg,
+                    content:
+                      chunk.type === "text" && chunk.content
+                        ? msg.content + chunk.content
+                        : msg.content,
+                    streamingLayer:
+                      chunk.type === "layer" && chunk.layer
+                        ? chunk.layer
+                        : msg.streamingLayer,
+                    sources:
+                      chunk.type === "source" && chunk.source
+                        ? [...(msg.sources || []), chunk.source]
+                        : msg.sources,
+                    thinking:
+                      chunk.type === "thinking" && chunk.thinking
+                        ? chunk.thinking
+                        : msg.thinking,
+                    isStreaming:
+                      chunk.type !== "done" && chunk.type !== "error",
+                  }
                 : msg
             )
           );
@@ -168,15 +182,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleTranslateMessage = async (messageId: string, content: string) => {
     // Find message and check if already translated
-    const message = messages.find(m => m.id === messageId);
+    const message = messages.find((m) => m.id === messageId);
     if (!message) return;
 
     // Allow re-translation regardless of previous state to support language switching
 
-
-    setMessages(prev => prev.map(msg =>
-      msg.id === messageId ? { ...msg, isTranslating: true } : msg
-    ));
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, isTranslating: true } : msg
+      )
+    );
 
     try {
       const response = await translateMessage(
@@ -184,25 +199,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         sessionId,
         content,
         "en",
-        selectedLanguage  // Global selected language
+        selectedLanguage // Global selected language
       );
 
       if (response.success && response.translated) {
-        setMessages(prev => prev.map(msg =>
-          msg.id === messageId ? {
-            ...msg,
-            translatedContent: response.translated,
-            isTranslating: false
-          } : msg
-        ));
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? {
+                  ...msg,
+                  translatedContent: response.translated,
+                  isTranslating: false,
+                }
+              : msg
+          )
+        );
       } else {
         throw new Error(response.error || "Translation failed");
       }
     } catch (error) {
       console.error("Translation error:", error);
-      setMessages(prev => prev.map(msg =>
-        msg.id === messageId ? { ...msg, isTranslating: false } : msg
-      ));
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, isTranslating: false } : msg
+        )
+      );
       // Optionally show a toast or error indicator
     }
   };
@@ -229,10 +250,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             prev.map((item) =>
               item.fileId === fileId
                 ? {
-                  ...item,
-                  progress,
-                  status: progress < 100 ? "uploading" : "processing",
-                }
+                    ...item,
+                    progress,
+                    status: progress < 100 ? "uploading" : "processing",
+                  }
                 : item
             )
           );
@@ -272,13 +293,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           prev.map((item) =>
             item.fileId === fileId
               ? {
-                ...item,
-                status: "error",
-                error:
-                  error instanceof ChatApiError
-                    ? error.message
-                    : "Upload failed",
-              }
+                  ...item,
+                  status: "error",
+                  error:
+                    error instanceof ChatApiError
+                      ? error.message
+                      : "Upload failed",
+                }
               : item
           )
         );
@@ -287,8 +308,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         const errorMessage: MessageUI = {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: `⚠️ Failed to upload **${file.name}**: ${error instanceof ChatApiError ? error.message : "Unknown error"
-            }`,
+          content: `⚠️ Failed to upload **${file.name}**: ${
+            error instanceof ChatApiError ? error.message : "Unknown error"
+          }`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, errorMessage]);
@@ -309,7 +331,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const getExamplePrompts = () => {
-    // Generic content-based prompts (not based on filename)
+    // Only show example prompts when documents are uploaded
     if (uploadedFiles.length > 0) {
       return [
         "Summarize the key points from the documents",
@@ -318,12 +340,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       ];
     }
 
-    // Default prompts if no files
-    return [
-      "Upload a document to get started",
-      "Ask questions about your PDFs",
-      "Get summaries and explanations",
-    ];
+    // Return empty array if no files (prompts won't be shown anyway)
+    return [];
   };
 
   const formatTimestamp = (date: Date): string => {
@@ -384,16 +402,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     />
                   ) : (
                     <div
-                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                      className={`flex ${
+                        message.role === "user"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-2xl p-4 shadow-md ${message.role === "user"
-                          ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
-                          : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
-                          }`}
+                        className={`max-w-[85%] rounded-2xl p-4 shadow-md ${
+                          message.role === "user"
+                            ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-br-sm"
+                            : "bg-white text-gray-800 rounded-bl-sm border-2 border-orange-100"
+                        }`}
                       >
                         {/* Message Content */}
-                        <div className="prose prose-sm max-w-none">
+                        <div className="max-w-none">
                           {message.role === "assistant" ? (
                             <MarkdownRenderer content={message.content} />
                           ) : (
@@ -405,56 +428,93 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                         {/* Timestamp */}
                         <div
-                          className={`text-xs mt-2 ${message.role === "user" ? "text-orange-100" : "text-gray-500"}`}
+                          className={`text-xs mt-2 ${
+                            message.role === "user"
+                              ? "text-orange-100"
+                              : "text-gray-500"
+                          }`}
                         >
                           {formatTimestamp(message.timestamp)}
                         </div>
 
                         {/* Source Citations - Accordion */}
-                        {message.sources && message.sources.length > 0 && !message.isStreaming && (
-                          <div className="mt-3">
-                            <Accordion
-                              title="Sources"
-                              icon={
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                                  />
-                                </svg>
-                              }
-                              badge={message.sources.length}
-                            >
-                              <div className="space-y-2">
-                                {[...message.sources].reverse().map((source, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="bg-orange-50 rounded-lg p-3 border border-orange-200"
+                        {message.sources &&
+                          message.sources.length > 0 &&
+                          !message.isStreaming && (
+                            <div className="mt-3">
+                              <Accordion
+                                title="Sources"
+                                icon={
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
                                   >
-                                    <div className="flex items-center gap-2 mb-1.5">
-                                      <span className="text-xs font-semibold text-orange-700">
-                                        {source.pdfName}
-                                      </span>
-                                      <span className="text-xs text-orange-500">
-                                        • Page {source.pageNo}
-                                      </span>
-                                    </div>
-                                    <p className="text-xs text-gray-700 leading-relaxed">
-                                      {source.snippet}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            </Accordion>
-                          </div>
-                        )}
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                    />
+                                  </svg>
+                                }
+                                badge={message.sources.length}
+                              >
+                                <div className="space-y-2">
+                                  {[...message.sources]
+                                    .reverse()
+                                    .map((source, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="bg-orange-50 rounded-lg p-3 border border-orange-200"
+                                      >
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                          <span className="text-xs font-semibold text-orange-700">
+                                            {source.pdfName}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-gray-700 leading-relaxed">
+                                          {source.snippet}
+                                        </p>
+                                      </div>
+                                    ))}
+                                </div>
+                              </Accordion>
+                            </div>
+                          )}
+
+                        {/* Thinking Process - Accordion */}
+                        {message.thinking &&
+                          !message.isStreaming &&
+                          message.role === "assistant" && (
+                            <div className="mt-3">
+                              <Accordion
+                                title="Thinking Process"
+                                icon={
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                                    />
+                                  </svg>
+                                }
+                              >
+                                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                  <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap font-mono">
+                                    {message.thinking}
+                                  </p>
+                                </div>
+                              </Accordion>
+                            </div>
+                          )}
 
                         {/* Translation Section */}
                         {message.role === "assistant" &&
@@ -465,8 +525,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                               <Accordion
                                 title="Translation"
                                 icon={
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
+                                    />
                                   </svg>
                                 }
                               >
@@ -486,24 +556,64 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                                   {/* Translate Action */}
                                   <button
-                                    onClick={() => handleTranslateMessage(message.id, message.content)}
+                                    onClick={() =>
+                                      handleTranslateMessage(
+                                        message.id,
+                                        message.content
+                                      )
+                                    }
                                     disabled={message.isTranslating}
                                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors text-xs font-semibold"
                                   >
                                     {message.isTranslating ? (
                                       <>
-                                        <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24">
-                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        <svg
+                                          className="animate-spin w-3 h-3"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <circle
+                                            className="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                            fill="none"
+                                          ></circle>
+                                          <path
+                                            className="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                          ></path>
                                         </svg>
-                                        Translating to {INDIAN_LANGUAGES.find(l => l.code === selectedLanguage)?.name || selectedLanguage}...
+                                        Translating to{" "}
+                                        {INDIAN_LANGUAGES.find(
+                                          (l) => l.code === selectedLanguage
+                                        )?.name || selectedLanguage}
+                                        ...
                                       </>
                                     ) : (
                                       <>
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                        <svg
+                                          className="w-3.5 h-3.5"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth="2"
+                                            d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
+                                          />
                                         </svg>
-                                        {message.translatedContent ? "Translate Again" : "Translate"} to {INDIAN_LANGUAGES.find(l => l.code === selectedLanguage)?.name || selectedLanguage}
+                                        {message.translatedContent
+                                          ? "Translate Again"
+                                          : "Translate"}{" "}
+                                        to{" "}
+                                        {INDIAN_LANGUAGES.find(
+                                          (l) => l.code === selectedLanguage
+                                        )?.name || selectedLanguage}
                                       </>
                                     )}
                                   </button>
@@ -517,7 +627,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </div>
               ))}
 
-              {isLoading && !messages.some(m => m.isStreaming) && <MessageSkeleton />}
+              {isLoading && !messages.some((m) => m.isStreaming) && (
+                <MessageSkeleton />
+              )}
             </div>
             <div ref={messagesEndRef} />
           </>
@@ -525,57 +637,56 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Upload Progress Indicators */}
-      {
-        uploadProgress.length > 0 && (
-          <div className="px-4 py-2 bg-orange-50 border-t border-orange-200 space-y-2">
-            {uploadProgress.map((upload) => (
-              <div key={upload.fileId} className="flex items-center gap-3">
-                <svg
-                  className="w-4 h-4 text-orange-600 flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-700 truncate">
-                      {upload.fileName}
-                    </span>
-                    <span className="text-gray-500 ml-2">
-                      {upload.status === "completed"
-                        ? "✓"
-                        : upload.status === "error"
-                          ? "✗"
-                          : `${Math.round(upload.progress)}%`}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div
-                      className={`h-1.5 rounded-full transition-all ${upload.status === "completed"
+      {uploadProgress.length > 0 && (
+        <div className="px-4 py-2 bg-orange-50 border-t border-orange-200 space-y-2">
+          {uploadProgress.map((upload) => (
+            <div key={upload.fileId} className="flex items-center gap-3">
+              <svg
+                className="w-4 h-4 text-orange-600 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-gray-700 truncate">
+                    {upload.fileName}
+                  </span>
+                  <span className="text-gray-500 ml-2">
+                    {upload.status === "completed"
+                      ? "✓"
+                      : upload.status === "error"
+                      ? "✗"
+                      : `${Math.round(upload.progress)}%`}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${
+                      upload.status === "completed"
                         ? "bg-green-500"
                         : upload.status === "error"
-                          ? "bg-red-500"
-                          : "bg-orange-500"
-                        }`}
-                      style={{ width: `${upload.progress}%` }}
-                    />
-                  </div>
-                  {upload.error && (
-                    <p className="text-xs text-red-600 mt-1">{upload.error}</p>
-                  )}
+                        ? "bg-red-500"
+                        : "bg-orange-500"
+                    }`}
+                    style={{ width: `${upload.progress}%` }}
+                  />
                 </div>
+                {upload.error && (
+                  <p className="text-xs text-red-600 mt-1">{upload.error}</p>
+                )}
               </div>
-            ))}
-          </div>
-        )
-      }
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Compact Input Area - All controls on one line */}
       <div className="flex-shrink-0 border-t-2 border-orange-200 p-3 bg-white">
@@ -612,8 +723,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </svg>
           </button>
 
-
-
           {/* Text Input - Takes remaining space */}
           <MentionInput
             value={inputValue}
@@ -638,10 +747,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className={`p-2.5 rounded-xl transition-all flex-shrink-0 border-2 ${inputValue.trim() && !isLoading
-              ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white border-orange-400 hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg"
-              : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-              }`}
+            className={`p-2.5 rounded-xl transition-all flex-shrink-0 border-2 ${
+              inputValue.trim() && !isLoading
+                ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white border-orange-400 hover:from-orange-500 hover:to-orange-600 shadow-md hover:shadow-lg"
+                : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+            }`}
           >
             <svg
               className="w-5 h-5"
@@ -659,24 +769,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </button>
         </div>
 
-        {/* Example Prompts - Compact */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-2">
-          <span className="text-xs text-gray-500 font-medium">
-            Try:
-          </span>
-          {getExamplePrompts().map((prompt, index) => (
-            <button
-              key={index}
-              className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full hover:bg-orange-100 hover:text-orange-800 transition-all border border-orange-200 font-medium"
-              onClick={() => setInputValue(prompt)}
-              disabled={isLoading}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
+        {/* Example Prompts - Compact - Only show if documents uploaded */}
+        {uploadedFiles.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <span className="text-xs text-gray-500 font-medium">Try:</span>
+            {getExamplePrompts().map((prompt, index) => (
+              <button
+                key={index}
+                className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full hover:bg-orange-100 hover:text-orange-800 transition-all border border-orange-200 font-medium"
+                onClick={() => setInputValue(prompt)}
+                disabled={isLoading}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-    </div >
+    </div>
   );
 };
 

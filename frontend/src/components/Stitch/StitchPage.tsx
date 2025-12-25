@@ -477,10 +477,20 @@ const StitchPage: React.FC = () => {
     return text.length;
   }, []);
 
-  // Get active content for stats
+  // Get active content for stats (full content, not truncated)
   const getActiveContent = useCallback((): string => {
     return activeTab === "english" ? englishContent : translatedContent[activeTab] || "";
   }, [activeTab, englishContent, translatedContent]);
+
+  // Get truncated content for preview (limit ~200 words for readability)
+  const getPreviewContent = useCallback((content: string): string => {
+    if (!content) return "";
+    const words = content.trim().split(/\s+/);
+    if (words.length <= 200) return content;
+
+    const truncated = words.slice(0, 200).join(" ");
+    return `${truncated} [...]`;
+  }, []);
 
   // Reset markdown toggle when switching away from English tab
   useEffect(() => {
@@ -1848,7 +1858,7 @@ const StitchPage: React.FC = () => {
                       // Only allow markdown rendering after generation completes (not during streaming)
                       // During generation (isGenerating), always show plain text
                       <ContentPreview
-                        content={englishContent}
+                        content={getPreviewContent(englishContent)}
                         isMarkdown={markdownEnabled && !isGenerating && activeTab === "english"}
                       />
                     ) : translatingLanguages.has(activeTab) ? (
@@ -1895,7 +1905,7 @@ const StitchPage: React.FC = () => {
                       </div>
                     ) : translatedContent[activeTab] ? (
                       // Translated content always shows as plain text (no markdown rendering - markdown toggle is English-only)
-                      <ContentPreview content={translatedContent[activeTab]} isMarkdown={false} />
+                      <ContentPreview content={getPreviewContent(translatedContent[activeTab])} isMarkdown={false} />
                     ) : (
                       <div className="flex items-center justify-center h-full text-gray-400">
                         <p className="text-sm">No translation available for this language yet</p>

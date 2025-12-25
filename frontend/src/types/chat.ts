@@ -103,11 +103,12 @@ export interface MessageUI {
   sources?: SourceCitation[];
   metadata?: QueryMetadata;
   isLoading?: boolean;
-  isStreaming?: boolean; // NEW: indicates message is currently streaming
-  streamingLayer?: string; // NEW: current layer being used for streaming
-  translatedContent?: string; // Content translated to Hindi/other languages
-  translatedLanguage?: string; // NEW: The language it was translated to
-  isTranslating?: boolean; // Loading state for translation
+  isStreaming?: boolean;
+  streamingLayer?: string;
+  translatedContent?: string;
+  translatedLanguage?: string;
+  isTranslating?: boolean;
+  thinking?: string;
 }
 
 export interface UploadProgress {
@@ -120,11 +121,12 @@ export interface UploadProgress {
 
 // Streaming response types (for SSE)
 export interface StreamChunk {
-  type: 'layer' | 'text' | 'source' | 'done' | 'error';
+  type: 'layer' | 'text' | 'source' | 'done' | 'error' | 'thinking';
   content?: string;
   layer?: string;
   source?: SourceCitation;
   error?: string;
+  thinking?: string;
 }
 
 // @ Mention types

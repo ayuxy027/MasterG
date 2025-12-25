@@ -27,6 +27,15 @@ html,
 body {
   font-family: inherit;
   letter-spacing: inherit;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Custom animations */
@@ -86,4 +95,24 @@ body {
 
 .animate-slideIn {
   animation: slideIn 0.3s ease-out;
+}
+
+/* CRITICAL: Global KaTeX Fix - Remove default 1em margins permanently */
+.katex-display {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+
+/* Remove wrapper spacing */
+.katex-display > .katex {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Inline math */
+.katex {
+  margin: 0 !important;
+  padding: 0 !important;
 }

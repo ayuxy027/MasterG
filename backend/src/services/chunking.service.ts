@@ -1,89 +1,59 @@
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { v4 as uuidv4 } from "uuid";
 import { Chunk, ChunkMetadata } from "../types";
-import env from "../config/env";
+import { RAG_CONSTANTS } from "../config/ragConstants";
 import { languageService } from "./language.service";
+import { countTokens, splitRecursively } from "../utils/tokenCounter";
 
 export class ChunkingService {
-  private splitter: RecursiveCharacterTextSplitter;
-
-  constructor() {
-    this.splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: env.CHUNK_SIZE,
-      chunkOverlap: env.CHUNK_OVERLAP,
-      separators: ["\n\n", "\n", ". ", " ", ""],
-    });
-  }
-
-  /**
-   * Create ONE chunk per page (no splitting within pages)
-   * Each page = 1 chunk with proper page number for citations
-   * NOW WITH LANGUAGE DETECTION + FULL DOCUMENT STORAGE
-   */
   async createChunks(
     text: string,
     fileName: string,
     fileId: string,
     pageNumber: number,
-    userId?: string,
-    fullDocumentContent?: string // Store complete PDF content for context
+    userId?: string
   ): Promise<Chunk[]> {
-    try {
-      // Detect language of the page text
-      const languageDetection = languageService.detectLanguage(text);
+    const languageDetection = languageService.detectLanguage(text);
 
-      // console.log(
-      //   `📝 Page ${pageNumber} detected as ${languageDetection.language} (${
-      //     languageDetection.languageCode
-      //   }) with ${(languageDetection.confidence * 100).toFixed(0)}% confidence`
-      // );
+    const textChunks = splitRecursively(text, RAG_CONSTANTS.CHUNK_TOK);
 
-      // Split text into chunks using the configured splitter
-      const splitDocs = await this.splitter.createDocuments([text]);
+    const chunks: Chunk[] = [];
 
-      const chunks: Chunk[] = splitDocs.map((doc, index) => {
-        const metadata: ChunkMetadata = {
-          fileName, // PDF name for citations
-          fileId,
-          page: pageNumber, // Page number for citations
-          chunkIndex: index,
-          timestamp: new Date().toISOString(),
-          userId,
-          language: languageDetection.languageCode, // Store detected language
-          languageConfidence: languageDetection.confidence, // Store confidence
-        };
+    for (let i = 0; i < textChunks.length; i++) {
+      const content = textChunks[i].trim();
 
-        return {
-          id: uuidv4(),
-          content: doc.pageContent.trim(),
-          metadata,
-        };
+      if (content.length === 0) continue;
+
+      const tokenCount = countTokens(content);
+
+      let overlapContent = '';
+      if (i > 0) {
+        const prevChunk = textChunks[i - 1];
+        const words = prevChunk.trim().split(/\s+/);
+        const overlapWords = words.slice(-Math.floor(RAG_CONSTANTS.OVERLAP_TOK / 2));
+        overlapContent = overlapWords.join(' ');
+      }
+
+      const finalContent = overlapContent ? `${overlapContent} ${content}` : content;
+
+      const metadata: ChunkMetadata = {
+        fileName,
+        fileId,
+        page: pageNumber,
+        chunkIndex: i,
+        timestamp: new Date().toISOString(),
+        userId,
+        language: languageDetection.languageCode,
+        languageConfidence: languageDetection.confidence,
+      };
+
+      chunks.push({
+        id: uuidv4(),
+        content: finalContent,
+        metadata,
       });
-
-      // Filter out empty chunks
-      const validChunks = chunks.filter(this.validateChunk);
-
-      // console.log(
-      //   `✅ Created ${validChunks.length} chunks for ${fileName} (Page ${pageNumber}, Lang: ${
-      //     languageDetection.language
-      //   })`
-      // );
-
-      return validChunks;
-    } catch (error) {
-      console.error("Chunking error:", error);
-      throw new Error("Failed to create chunks from text");
     }
-  }
 
-  /**
-   * Validate chunk content
-   */
-  validateChunk(chunk: Chunk): boolean {
-    return (
-      chunk.content.trim().length > 0 &&
-      chunk.content.length <= env.CHUNK_SIZE * 1.5 // Allow some buffer
-    );
+    return chunks.filter(chunk => countTokens(chunk.content) <= RAG_CONSTANTS.CHUNK_TOK * 1.2);
   }
 }
 
