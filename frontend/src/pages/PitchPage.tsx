@@ -190,9 +190,9 @@ const PitchPage = () => {
       {/* Banner at the top - fades on scroll */}
       <Banner isVisible={bannerVisible} />
       
-      {/* Fixed Navbar */}
+      {/* Fixed Navbar - always visible on pitch page */}
       <div className="fixed top-[40px] sm:top-[44px] left-0 right-0 z-50">
-        <Navbar />
+        <Navbar alwaysVisible={true} />
       </div>
 
       {/* Hero Section */}

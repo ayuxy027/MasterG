@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  alwaysVisible?: boolean;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ alwaysVisible = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -14,6 +18,11 @@ const Navbar: React.FC = () => {
   };
 
   useEffect(() => {
+    if (alwaysVisible) {
+      setIsVisible(true);
+      return;
+    }
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
 
@@ -30,7 +39,7 @@ const Navbar: React.FC = () => {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY]);
+  }, [lastScrollY, alwaysVisible]);
 
   return (
     <>
