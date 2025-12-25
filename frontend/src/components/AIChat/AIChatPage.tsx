@@ -211,16 +211,16 @@ const AIChatPage: React.FC = () => {
   return (
     <div className="flex flex-col overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30" style={{ height: '100dvh' }}>
       {/* Banner at the top - scrolls away */}
-      <div className="relative z-[60]">
+      <div className="relative z-[60] flex-shrink-0">
         <Banner />
       </div>
       {/* Fixed Navbar - Renders the fixed navbar */}
-      <div className="fixed top-6 left-0 right-0 z-50">
+      <div className="fixed top-[40px] sm:top-[44px] left-0 right-0 z-50">
         <Navbar />
       </div>
 
       {/* Header Section */}
-      <div className="flex-shrink-0 px-4 sm:px-6 md:px-8 py-2 sm:py-3 border-b-2 border-orange-100 bg-white/50 backdrop-blur-sm max-w-[1920px] w-full mx-auto">
+      <div className="flex-shrink-0 px-4 sm:px-6 md:px-8 py-2 sm:py-3 border-b-2 border-orange-100 bg-white/50 backdrop-blur-sm max-w-[1920px] w-full mx-auto mt-[100px] sm:mt-[104px]">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-gray-800">
