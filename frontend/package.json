@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@vercel/analytics": "^1.6.1",
     "docx-preview": "^0.3.7",
     "katex": "^0.16.27",
     "lucide-react": "^0.562.0",
