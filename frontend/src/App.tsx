@@ -1,4 +1,6 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { track } from '@vercel/analytics';
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 import AIChatPage from "./components/AIChat/AIChatPage";
@@ -10,9 +12,21 @@ import PlaygroundPage from "./pages/PlaygroundPage";
 import BenchmarksPage from "./pages/BenchmarksPage";
 import PitchPage from "./pages/PitchPage";
 
+const RouteChangeTracker = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    track('pageview', { url: location.pathname + location.search });
+  }, [location]);
+
+  return null;
+};
+
 const App = () => {
   return (
-    <Routes>
+    <>
+      <RouteChangeTracker />
+      <Routes>
       <Route path="/" element={
         <Layout>
           <Landing />
@@ -54,7 +68,8 @@ const App = () => {
         </Layout>
       } />
       <Route path="/pitch" element={<PitchPage />} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
 
