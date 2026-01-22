@@ -1,405 +1,102 @@
-# MasterG 📚
+# MasterG 🧑‍🏫
+Welcome to **MasterG** 📚
 
-AI-powered educational platform that generates curriculum-aligned content in 22+ Indian languages, designed for offline use on resource-constrained devices.
+## Project Overview  
+**MasterG** is a lightweight, multilingual AI-powered educational platform that generates curriculum-aligned content in 22+ Indian languages. Designed for **100% offline operation** with **zero reliance on cloud services**, MasterG runs efficiently on low-resource devices (4-8GB RAM) without requiring internet connectivity.
 
-## 📖 Overview
+**🏆 MasterG Won First Place at Eduthon Techfest IIT B 29th Edition 🎉**
 
-MasterG is a comprehensive educational platform that addresses the multilingual content generation crisis in Indian education. It provides curriculum-aligned educational content across 22+ Indian languages while operating efficiently on low-resource devices (4-8GB RAM) without requiring internet connectivity.
+## Tech Stack  
 
-## 🚀 Core Features
+### **Frontend**  
+- **React 19** with TypeScript  
+- **Vite**  
+- **Tailwind CSS**  
+- **React Router DOM**  
+- **Recharts** (Data Visualization)  
+- **KaTeX** (Math Rendering)  
+- **HTML5 Canvas API**  
 
-### 1. AI Whiteboard (AI-Board)
-- 📝 Canvas-based drawing with pen, eraser, sticky notes, and text tools
-- ⚡ AI-powered card operations: Summarize, Flashcards, Mind Maps, Action Points
-- 🤖 Local AI processing with DeepSeek R1 model
-- ⌨️ Keyboard shortcuts and zoom/pan functionality
+### **Backend**  
+- **Node.js + Express** with TypeScript  
+- **MongoDB** (Local session management)  
+- **ChromaDB** (Local vector embeddings)  
+- **Tesseract.js** (OCR)  
+- **Ollama** (Local AI inference)  
 
-### 2. AI Chat Interface
-- 📄 Document upload (PDF, DOCX, PPT, images) with OCR capabilities
-- 🛤️ Multi-layer AI routing (simple chat, RAG, deep analysis)
-- 📑 Session management with source citations and page references
+### **Mobile**  
+- **Expo + React Native**  
+- **Expo Router**  
+- **Expo Camera**  
+- **Expo SQLite** (Local storage)  
+- **llama.rn** (On-device AI processing)  
 
-### 3. Learning Material Resource (LMR)
-- 🗂️ Upload study materials (PDF, PPT, DOCX) for automated processing
-- ✏️ Generate summaries, questions, quizzes, and revision notes
-- 🌐 Support for 22+ Indian languages with cultural relevance
+### **AI & Machine Learning**  
+- **DeepSeek-R1 1.5B** (Local reasoning model)  
+- **NLLB-200 600M** (Local multilingual translation)  
+- **ChromaDB** (Local vector database)  
+- **Tesseract.js** (Local OCR)  
 
-### 4. Educational Poster Generation
-- 🖼️ Generate culturally relevant educational posters
-- 🔢 Multiple aspect ratios and languages
-- 🎨 Indian cultural context integration
+## Features  
+- **AI Whiteboard (AI-Board)** 📝 - Canvas-based drawing with AI-powered card operations  
+- **AI Chat Interface** 💬 - Document upload with RAG-powered multilingual chat  
+- **Learning Material Resource (LMR)** 📚 - Generate summaries, quizzes, and revision notes  
+- **Educational Poster Generation** 🖼️ - Culturally relevant educational posters  
+- **Offline Content Generator (Stitch)** 🌎 - Real-time multilingual content generation  
+- **Mobile Application** 📱 - Cross-platform offline-capable mobile app  
 
-### 5. Offline Content Generator (Stitch)
-- 🌎 Generate educational content in native languages
-- 🎚️ Age-appropriate scaling (Class 3, 8, 12)
-- ⏱️ Real-time streaming with thinking text
-- 🌍 Translation using NLLB-200 model
+## Setup and Installation  
+1. **Clone this repository:**  
+   ```bash
+   git clone https://github.com/ayuxy027/MasterG.git
+   ```
+2. **Install frontend dependencies:**  
+   ```bash
+   cd frontend
+   npm install
+   ```
+3. **Install backend dependencies:**  
+   ```bash
+   cd ../backend
+   npm install
+   ```
+4. **Setup Ollama (Required for AI features):**  
+   ```bash
+   # Install Ollama from https://ollama.ai
+   # Pull required models
+   ollama pull deepseek-r1:1.5b
+   ```
+5. **Setup ChromaDB (Required for vector storage):**  
+   ```bash
+   # ChromaDB runs locally, no cloud setup needed
+   # Follow ChromaDB installation guide
+   ```
+6. **Start backend server:**  
+   ```bash
+   cd backend
+   npm run dev
+   ```
+7. **Start frontend development server:**  
+   ```bash
+   cd frontend
+   npm run dev
+   ```
 
-### 6. Mobile Application
-- 📱 Cross-platform (iOS, Android, Web) via Expo
-- 📷 Camera integration for document capture
-- 💾 Offline capabilities with local storage
+**Note:** MasterG is **100% offline** and requires **no external API keys** or cloud services. All AI processing happens locally using Ollama and local models.
 
-## 🏗️ System Architecture
+## Contributing  
+**Contributions are welcomed!** 😁  
+Let's keep the spirit of open source alive!  
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                                 MASTERG PLATFORM                                          │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                           │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                    FRONTEND (React + Expo Mobile)                                 │  │
-│  │  ┌─────────────────┐   ┌───────────────────────────────────────────────────────────────────────┐  │  │
-│  │  │   Web App       │   │                    Mobile App (Expo)                                  │  │  │
-│  │  │                 │   │  ┌───────────────────────────────────────────────────────────────────┐  │  │  │
-│  │  │  ┌─────────────┐│   │  │    Mobile UI Components (React Native)                          │  │  │  │
-│  │  │  │AI-Board Page││   │  │  - Camera Integration (Expo Camera)                             │  │  │  │
-│  │  │  │ - Canvas    ││   │  │  - Document Capture & Processing                                │  │  │  │
-│  │  │  │ - Sticky    ││   │  │  - Local Storage (SQLite, Async Storage)                        │  │  │  │
-│  │  │  │   Notes     ││   │  │  - Offline AI Processing (llama.rn)                             │  │  │  │
-│  │  │  │ - Cards     ││   │  │  - Cross-platform UI (Expo Router)                              │  │  │  │
-│  │  │  └─────────────┘│   │  └───────────────────────────────────────────────────────────────────┘  │  │  │
-│  │  │                 │   │                                                                           │  │  │
-│  │  │  ┌─────────────┐│   │  ┌───────────────────────────────────────────────────────────────────┐  │  │  │
-│  │  │  │AI Chat Page ││   │  │    Mobile AI Services                                           │  │  │  │
-│  │  │  │ - File      ││   │  │  - Local AI Inference (llama.rn)                                │  │  │  │
-│  │  │  │   Upload    ││   │  │  - Document Processing (Expo FileSystem)                        │  │  │  │
-│  │  │  │ - Session   ││   │  │  - Text Recognition (ML Kit)                                    │  │  │  │
-│  │  │  │   Management││   │  │  - Offline Storage & Sync                                       │  │  │  │
-│  │  │  │ - RAG       ││   │  └───────────────────────────────────────────────────────────────────┘  │  │  │
-│  │  │  └─────────────┘│   │                                                                           │  │  │
-│  │  │                 │   │  ┌───────────────────────────────────────────────────────────────────┐  │  │  │
-│  │  │  ┌─────────────┐│   │  │    Mobile Core Services                                         │  │  │  │
-│  │  │  │LMR Page     ││   │  │  - Expo Router Navigation                                       │  │  │  │
-│  │  │  │ - Document  ││   │  │  - Expo Document Picker                                         │  │  │  │
-│  │  │  │   Processing││   │  │  - Expo Print & Sharing                                         │  │  │  │
-│  │  │  │ - Content   ││   │  │  - Expo Media Library                                           │  │  │  │
-│  │  │  │   Generation││   │  │  - Expo Crypto & Security                                       │  │  │  │
-│  │  │  └─────────────┘│   │  └───────────────────────────────────────────────────────────────────┘  │  │  │
-│  │  │                 │   │                                                                           │  │  │
-│  │  │  ┌─────────────┐│   │                                                                           │  │  │
-│  │  │  │Stitch Page  ││   │                                                                           │  │  │
-│  │  │  │ - Multilingual││  │                                                                           │  │  │
-│  │  │  │   Content   ││   │                                                                           │  │  │
-│  │  │  │   Generation││   │                                                                           │  │  │
-│  │  │  │ - Age       ││   │                                                                           │  │  │
-│  │  │  │   Scaling   ││   │                                                                           │  │  │
-│  │  │  └─────────────┘│   │                                                                           │  │  │
-│  │  │                 │   │                                                                           │  │  │
-│  │  │  ┌─────────────┐│   │                                                                           │  │  │
-│  │  │  │Posters Page ││   │                                                                           │  │  │
-│  │  │  │ - Educational││  │                                                                           │  │  │
-│  │  │  │   Poster    ││   │                                                                           │  │  │
-│  │  │  │   Generation││   │                                                                           │  │  │
-│  │  │  │ - Cultural  ││   │                                                                           │  │  │
-│  │  │  │   Context   ││   │                                                                           │  │  │
-│  │  │  └─────────────┘│   │                                                                           │  │  │
-│  │  └─────────────────┘   └───────────────────────────────────────────────────────────────────────────┘  │  │
-│  │                                                                                                       │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │              Frontend Services & APIs (React Components)                                         │  │
-│  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │  │
-│  │  │  │ boardApi.ts  │  │ chatApi.ts   │  │ lmrApi.ts    │  │ posterApi.ts │  │ stitchApi.ts │     │  │
-│  │  │  │ - Canvas     │  │ - sendQuery  │  │ - uploadDoc  │  │ - generate   │  │ - generate   │     │  │
-│  │  │  │   Operations │  │ - uploadFile │  │ - generate   │  │   Posters    │  │   Content    │     │  │
-│  │  │  │ - Card       │  │ - getSession │  │ - getHistory │  │ - getLangs   │  │ - translate  │     │  │
-│  │  │  │   Operations │  │ - deleteSess │  │ - saveNotes  │  │ - getCat     │  │ - saveSess   │     │  │
-│  │  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  └───────────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                                           │
-│                                    │ HTTP/HTTPS │ WebSocket │ Local Storage │                            │
-│                                    │ VITE_API_URL │           │ Expo Storage │                            │
-│                                    ▼            ▼            ▼               ▼                            │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                           BACKEND (Node.js + Express)                                 │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                API Routes & Controllers                                                         │  │
-│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │  │
-│  │  │  │ upload.routes   │  │ query.routes    │  │ chat.routes     │  │ board.routes    │          │  │
-│  │  │  │ - POST /upload  │  │ - POST /query   │  │ - GET /sessions │  │ - POST /cards   │          │  │
-│  │  │  │ - POST /stats   │  │ - GET /health   │  │ - POST /query   │  │ - POST /action  │          │  │
-│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘          │  │
-│  │  │                                                                                               │  │
-│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │  │
-│  │  │  │ lmr.routes      │  │ poster.routes   │  │ stitch.routes   │  │ browse.routes   │          │  │
-│  │  │  │ - POST /upload  │  │ - POST /generate│  │ - POST /generate│  │ - GET /files    │          │  │
-│  │  │  │ - POST /summary │  │ - GET /langs    │  │ - POST /translate│ │ - GET /preview  │          │  │
-│  │  │  │ - POST /quiz    │  │ - GET /cats     │  │ - GET /status   │  │                 │          │  │
-│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘          │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                           │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                Controllers & Business Logic                                                     │  │
-│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │  │
-│  │  │  │upload.controller│  │chat.controller  │  │lmr.controller   │  │board.controller │          │  │
-│  │  │  │ - File upload   │  │ - Handle queries│  │ - Process docs  │  │ - Canvas ops    │          │  │
-│  │  │  │ - PDF parsing   │  │ - Session mgmt  │  │ - AI generation │  │ - Card actions  │          │  │
-│  │  │  │ - OCR fallback  │  │ - 3-layer route │  │ - Multi-lingual │  │ - AI processing │          │  │
-│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘          │  │
-│  │  │                                                                                               │  │
-│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │  │
-│  │  │  │poster.controller│  │stitch.controller│  │queryRouter      │  │document.service │          │  │
-│  │  │  │ - Generate      │  │ - Content gen   │  │ - Layer routing │  │ - Page-wise     │          │  │
-│  │  │  │   posters       │  │ - Translation   │  │ - AI selection  │  │   store         │          │  │
-│  │  │  │ - Cultural      │  │ - Session mgmt  │  │ - Response gen  │  │ - MongoDB ops   │          │  │
-│  │  │  │   context       │  │ - Progress      │  │                 │  │ - Metadata      │          │  │
-│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘          │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                           │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                AI & Processing Services                                                         │  │
-│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │  │
-│  │  │  │groq.service     │  │gemini.service   │  │embedding.service│  │vectordb.service │          │  │
-│  │  │  │ - Llama Scout   │  │ - Flash 2.0     │  │ - Google Embed  │  │ - ChromaDB ops  │          │  │
-│  │  │  │ - Fast responses│  │ - Deep analysis │  │ - 384-dim vec   │  │ - Collection mgmt│         │  │
-│  │  │  │ - Simple chat   │  │ - Document      │  │ - Batch process │  │ - Semantic search│         │  │
-│  │  │  └─────────────────┘  │   processing    │  └─────────────────┘  └─────────────────┘          │  │
-│  │  │                       └─────────────────┘                                                      │  │
-│  │  │                                                                                               │  │
-│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │  │
-│  │  │  │pdf.service      │  │ocr.service      │  │chunking.service │  │translation.service│        │  │
-│  │  │  │ - Extract text  │  │ - Tesseract.js  │  │ - Page-wise     │  │ - NLLB-200      │          │  │
-│  │  │  │ - Page-wise     │  │ - Image extract │  │   chunk         │  │ - Multi-lingual │          │  │
-│  │  │  │ - Metadata      │  │ - Format conv   │  │ - Metadata      │  │ - Batch process │          │  │
-│  │  │  │   attach        │  │ - Text recog    │  │   attach        │  │ - Caching       │          │  │
-│  │  │  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘          │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                           │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                Data Storage & External APIs                                                     │  │
-│  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │  │
-│  │  │  │   MongoDB    │  │  ChromaDB    │  │  Ollama API  │  │Google AI API │  │Google Studio │     │  │
-│  │  │  │  - Sessions  │  │  - Embeddings│  │  - DeepSeek  │  │  - Gemini    │  │  - Image     │     │  │
-│  │  │  │  - Messages  │  │  - Vectors   │  │    R1        │  │    Pro       │  │    Gen       │     │  │
-│  │  │  │  - Documents │  │  - Metadata  │  │  - Offline   │  │  - Groq      │  │  - Cultural  │     │  │
-│  │  │  │  - LMR Data  │  │  - Semantic  │  │    Models    │  │    API       │  │    Context   │     │  │
-│  │  │  │  - Stitch    │  │    Search    │  │              │  │              │  │              │     │  │
-│  │  │  │    Sessions  │  │              │  │              │  │              │  │              │     │  │
-│  │  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  └───────────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                                           │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                    DATA FLOWS & PROCESSES                                             │  │
-│  │                                                                                                         │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                    Document Upload & Processing Flow                                            │  │
-│  │  │  1. User selects file(s) → Frontend upload → Backend processing → Page-wise extraction         │  │
-│  │  │  2. OCR fallback for images → Chunking service → Embedding generation → ChromaDB storage      │  │
-│  │  │  3. Document metadata storage → MongoDB session save → Response with file ID                   │  │
-│  │  │  4. Frontend updates UI with success message and file availability                             │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                         │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                    AI Query Processing Flow                                                     │  │
-│  │  │  1. User types message → Frontend API call → 3-Layer routing decision                          │  │
-│  │  │  2. Layer 1 (Groq): Simple greetings and chat → Fast response                                  │  │
-│  │  │  3. Layer 2 (RAG): Document-specific queries → Semantic search in ChromaDB → Context retrieval  │  │
-│  │  │  4. Layer 3 (Gemini): Complex analysis → Full document context → Deep processing               │  │
-│  │  │  5. Response with citations → Save to chat history → Frontend display                          │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                         │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                    AI-Board Card Operations Flow                                               │  │
-│  │  │  1. User creates content → Canvas operations → Local storage of paths/notes/cards             │  │
-│  │  │  2. AI card generation → Ollama DeepSeek R1 processing → Streaming responses                  │  │
-│  │  │  3. Card selection (up to 4) → AI operation selection → Local AI processing                  │  │
-│  │  │  4. Result generation → Canvas placement → Real-time updates                                   │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                         │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                    Multilingual Content Generation Flow                                        │  │
-│  │  │  1. User inputs topic → Age/subject selection → Language selection                            │  │
-│  │  │  2. Content generation in English → DeepSeek R1 processing → Streaming output                 │  │
-│  │  │  3. Translation to selected language → NLLB-200 processing → Real-time translation updates    │  │
-│  │  │  4. Session management → Local storage → Frontend display and copy/download options           │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                         │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                    Educational Poster Generation Flow                                          │  │
-│  │  │  1. User selects category → Enters prompt → Language selection                                │  │
-│  │  │  2. Query enhancement with cultural context → Google AI Studio processing                     │  │
-│  │  │  3. Multiple poster generation → Responsive grid display → Download options                   │  │
-│  │  │  4. Local storage of generated posters → History management                                   │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                                                         │  │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  │                    Mobile Offline Processing Flow                                             │  │
-│  │  │  1. Document capture via camera → Local processing → Offline AI inference (llama.rn)         │  │
-│  │  │  2. Local storage using SQLite → Sync when online → Cross-platform compatibility             │  │
-│  │  │  3. Offline content generation → Local model usage → Data persistence                        │  │
-│  │  │  4. Online sync when connectivity available → Cloud backup and sharing                       │  │
-│  │  └───────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│  └───────────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                                           │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+### **Important**  
+- Please follow the project's **license terms** before redistributing or modifying.  
+- Creating something from scratch takes a lot of hard work, and I hope you respect that. 😄  
+- If you have any questions or need permission for something specific, feel free to reach out.  
 
-## 🛠️ Tech Stack
+## Contact  
+If you have any inquiries or suggestions, please reach out:  
+- **Email:** [ayush421301@gmail.com](mailto:ayush421301@gmail.com)  
+- **X (Twitter):** [ayuxy027](https://x.com/ayuxy027)  
+- **GitHub:** [ayuxy027](https://github.com/ayuxy027)  
 
-### Frontend (Web)
-- ⚛️ **Framework**: React 19 + TypeScript + Vite
-- 🧩 **UI Components**: Tailwind CSS, Lucide React
-- 🔄 **State Management**: React hooks + Context API
-- 📄 **Document Processing**: react-pdf, docx-preview, @cyntler/react-doc-viewer
-- 🧮 **Math Rendering**: KaTeX + rehype-katex
-- 🧭 **Routing**: React Router DOM
-- 📊 **Charts**: Recharts
-- 🖌️ **Canvas**: HTML5 Canvas API
-
-### Backend (Node.js)
-- 🖥️ **Framework**: Node.js + Express + TypeScript
-- ⚡ **Database**: MongoDB for session management
-- 🗃️ **Vector Database**: ChromaDB for embeddings
-- 📄 **Document Processing**: pdf-parse, mammoth, officeparser
-- 🕵️ **OCR**: Tesseract.js
-- 🤖 **AI Integration**: Ollama API, Google AI Studio
-- 📤 **File Upload**: Multer
-- 🔐 **Authentication**: Google Auth Library
-
-### Mobile (Expo/React Native)
-- 📲 **Framework**: Expo + React Native
-- 🧭 **Navigation**: Expo Router
-- 📸 **Camera**: Expo Camera
-- 📄 **Document Processing**: Expo Document Picker
-- 💾 **Local Storage**: Expo SQLite, Async Storage
-- 🤖 **AI Processing**: llama.rn for on-device inference
-- 🌐 **Cross-platform**: iOS, Android, Web support
-
-### AI & Machine Learning
-- 🧠 **Primary LLM**: DeepSeek-R1 1.5B (reasoning-focused)
-- 🌍 **Translation**: NLLB-200 (600M distilled) for multilingual support
-- 🧬 **Embeddings**: Google Embeddings (384-dim vectors)
-- 🖼️ **Image Generation**: Google AI Studio for educational posters
-- 💻 **Offline Processing**: Ollama for local AI operations
-- 🔎 **OCR**: Tesseract.js for image text extraction
-
-## ⚙️ Setup Instructions
-
-### Prerequisites
-- 🟢 Node.js (v18+)
-- 🍃 MongoDB (optional, app works without it)
-- 💠 ChromaDB
-- 🤖 Ollama with DeepSeek-R1 model
-- 🔑 Google AI API key (for some features)
-
-### Frontend Setup
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Backend Setup
-```bash
-cd backend
-npm install
-cp .env.example .env  # Configure environment variables
-npm run dev
-```
-
-### Mobile App Setup
-```bash
-cd app
-npm install
-npx expo start
-```
-
-### Environment Variables
-Create `.env` files in both frontend and backend with appropriate API keys and URLs.
-
-## 🌐 Multilingual Support
-
-The platform supports 22+ scheduled Indian languages:
-- Assamese, Bengali, Bhojpuri, Bodo, Dogri, English, Gujarati, Hindi, Kannada, Kashmiri, Konkani, Maithili, Malayalam, Manipuri, Marathi, Nepali, Odia, Punjabi, Sanskrit, Santali, Sindhi, Tamil, Telugu, Urdu
-
-## 📊 Performance Benchmarks
-
-### LLM Selection Process
-- 🧠 **DeepSeek-R1 1.5B**: Selected as optimal model with 78% GSM8K reasoning score
-- 💾 **Memory Footprint**: ~2.2GB RAM usage, ~1.1GB disk space
-- ⚡ **Inference Speed**: 35-45 tokens/second on CPU
-- 🔍 **Reasoning Quality**: Superior chain-of-thought processing with auditable intelligence
-
-### Translation Performance
-- 🌍 **NLLB-200**: 10x performance improvement (5:00 → 0:30) through optimizations
-- 🗣️ **Language Coverage**: 200+ global languages, 22+ Indian languages
-- 🚀 **Optimizations**: Batch processing, parallel workers, caching, multi-threading
-- 🎓 **Scientific Fidelity**: Preserves technical terms and educational content accuracy
-
-## 🎓 Educational Features
-
-### Curriculum Alignment
-- 📘 NCERT standards compliance
-- 📗 CBSE guidelines adherence
-- 🏫 State board curriculum support
-- 🧒 Age-appropriate content scaling (Class 3, 8, 12)
-
-### Accessibility Support
-- 👁‍🗨 Learning-friendly outputs for students with dyslexia
-- 🦯 Visual impairment accommodations
-- 🔤 Code-mixing fluency (Hindi-English, Punjabi-English)
-
-## 🏛️ Key Architecture Decisions
-
-### 1. Session Isolation
-- Each session has unique ChromaDB collection
-- Prevents cross-contamination
-- Clean context per conversation
-
-### 2. Progressive Enhancement
-- Works without MongoDB (graceful degradation)
-- Empty states guide users
-- Error messages actionable
-
-### 3. Real-time Feedback
-- Upload progress bars
-- Loading animations
-- Optimistic UI updates
-
-### 4. Type Safety
-- Full TypeScript coverage
-- Interfaces match backend
-- Compile-time error catching
-
-### 5. Separation of Concerns
-- API layer isolated from UI
-- Components focus on UI
-- Services handle business logic
-
-### 6. Offline-First Design
-- Core functionality works without internet
-- Local storage for sessions and content
-- Sync when connectivity available
-
-### 7. Scalable AI Processing
-- Multi-layer routing for different query types
-- Caching for repeated requests
-- Batch processing for efficiency
-
-## 📈 Key Success Metrics
-
-- 📴 **Offline Operation**: 100% functionality without internet connection
-- 🇮🇳 **Language Accuracy**: ≥95% script accuracy across all supported languages
-- ✍️ **Mathematical Notation**: ≥98% symbol accuracy (SAR)
-- 🎯 **Content Quality**: ≥95% curriculum alignment accuracy
-- 🕒 **Generation Speed**: <30 seconds for standard content on 4-8GB RAM devices
-- 🌍 **Translation Quality**: ≥95% accuracy across 15+ languages
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Commit your changes (`git commit -m 'Add some amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-## ⚖️ License
-
-This project is licensed under the ISC License.
-
-## 💬 Support
-
-For support, please open an issue in the GitHub repository.
+---

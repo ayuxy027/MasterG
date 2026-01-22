@@ -127,15 +127,11 @@ const Landing = () => {
                 <div className="max-w-7xl my-2 mx-auto">
                     {/* Header Section */}
                     <div className="text-center mb-8 sm:mb-12 md:mb-16 relative z-10">
-                        <span className="inline-flex items-center justify-center gap-1 sm:gap-2 mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 border-2 text-white border-orange-400 bg-orange-400 rounded-full text-[10px] sm:text-xs md:text-sm font-medium">
-                            <svg className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.236 22a3 3 0 0 0-2.2-5" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16 20a3 3 0 0 1 3-3h1a2 2 0 0 0 2-2v-2a4 4 0 0 0-4-4V4" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M18 13h.01" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M18 6a4 4 0 0 0-4 4 7 7 0 0 0-7 7c0-5 4-5 4-10.5a4.5 4.5 0 1 0-9 0 2.5 2.5 0 0 0 5 0C7 10 3 11 3 17c0 2.8 2.2 5 5 5h10" />
+                        <span className="inline-flex items-center justify-center gap-1.5 sm:gap-2 mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 border-2 text-white border-orange-400 bg-orange-400 rounded-full text-[10px] sm:text-xs md:text-sm font-medium">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
                             </svg>
-                            <span className="hidden sm:inline">|</span>
-                            <span className="text-[10px] sm:text-xs md:text-sm">Trusted by 500+ students</span>
+                            <span className="text-[10px] sm:text-xs md:text-sm">MasterG won first place at Techfest IIT B</span>
                         </span>
 
                         <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-7xl tracking-tight font-semibold text-orange-400 mb-2 px-2">
