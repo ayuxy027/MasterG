@@ -263,16 +263,18 @@ export async function getAllSessions(
 
     // Transform to SessionListItem format
     return (
-      data.sessions?.map((session: Record<string, unknown>) => ({
-        sessionId: session.sessionId,
-        chatName: session.chatName,
-        messageCount: (session.messages as unknown[])?.length || 0,
-        lastMessage:
-          (session.messages as Array<{content: string}>)?.[((session.messages as unknown[])?.length || 1) - 1]?.content ||
-          "New conversation",
-        createdAt: new Date(session.createdAt as string),
-        updatedAt: new Date(session.updatedAt as string),
-      })) || []
+      data.sessions?.map((session: Record<string, unknown>) => {
+        const messages = session.messages as Array<{ content: string }> | undefined;
+        const lastMessage = messages?.[messages.length - 1]?.content || "New conversation";
+        return {
+          sessionId: session.sessionId,
+          chatName: session.chatName,
+          messageCount: messages?.length || 0,
+          lastMessage,
+          createdAt: new Date(session.createdAt as string),
+          updatedAt: new Date(session.updatedAt as string),
+        };
+      }) || []
     );
   } catch (error) {
     if (error instanceof ChatApiError) throw error;

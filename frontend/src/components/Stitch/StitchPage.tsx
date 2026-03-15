@@ -1022,7 +1022,7 @@ const StitchPage: React.FC = () => {
                 accumulatedThinking += parsed.content || "";
                 setThinkingText(accumulatedThinking);
               } else if (parsed.type === "response") {
-                if (accumulatedResponse === "" && generationMode === "cloud" && !accumulatedThinking) {
+                if (!accumulatedResponse && generationMode === "cloud" && !accumulatedThinking) {
                   setThinkingText("Processing request with Kimi K2 model...");
                 }
                 accumulatedResponse += parsed.content || "";
