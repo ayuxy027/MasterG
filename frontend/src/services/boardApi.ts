@@ -103,7 +103,7 @@ export async function checkOllamaStatus(): Promise<OllamaStatus> {
     }
 
     return response.json();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Board API: Ollama status check error:", error);
     return { connected: false };
   }
@@ -182,7 +182,7 @@ export async function generateCards(
             } else if (parsed.type === "error") {
               throw new Error(parsed.error);
             }
-          } catch (e) {
+          } catch {
             // Skip invalid JSON
             continue;
           }
@@ -200,7 +200,7 @@ export async function generateCards(
     }
 
     return cards;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Board API: Generate error:", error);
     throw error;
   }
@@ -296,7 +296,7 @@ export async function performCardAction(
             } else if (parsed.type === "error") {
               throw new Error(parsed.error);
             }
-          } catch (e) {
+          } catch {
             // Skip invalid JSON
             continue;
           }
@@ -320,11 +320,11 @@ export async function performCardAction(
     } else {
       throw new Error("No result received from action");
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Board API: Action error:", error);
     return {
       success: false,
-      message: error.message || "Failed to perform action",
+      message: error instanceof Error ? error.message : "Failed to perform action",
     };
   }
 }

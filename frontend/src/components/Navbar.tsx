@@ -6,8 +6,10 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ alwaysVisible = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
+  const [scrollVisible, setScrollVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  const isVisible = alwaysVisible || scrollVisible;
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -18,20 +20,17 @@ const Navbar: React.FC<NavbarProps> = ({ alwaysVisible = false }) => {
   };
 
   useEffect(() => {
-    if (alwaysVisible) {
-      setIsVisible(true);
-      return;
-    }
+    if (alwaysVisible) return;
 
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
 
       if (currentScrollY > lastScrollY && currentScrollY > 100) {
         // Scrolling down
-        setIsVisible(false);
+        setScrollVisible(false);
       } else {
         // Scrolling up
-        setIsVisible(true);
+        setScrollVisible(true);
       }
 
       setLastScrollY(currentScrollY);

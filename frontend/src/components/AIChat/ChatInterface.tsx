@@ -61,6 +61,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     loadUploadedFiles();
     // Check if this is a new session (no messages)
     setIsFirstMessage(messages.length === 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, messages.length]);
 
   // Handle initial prompt from Plan mode

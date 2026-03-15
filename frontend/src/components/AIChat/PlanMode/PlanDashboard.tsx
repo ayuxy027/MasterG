@@ -23,6 +23,7 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
 
     useEffect(() => {
         loadDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId, sessionId]);
 
     const loadDocuments = async () => {
@@ -30,8 +31,8 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
         try {
             const docs = await getDocuments(userId, sessionId);
             setDocuments(docs);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         } finally {
             setIsLoading(false);
         }

@@ -30,6 +30,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
     // Load saved tree from MongoDB on mount
     useEffect(() => {
         loadSavedTree();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [document.id]);
 
     const loadSavedTree = async () => {
@@ -39,7 +40,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
             if (savedTree) {
                 setTree(savedTree);
             }
-        } catch (err) {
+        } catch {
             // No saved tree, that's fine
         } finally {
             setIsLoadingTree(false);
@@ -57,8 +58,8 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
                 document.fileName
             );
             setTree(result);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         } finally {
             setIsLoading(false);
         }
@@ -89,12 +90,12 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
 
             // 4. Switch to Chat with result
             onSwitchToStudy(optimizedPrompt);
-        } catch (error: any) {
+        } catch (error: unknown) {
 
             // Fallback with error visibility for debugging
             // User sees: "Error: [Message] -> Explain..."
             // This helps Identify if it's a network error, 500, or logical error.
-            const errorMsg = error.message || "Unknown error";
+            const errorMsg = error instanceof Error ? error.message : "Unknown error";
             onSwitchToStudy(`[Optimization Failed: ${errorMsg}] Explain "${node.title}" from ${document.fileName}`);
         } finally {
             setOptimizingNodeId(null);

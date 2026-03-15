@@ -135,7 +135,7 @@ const Landing = () => {
                         </span>
 
                         <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-7xl tracking-tight font-semibold text-orange-400 mb-2 px-2">
-                            Your Personlised  <br className="hidden sm:block" />
+                            Your Personalised  <br className="hidden sm:block" />
                             <span className="inline-flex items-center align-middle flex-wrap justify-center gap-1 sm:gap-2 md:gap-3">
                                 <span className="inline-flex items-center justify-center border-2 border-orange-400 rounded-full px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 lg:px-6 lg:py-3 transform -rotate-6 origin-center mr-1 sm:mr-2 md:mr-3">
                                     <svg className="text-orange-400 w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-10 lg:h-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">

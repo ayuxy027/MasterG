@@ -50,6 +50,7 @@ const AIChatPage: React.FC = () => {
   // Load sessions on mount
   useEffect(() => {
     loadSessions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   // Load session messages when session changes
@@ -57,6 +58,7 @@ const AIChatPage: React.FC = () => {
     if (currentSessionId) {
       loadSessionMessages(currentSessionId);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSessionId]);
 
   // Handle banner fade on scroll
@@ -216,6 +218,7 @@ const AIChatPage: React.FC = () => {
         console.error("Failed to generate/save chat name:", error);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, currentSessionId]);
 
 

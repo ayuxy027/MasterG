@@ -150,6 +150,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging, dragStart.x, dragStart.y, id, onUpdate]);
 
   React.useEffect(() => {
@@ -161,6 +162,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         document.removeEventListener('mouseup', handleResizeEnd);
       };
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isResizing, id, onUpdate]);
 
   React.useEffect(() => {

@@ -18,13 +18,14 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
 
     useEffect(() => {
         loadPlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId, sessionId]);
 
     const loadPlan = async () => {
         try {
             const data = await getLatestPlan(userId, sessionId);
             setPlan(data);
-        } catch (err: any) {
+        } catch {
             // Ignore 404
         }
     };
@@ -33,12 +34,12 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
         setIsLoading(true);
         setError(null);
         try {
-            const newPlanText = await generatePlan(userId, sessionId);
+            await generatePlan(userId, sessionId);
             // Refresh full plan object
             await loadPlan();
             setIsExpanded(true);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         } finally {
             setIsLoading(false);
         }
@@ -51,8 +52,8 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
         try {
             await translatePlan(userId, sessionId, targetLang);
             await loadPlan(); // Refresh to get new translations
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         } finally {
             setIsTranslating(false);
         }

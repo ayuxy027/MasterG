@@ -14,6 +14,24 @@ import {
 } from 'recharts';
 import { CheckCircle2, XCircle, AlertTriangle, Award, ChevronRight } from 'lucide-react';
 
+const Badge = ({ label, variant = 'default' }: { label: string; variant?: 'default' | 'success' | 'warning' | 'error' }) => {
+  const variants = {
+    default: 'bg-gray-100 text-gray-700',
+    success: 'bg-orange-50 text-orange-700',
+    warning: 'bg-orange-100 text-orange-800',
+    error: 'bg-gray-100 text-gray-600',
+  };
+
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium ${variants[variant]}`}>
+      {variant === 'success' && <CheckCircle2 className="w-3 h-3 mr-1.5" />}
+      {variant === 'warning' && <AlertTriangle className="w-3 h-3 mr-1.5" />}
+      {variant === 'error' && <XCircle className="w-3 h-3 mr-1.5" />}
+      {label}
+    </span>
+  );
+};
+
 const BenchmarksPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'llm' | 'translation'>('llm');
 
@@ -64,24 +82,6 @@ const BenchmarksPage: React.FC = () => {
     { name: 'DeepSeek-R1', modelSize: 1.3, diskUsage: 3.0 },
     { name: 'Gemma', modelSize: 0.27, diskUsage: 2.0 },
   ];
-
-  const Badge = ({ label, variant = 'default' }: { label: string; variant?: 'default' | 'success' | 'warning' | 'error' }) => {
-    const variants = {
-      default: 'bg-gray-100 text-gray-700',
-      success: 'bg-orange-50 text-orange-700',
-      warning: 'bg-orange-100 text-orange-800',
-      error: 'bg-gray-100 text-gray-600',
-    };
-
-    return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium ${variants[variant]}`}>
-        {variant === 'success' && <CheckCircle2 className="w-3 h-3 mr-1.5" />}
-        {variant === 'warning' && <AlertTriangle className="w-3 h-3 mr-1.5" />}
-        {variant === 'error' && <XCircle className="w-3 h-3 mr-1.5" />}
-        {label}
-      </span>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-white">

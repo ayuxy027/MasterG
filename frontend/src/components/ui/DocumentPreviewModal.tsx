@@ -38,12 +38,6 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     : getViewerTypeFromExtension(fileName);
 
   // For text files, fetch content separately
-  useEffect(() => {
-    if (isOpen && viewerType === 'text') {
-      fetchTextContent();
-    }
-  }, [isOpen, viewerType]);
-
   const fetchTextContent = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/files/${fileId}/content?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}`);
@@ -55,6 +49,13 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       console.error('Failed to fetch text content:', error);
     }
   };
+
+  useEffect(() => {
+    if (isOpen && viewerType === 'text') {
+      fetchTextContent();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, viewerType]);
 
   const getFileIcon = () => {
     const icons: Record<ViewerType, React.ReactNode> = {

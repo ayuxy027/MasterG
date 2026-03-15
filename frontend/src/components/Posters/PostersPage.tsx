@@ -50,13 +50,6 @@ const loadPostersFromStorage = (): StoredPoster[] => {
   return [];
 };
 
-const clearPostersFromStorage = (): void => {
-  try {
-    localStorage.removeItem(POSTERS_STORAGE_KEY);
-  } catch (error) {
-    console.warn("Failed to clear posters from localStorage:", error);
-  }
-};
 
 const PostersPage: React.FC = () => {
   // State
@@ -77,7 +70,6 @@ const PostersPage: React.FC = () => {
   );
   const [storedPosters, setStoredPosters] = useState<StoredPoster[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [enhancedPrompt, setEnhancedPrompt] = useState<string>("");
 
   // Load categories, languages, and stored posters on mount
   useEffect(() => {
@@ -91,9 +83,6 @@ const PostersPage: React.FC = () => {
       const latestTimestamp = stored[stored.length - 1].createdAt;
       const latestBatch = stored.filter(p => p.createdAt === latestTimestamp);
       setGeneratedPosters(latestBatch);
-      if (latestBatch.length > 0) {
-        setEnhancedPrompt(latestBatch[0].enhancedPrompt);
-      }
     }
   }, []);
 
@@ -140,7 +129,6 @@ const PostersPage: React.FC = () => {
     setIsGenerating(true);
     setError(null);
     setGeneratedPosters([]);
-    setEnhancedPrompt("");
 
     try {
       const response = await generatePosters({
@@ -152,9 +140,6 @@ const PostersPage: React.FC = () => {
       });
 
       setGeneratedPosters(response.posters);
-      if (response.posters.length > 0) {
-        setEnhancedPrompt(response.posters[0].enhancedPrompt);
-      }
 
       // Save to localStorage with metadata
       const timestamp = new Date().toISOString();
@@ -181,14 +166,6 @@ const PostersPage: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  // Clear poster history
-  const handleClearHistory = () => {
-    clearPostersFromStorage();
-    setStoredPosters([]);
-    setGeneratedPosters([]);
-    setEnhancedPrompt("");
   };
 
   const handleDownload = (poster: GeneratedPoster, index: number) => {
@@ -319,7 +296,7 @@ const PostersPage: React.FC = () => {
                 </label>
                 <select
                   value={aspectRatio}
-                  onChange={(e) => setAspectRatio(e.target.value as any)}
+                  onChange={(e) => setAspectRatio(e.target.value as "1:1" | "16:9" | "9:16" | "4:3" | "3:4")}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 transition-all"
                 >
                   <option value="1:1">Square (1:1)</option>

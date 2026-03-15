@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import PDFViewer from './PDFViewer';
 import TextViewer from './TextViewer';

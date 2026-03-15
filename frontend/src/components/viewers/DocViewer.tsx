@@ -36,6 +36,7 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
         } else {
             setIsLoading(false);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [url, ext]);
 
     /**
@@ -68,7 +69,7 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
             console.log('⚠️ No PDF preview, falling back to text');
             await fetchTextContent();
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Preview check error:', err);
             // Fall back to text content
             await fetchTextContent();
@@ -101,13 +102,13 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
                     });
                 }
                 setIsLoading(false);
-            } catch (importError: any) {
+            } catch (importError: unknown) {
                 console.error('docx-preview not available:', importError);
                 await fetchTextContent();
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('DOCX render error:', err);
-            setError(err.message || 'Failed to render document');
+            setError((err as Error).message || 'Failed to render document');
             setIsLoading(false);
         }
     };
@@ -137,7 +138,7 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
 
             setError('Preview not available for this document type. Please download to view.');
             setIsLoading(false);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Text content fetch error:', err);
             setError('Could not load document preview');
             setIsLoading(false);

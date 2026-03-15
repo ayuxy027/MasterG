@@ -31,6 +31,7 @@ const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
 
   useEffect(() => {
     loadFiles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   const loadFiles = async () => {

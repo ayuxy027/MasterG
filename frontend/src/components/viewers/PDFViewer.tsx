@@ -19,6 +19,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ url, fileName }) => {
 
     // Set a timeout to detect if PDF fails to load
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsLoading(true);
         setError(null);
 

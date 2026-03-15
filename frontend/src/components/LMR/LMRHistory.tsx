@@ -21,6 +21,7 @@ const LMRHistoryComponent: React.FC<LMRHistoryProps> = ({
 
   useEffect(() => {
     loadHistory();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, sessionId]);
 
   const loadHistory = async () => {

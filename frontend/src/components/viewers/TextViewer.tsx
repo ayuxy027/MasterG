@@ -20,6 +20,7 @@ const TextViewer: React.FC<TextViewerProps> = ({ url, content: initialContent, f
         if (!initialContent && url) {
             fetchContent();
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [url, initialContent]);
 
     const fetchContent = async () => {
@@ -29,8 +30,8 @@ const TextViewer: React.FC<TextViewerProps> = ({ url, content: initialContent, f
             if (!response.ok) throw new Error('Failed to load file');
             const text = await response.text();
             setContent(text);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load content');
+        } catch (err: unknown) {
+            setError((err as Error).message || 'Failed to load content');
         } finally {
             setIsLoading(false);
         }

@@ -83,8 +83,8 @@ export function useVoiceInput({
                     } else {
                         throw new Error("No speech detected");
                     }
-                } catch (err: any) {
-                    const errorMessage = err.message || "Transcription failed";
+                } catch (err: unknown) {
+                    const errorMessage = (err as Error).message || "Transcription failed";
                     setError(errorMessage);
                     setStatus("error");
                     onError?.(errorMessage);
@@ -92,8 +92,9 @@ export function useVoiceInput({
             };
 
             // Handle errors
-            mediaRecorder.onerror = (event: any) => {
-                const errorMessage = event.error?.message || "Recording failed";
+            mediaRecorder.onerror = (event: Event) => {
+                const errorEvent = event as MediaRecorderErrorEvent;
+                const errorMessage = errorEvent.error?.message || "Recording failed";
                 setError(errorMessage);
                 setStatus("error");
                 onError?.(errorMessage);
@@ -102,15 +103,15 @@ export function useVoiceInput({
             // Start recording
             mediaRecorder.start(100); // Collect data every 100ms
             console.log("[VoiceInput] Recording started");
-        } catch (err: any) {
+        } catch (err: unknown) {
             let errorMessage = "Failed to access microphone";
 
-            if (err.name === "NotAllowedError") {
+            if ((err as Error).name === "NotAllowedError") {
                 errorMessage = "Microphone access denied. Please allow microphone access.";
-            } else if (err.name === "NotFoundError") {
+            } else if ((err as Error).name === "NotFoundError") {
                 errorMessage = "No microphone found. Please connect a microphone.";
-            } else if (err.message) {
-                errorMessage = err.message;
+            } else if ((err as Error).message) {
+                errorMessage = (err as Error).message;
             }
 
             setError(errorMessage);

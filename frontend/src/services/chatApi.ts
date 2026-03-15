@@ -152,7 +152,7 @@ export async function sendStreamingQuery(
             try {
               const chunk = JSON.parse(jsonStr) as StreamChunk;
               onChunk(chunk);
-            } catch (e) {
+            } catch {
               // Ignore parse errors for incomplete JSON
               console.warn("Failed to parse SSE chunk:", jsonStr);
             }
@@ -200,7 +200,7 @@ export async function uploadFile(
           try {
             const data = JSON.parse(xhr.responseText);
             resolve(data);
-          } catch (e) {
+          } catch {
             reject(new ChatApiError("Invalid response format", xhr.status));
           }
         } else {
@@ -213,7 +213,7 @@ export async function uploadFile(
                 errorData
               )
             );
-          } catch (e) {
+          } catch {
             reject(new ChatApiError("Upload failed", xhr.status));
           }
         }
@@ -263,15 +263,15 @@ export async function getAllSessions(
 
     // Transform to SessionListItem format
     return (
-      data.sessions?.map((session: any) => ({
+      data.sessions?.map((session: Record<string, unknown>) => ({
         sessionId: session.sessionId,
         chatName: session.chatName,
-        messageCount: session.messages?.length || 0,
+        messageCount: (session.messages as unknown[])?.length || 0,
         lastMessage:
-          session.messages?.[session.messages.length - 1]?.content ||
+          (session.messages as Array<{content: string}>)?.[((session.messages as unknown[])?.length || 1) - 1]?.content ||
           "New conversation",
-        createdAt: new Date(session.createdAt),
-        updatedAt: new Date(session.updatedAt),
+        createdAt: new Date(session.createdAt as string),
+        updatedAt: new Date(session.updatedAt as string),
       })) || []
     );
   } catch (error) {
@@ -318,7 +318,7 @@ export async function getSessionDetails(
       sessionId: data.session.sessionId,
       chromaCollectionName: data.session.chromaCollectionName,
       messages:
-        data.session.messages?.map((msg: any) => ({
+        data.session.messages?.map((msg: Record<string, unknown>) => ({
           ...msg,
           timestamp: new Date(msg.timestamp),
         })) || [],
@@ -604,7 +604,7 @@ export async function generateChatName(firstMessage: string): Promise<string> {
       generatedName ||
       firstMessage.substring(0, 30) + (firstMessage.length > 30 ? "..." : "")
     );
-  } catch (error) {
+  } catch {
     // Fallback to truncated first message
     return (
       firstMessage.substring(0, 30) + (firstMessage.length > 30 ? "..." : "")
