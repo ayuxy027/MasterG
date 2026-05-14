@@ -786,16 +786,15 @@ const StitchPage: React.FC = () => {
   }, [autoSaveSession]);
 
   useEffect(() => {
-    if (!currentSessionId || (!englishContent && Object.keys(translatedContent).length === 0)) {
-      return;
-    }
+    if (!currentSessionId || isGenerating) return;
+    if (!englishContent && Object.keys(translatedContent).length === 0) return;
 
     const timeoutId = setTimeout(() => {
       autoSaveSessionRef.current();
-    }, 2000); // Debounce by 2 seconds
+    }, 2000);
 
     return () => clearTimeout(timeoutId);
-  }, [englishContent, translatedContent, topic, selectedGrade, selectedSubject, customGrade, customSubject, markdownEnabled, currentSessionId]);
+  }, [englishContent, translatedContent, topic, selectedGrade, selectedSubject, customGrade, customSubject, markdownEnabled, currentSessionId, isGenerating]);
 
   // Check Ollama, Groq, and NLLB status on mount
   useEffect(() => {
@@ -811,15 +810,15 @@ const StitchPage: React.FC = () => {
     };
   }, []);
 
-  // Create new session
   const handleNewSession = useCallback(() => {
-    const newSessionId = generateSessionId();
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsGenerating(false);
 
-    // Mark as new session so we don't try to load it from backend
+    const newSessionId = generateSessionId();
     isNewSessionRef.current = true;
     setCurrentSessionId(newSessionId);
 
-    // Clear current content
     setTopic("");
     setSelectedGrade("8");
     setCustomGrade("");
@@ -835,8 +834,14 @@ const StitchPage: React.FC = () => {
     showToast("New session created", "info");
   }, [showToast]);
 
-  // Select existing session
   const handleSessionSelect = useCallback((sessionId: string) => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsGenerating(false);
+    setEnglishContent("");
+    setTranslatedContent({});
+    setThinkingText("");
+    setActiveTab("english");
     setCurrentSessionId(sessionId);
   }, []);
 
@@ -984,50 +989,44 @@ const StitchPage: React.FC = () => {
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (!data || data === "[DONE]") continue;
 
-              if (parsed.type === "thinking") {
-                if (firstThinkingChunk) {
-                  thinkingStartTime = Date.now();
-                  firstThinkingChunk = false;
-                }
-                accumulatedThinking += parsed.content || "";
-                setThinkingText(accumulatedThinking);
-              } else if (parsed.type === "response") {
-                if (firstResponseChunk) {
-                  generationStartTime = Date.now();
-                  firstResponseChunk = false;
-                  // For cloud mode, simulate thinking text if not provided
-                  if (generationMode === "cloud" && !accumulatedThinking) {
-                    setThinkingText("Processing request with Kimi K2 model...");
-                  }
-                }
-                accumulatedResponse += parsed.content || "";
-                setEnglishContent(accumulatedResponse); // Store English version
-              } else if (parsed.type === "complete") {
-                const finalContent = parsed.content || accumulatedResponse;
-                setEnglishContent(finalContent);
-                if (parsed.thinkingText) {
-                  setThinkingText(parsed.thinkingText);
-                }
+          let parsed: { type?: string; content?: string; thinkingText?: string; error?: string };
+          try {
+            parsed = JSON.parse(data);
+          } catch {
+            continue;
+          }
 
-                // Calculate times
-                const thinkingTime = thinkingStartTime ? Date.now() - thinkingStartTime : undefined;
-                const generationTime = generationStartTime ? Date.now() - generationStartTime : undefined;
-                setGenerationTimes({
-                  thinkingTime,
-                  generationTime,
-                });
-              } else if (parsed.type === "error") {
-                throw new Error(parsed.error);
-              }
-            } catch {
-              // Skip invalid JSON
-              continue;
+          if (parsed.type === "thinking") {
+            if (firstThinkingChunk) {
+              thinkingStartTime = Date.now();
+              firstThinkingChunk = false;
             }
+            accumulatedThinking += parsed.content || "";
+            setThinkingText(accumulatedThinking);
+          } else if (parsed.type === "response") {
+            if (firstResponseChunk) {
+              generationStartTime = Date.now();
+              firstResponseChunk = false;
+              if (generationMode === "cloud" && !accumulatedThinking) {
+                setThinkingText("Processing request with Kimi K2 model...");
+              }
+            }
+            accumulatedResponse += parsed.content || "";
+            setEnglishContent(accumulatedResponse);
+          } else if (parsed.type === "complete") {
+            const finalContent = parsed.content || accumulatedResponse;
+            setEnglishContent(finalContent);
+            if (parsed.thinkingText) setThinkingText(parsed.thinkingText);
+            setGenerationTimes({
+              thinkingTime: thinkingStartTime ? Date.now() - thinkingStartTime : undefined,
+              generationTime: generationStartTime ? Date.now() - generationStartTime : undefined,
+            });
+          } else if (parsed.type === "error") {
+            throw new Error(parsed.error || "Generation failed");
           }
         }
       }

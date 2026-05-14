@@ -113,9 +113,11 @@ const BoardPage: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const thinkingModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const aiAbortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => {
     if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
+    aiAbortControllerRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -434,6 +436,9 @@ const BoardPage: React.FC = () => {
 
   const handleGenerateCards = useCallback(async (prompt: string, count: number = 3) => {
     if (isGenerating) return;
+    aiAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortControllerRef.current = controller;
     setIsGenerating(true);
     setThinkingText("");
     setShowThinkingModal(true);
@@ -499,19 +504,24 @@ const BoardPage: React.FC = () => {
         prompt,
         count,
         (thinking) => {
+          if (controller.signal.aborted) return;
           setThinkingText(thinking);
         },
         (streamingCards) => {
-          // Real-time sticky note updates as they stream in
+          if (controller.signal.aborted) return;
           updateStickyNotesFromCards(streamingCards);
-        }
+        },
+        controller.signal
       );
 
-      // Final update with complete sticky notes
-      updateStickyNotesFromCards(newCards);
+      if (!controller.signal.aborted) updateStickyNotesFromCards(newCards);
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       console.error('Failed to generate cards:', error);
     } finally {
+      if (aiAbortControllerRef.current === controller) {
+        aiAbortControllerRef.current = null;
+      }
       setIsGenerating(false);
       if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
       thinkingModalTimeoutRef.current = setTimeout(() => {
@@ -523,9 +533,11 @@ const BoardPage: React.FC = () => {
 
 
   const handleCardAction = useCallback(async (action: CardAction) => {
-    // Use sticky notes if selected, otherwise fall back to cards
     const selectedIds = selectedStickyNoteIds.size > 0 ? selectedStickyNoteIds : selectedCardIds;
     if (selectedIds.size === 0 || isPerformingAction) return;
+    aiAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortControllerRef.current = controller;
     if (selectedIds.size > 4) {
       alert('Maximum 4 items can be selected for AI actions');
       return;
@@ -655,18 +667,18 @@ const BoardPage: React.FC = () => {
         action,
         contents,
         (partialData) => {
+          if (controller.signal.aborted) return;
           if (partialData.type === "card" && partialData.cards) {
-            // Real-time sticky note updates for mindMap/flashcards
             updateActionStickyNotes(partialData.cards);
           } else if (partialData.type === "partial" && partialData.content) {
-            // Real-time text updates for summarize/actionPoints
             updateActionResult(partialData.content);
           }
         },
         (thinking) => {
-          // Real-time thinking process updates
+          if (controller.signal.aborted) return;
           setThinkingText(thinking);
-        }
+        },
+        controller.signal
       );
 
       if (!result.success) {
@@ -684,8 +696,12 @@ const BoardPage: React.FC = () => {
       setSelectedStickyNoteIds(new Set());
       setSelectedCardIds(new Set());
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       console.error('Failed to perform card action:', error);
     } finally {
+      if (aiAbortControllerRef.current === controller) {
+        aiAbortControllerRef.current = null;
+      }
       setIsPerformingAction(false);
       streamingActionCardIdsRef.current.clear();
       resultCardIdRef.current = null;
@@ -831,11 +847,15 @@ const BoardPage: React.FC = () => {
   }, [currentSessionId, handleSaveBoardWithId]);
 
   const handleLoadBoard = useCallback(async (sessionId: string) => {
+    aiAbortControllerRef.current?.abort();
+    aiAbortControllerRef.current = null;
+    setIsGenerating(false);
+    setIsPerformingAction(false);
+
     try {
       const session = await boardSessionApi.getSession(userId, sessionId);
       if (session) {
 
-        // Restore drawing paths
         if (session.drawingPaths && session.drawingPaths.length > 0) {
           setDrawingPaths(session.drawingPaths.map(path => ({
             points: path.points,
@@ -888,6 +908,13 @@ const BoardPage: React.FC = () => {
   }, [userId, handleLoadBoard]);
 
   const handleNewBoard = useCallback(() => {
+    aiAbortControllerRef.current?.abort();
+    aiAbortControllerRef.current = null;
+    setIsGenerating(false);
+    setIsPerformingAction(false);
+    setShowThinkingModal(false);
+    setThinkingText("");
+
     setDrawingPaths([]);
     setCards([]);
     setStickyNotes([]);
@@ -899,23 +926,17 @@ const BoardPage: React.FC = () => {
     setLastSaved(null);
   }, []);
 
-  // Auto-save functionality (debounced)
   useEffect(() => {
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
 
-    // Only auto-save if there's content
+    if (isGenerating || isPerformingAction) return;
     const hasContent = drawingPaths.length > 0 || cards.length > 0 || stickyNotes.length > 0;
     if (!hasContent) return;
 
-    // Auto-save after 3 seconds of inactivity
     autoSaveTimeoutRef.current = setTimeout(() => {
       if (currentSessionId) {
-        // Session exists, save to it
         handleSaveBoardWithId(currentSessionId);
       } else {
-        // No session yet, create one and save
         const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         setCurrentSessionId(newSessionId);
         handleSaveBoardWithId(newSessionId);
@@ -927,7 +948,7 @@ const BoardPage: React.FC = () => {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [drawingPaths, cards, stickyNotes, viewOffset, zoom, currentSessionId, handleSaveBoardWithId]);
+  }, [drawingPaths, cards, stickyNotes, viewOffset, zoom, currentSessionId, isGenerating, isPerformingAction, handleSaveBoardWithId]);
 
 
   const translateRequestIdRef = useRef(0);

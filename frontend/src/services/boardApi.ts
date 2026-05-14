@@ -105,13 +105,15 @@ export async function generateCards(
   prompt: string,
   cardCount: number = 3,
   onThinkingUpdate?: (text: string) => void,
-  onCardUpdate?: (cards: CardData[]) => void
+  onCardUpdate?: (cards: CardData[]) => void,
+  signal?: AbortSignal
 ): Promise<CardData[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/board/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, cardCount, stream: true }),
+      signal,
     });
 
     if (!response.ok) {
@@ -133,6 +135,10 @@ export async function generateCards(
     let latestPartialCards: CardData[] = [];
 
     while (true) {
+      if (signal?.aborted) {
+        await reader.cancel().catch(() => undefined);
+        throw new DOMException("Aborted", "AbortError");
+      }
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -141,45 +147,35 @@ export async function generateCards(
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          try {
-            const parsed = JSON.parse(data);
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6);
+        if (!data || data === "[DONE]") continue;
 
-            if (parsed.type === "thinking") {
-              accumulatedThinking += parsed.content;
-              if (onThinkingUpdate) {
-                onThinkingUpdate(accumulatedThinking);
-              }
-            } else if (parsed.type === "card" && parsed.cards) {
-              // Real-time card updates as they're generated
-              latestPartialCards = parsed.cards;
-              if (onCardUpdate) {
-                onCardUpdate(latestPartialCards);
-              }
-            } else if (parsed.type === "complete") {
-              if (parsed.cards) {
-                cards = parsed.cards;
-                // Send final update
-                if (onCardUpdate) {
-                  onCardUpdate(cards);
-                }
-              }
-              if (parsed.thinkingText && onThinkingUpdate) {
-                onThinkingUpdate(parsed.thinkingText);
-              }
-            } else if (parsed.type === "error") {
-              throw new Error(parsed.error);
-            }
-          } catch {
-            // Skip invalid JSON
-            continue;
+        let parsed: { type?: string; content?: string; cards?: CardData[]; thinkingText?: string; error?: string };
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          continue;
+        }
+
+        if (parsed.type === "thinking") {
+          accumulatedThinking += parsed.content || "";
+          onThinkingUpdate?.(accumulatedThinking);
+        } else if (parsed.type === "card" && parsed.cards) {
+          latestPartialCards = parsed.cards;
+          onCardUpdate?.(latestPartialCards);
+        } else if (parsed.type === "complete") {
+          if (parsed.cards) {
+            cards = parsed.cards;
+            onCardUpdate?.(cards);
           }
+          if (parsed.thinkingText) onThinkingUpdate?.(parsed.thinkingText);
+        } else if (parsed.type === "error") {
+          throw new Error(parsed.error || "Generation failed");
         }
       }
     }
 
-    // Use final cards or fallback to partial cards
     if (cards.length === 0 && latestPartialCards.length > 0) {
       cards = latestPartialCards;
     }
@@ -190,6 +186,7 @@ export async function generateCards(
 
     return cards;
   } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     console.error("Board API: Generate error:", error);
     throw error instanceof Error ? error : new Error(String(error));
   }
@@ -199,7 +196,8 @@ export async function performCardAction(
   action: CardAction,
   cardContents: string[],
   onPartialUpdate?: (data: { type: string; cards?: CardData[]; content?: string }) => void,
-  onThinkingUpdate?: (text: string) => void
+  onThinkingUpdate?: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<ActionResponse> {
   try {
     if (cardContents.length === 0) {
@@ -214,6 +212,7 @@ export async function performCardAction(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, cardContents }),
+      signal,
     });
 
     if (!response.ok) {
@@ -238,6 +237,10 @@ export async function performCardAction(
     let accumulatedThinking = "";
 
     while (true) {
+      if (signal?.aborted) {
+        await reader.cancel().catch(() => undefined);
+        throw new DOMException("Aborted", "AbortError");
+      }
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -246,46 +249,32 @@ export async function performCardAction(
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          try {
-            const parsed = JSON.parse(data);
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6);
+        if (!data || data === "[DONE]") continue;
 
-            if (parsed.type === "thinking") {
-              // Thinking text updates (accumulated, like generateCards)
-              accumulatedThinking += parsed.content || "";
-              if (onThinkingUpdate) {
-                onThinkingUpdate(accumulatedThinking);
-              }
-            } else if (parsed.type === "card" && parsed.cards) {
-              // Partial card updates
-              partialCards = parsed.cards;
-              if (onPartialUpdate) {
-                onPartialUpdate({ type: "card", cards: partialCards });
-              }
-            } else if (parsed.type === "partial" && parsed.content) {
-              // Partial text updates (for summarize, actionPoints)
-              partialResult = parsed.content;
-              if (onPartialUpdate) {
-                onPartialUpdate({ type: "partial", content: partialResult });
-              }
-            } else if (parsed.type === "complete") {
-              if (parsed.thinkingText && onThinkingUpdate) {
-                onThinkingUpdate(parsed.thinkingText);
-              }
-              if (parsed.cards) {
-                cards = parsed.cards;
-              }
-              if (parsed.result) {
-                result = parsed.result;
-              }
-            } else if (parsed.type === "error") {
-              throw new Error(parsed.error);
-            }
-          } catch {
-            // Skip invalid JSON
-            continue;
-          }
+        let parsed: { type?: string; content?: string; cards?: CardData[]; thinkingText?: string; result?: string; error?: string };
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          continue;
+        }
+
+        if (parsed.type === "thinking") {
+          accumulatedThinking += parsed.content || "";
+          onThinkingUpdate?.(accumulatedThinking);
+        } else if (parsed.type === "card" && parsed.cards) {
+          partialCards = parsed.cards;
+          onPartialUpdate?.({ type: "card", cards: partialCards });
+        } else if (parsed.type === "partial" && parsed.content) {
+          partialResult = parsed.content;
+          onPartialUpdate?.({ type: "partial", content: partialResult });
+        } else if (parsed.type === "complete") {
+          if (parsed.thinkingText) onThinkingUpdate?.(parsed.thinkingText);
+          if (parsed.cards) cards = parsed.cards;
+          if (parsed.result) result = parsed.result;
+        } else if (parsed.type === "error") {
+          throw new Error(parsed.error || "Action failed");
         }
       }
     }
@@ -307,6 +296,7 @@ export async function performCardAction(
       throw new Error("No result received from action");
     }
   } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     console.error("Board API: Action error:", error);
     return {
       success: false,
