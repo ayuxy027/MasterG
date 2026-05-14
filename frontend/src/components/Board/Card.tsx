@@ -96,6 +96,7 @@ const Card: React.FC<CardProps> = ({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
       <div className={`bg-white rounded-xl shadow-lg border ${isSelected ? 'border-orange-400' : 'border-gray-200'
         } overflow-hidden h-full flex flex-col`}>
