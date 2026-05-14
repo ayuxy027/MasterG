@@ -579,17 +579,18 @@ const StitchPage: React.FC = () => {
         setActiveTab("english");
       }
     } finally {
-      if (requestGenerationId !== generationIdRef.current) return;
-      setTranslatingLanguages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(targetLang);
-        return newSet;
-      });
-      setIsTranslating(prev => {
-        const newPrev = { ...prev };
-        delete newPrev[targetLang];
-        return newPrev;
-      });
+      if (requestGenerationId === generationIdRef.current) {
+        setTranslatingLanguages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(targetLang);
+          return newSet;
+        });
+        setIsTranslating(prev => {
+          const newPrev = { ...prev };
+          delete newPrev[targetLang];
+          return newPrev;
+        });
+      }
     }
   };
 

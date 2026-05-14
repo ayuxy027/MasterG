@@ -33,10 +33,11 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
 
     useEffect(() => {
         isMountedRef.current = true;
+        const timeoutsAtMount = studyTimeoutsRef.current;
         return () => {
             isMountedRef.current = false;
-            studyTimeoutsRef.current.forEach(clearTimeout);
-            studyTimeoutsRef.current.clear();
+            timeoutsAtMount.forEach(clearTimeout);
+            timeoutsAtMount.clear();
         };
     }, []);
 
