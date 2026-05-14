@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { DocumentTree as DocumentTreeType, TreeNode } from '../../../types/documentTree';
 import { extractDocumentTree, getDocumentTree } from '../../../services/documentTreeApi';
 import { optimizePrompt } from '../../../services/planApi';
@@ -26,27 +26,42 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [optimizingNodeId, setOptimizingNodeId] = useState<string | null>(null);
+    const isMountedRef = useRef(true);
+    const loadRequestIdRef = useRef(0);
+    const extractRequestIdRef = useRef(0);
+    const studyTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+            studyTimeoutsRef.current.forEach(clearTimeout);
+            studyTimeoutsRef.current.clear();
+        };
+    }, []);
 
     const loadSavedTree = useCallback(async () => {
+        const requestId = ++loadRequestIdRef.current;
         setIsLoadingTree(true);
         try {
             const savedTree = await getDocumentTree(userId, sessionId, document.id);
-            if (savedTree) {
-                setTree(savedTree);
-            }
+            if (!isMountedRef.current || requestId !== loadRequestIdRef.current) return;
+            if (savedTree) setTree(savedTree);
         } catch {
             // No saved tree, that's fine
         } finally {
-            setIsLoadingTree(false);
+            if (isMountedRef.current && requestId === loadRequestIdRef.current) {
+                setIsLoadingTree(false);
+            }
         }
     }, [userId, sessionId, document.id]);
 
-    // Load saved tree from MongoDB on mount
     useEffect(() => {
         loadSavedTree();
     }, [loadSavedTree]);
 
     const handleExtractTree = async () => {
+        const requestId = ++extractRequestIdRef.current;
         setIsLoading(true);
         setError(null);
         try {
@@ -56,48 +71,47 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
                 document.id,
                 document.fileName
             );
+            if (!isMountedRef.current || requestId !== extractRequestIdRef.current) return;
             setTree(result);
         } catch (err: unknown) {
+            if (!isMountedRef.current || requestId !== extractRequestIdRef.current) return;
             setError(err instanceof Error ? err.message : String(err));
         } finally {
-            setIsLoading(false);
+            if (isMountedRef.current && requestId === extractRequestIdRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
     const handleStudyNode = async (node: TreeNode) => {
-
         try {
             setOptimizingNodeId(node.id);
 
-            // 1. Minimum UX delay to ensure "Optimizing..." state is visible
-            // This prevents the UI from flickering if the backend is too fast or fails immediately.
-            const minDelayPromise = new Promise(resolve => setTimeout(resolve, 800));
+            const minDelayPromise = new Promise<void>((resolve) => {
+                const id = setTimeout(() => {
+                    studyTimeoutsRef.current.delete(id);
+                    resolve();
+                }, 800);
+                studyTimeoutsRef.current.add(id);
+            });
 
-            // 2. Prepare Context (safely)
             const nodeDesc = node.description || '';
             const nodeKeywords = node.keywords?.join(', ') || '';
             const context = `${nodeDesc}. Keywords: ${nodeKeywords}`;
 
-
-            // 3. Call Backend (Parallel with min delay)
             const [optimizedPrompt] = await Promise.all([
                 optimizePrompt(node.title, context, document.id, grade),
-                minDelayPromise
+                minDelayPromise,
             ]);
 
-
-
-            // 4. Switch to Chat with result
+            if (!isMountedRef.current) return;
             onSwitchToStudy(optimizedPrompt);
         } catch (error: unknown) {
-
-            // Fallback with error visibility for debugging
-            // User sees: "Error: [Message] -> Explain..."
-            // This helps Identify if it's a network error, 500, or logical error.
+            if (!isMountedRef.current) return;
             const errorMsg = error instanceof Error ? error.message : "Unknown error";
             onSwitchToStudy(`[Optimization Failed: ${errorMsg}] Explain "${node.title}" from ${document.fileName}`);
         } finally {
-            setOptimizingNodeId(null);
+            if (isMountedRef.current) setOptimizingNodeId(null);
         }
     };
 

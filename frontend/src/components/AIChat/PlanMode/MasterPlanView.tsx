@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PlanResponse, generatePlan, getLatestPlan, translatePlan } from '../../../services/planApi';
 import { INDIAN_LANGUAGES } from '../../../constants/appConstants';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
@@ -12,13 +12,24 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
     const [plan, setPlan] = useState<PlanResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isTranslating, setIsTranslating] = useState(false);
-    const [targetLang, setTargetLang] = useState<string>('hi'); // Default Hindi
+    const [targetLang, setTargetLang] = useState<string>('hi');
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const isMountedRef = useRef(true);
+    const requestIdRef = useRef(0);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     const loadPlan = useCallback(async () => {
+        const requestId = ++requestIdRef.current;
         try {
             const data = await getLatestPlan(userId, sessionId);
+            if (!isMountedRef.current || requestId !== requestIdRef.current) return;
             setPlan(data);
         } catch {
             // Ignore 404
@@ -30,31 +41,42 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
     }, [loadPlan]);
 
     const handleGenerate = async () => {
+        const requestId = ++requestIdRef.current;
         setIsLoading(true);
         setError(null);
         try {
             await generatePlan(userId, sessionId);
-            // Refresh full plan object
+            if (!isMountedRef.current || requestId !== requestIdRef.current) return;
             await loadPlan();
+            if (!isMountedRef.current) return;
             setIsExpanded(true);
         } catch (err: unknown) {
+            if (!isMountedRef.current || requestId !== requestIdRef.current) return;
             setError(err instanceof Error ? err.message : String(err));
         } finally {
-            setIsLoading(false);
+            if (isMountedRef.current && requestId === requestIdRef.current) {
+                setIsLoading(false);
+            }
         }
     };
 
     const handleTranslate = async () => {
         if (!plan) return;
+        const requestedLang = targetLang;
+        const requestId = ++requestIdRef.current;
         setIsTranslating(true);
         setError(null);
         try {
-            await translatePlan(userId, sessionId, targetLang);
-            await loadPlan(); // Refresh to get new translations
+            await translatePlan(userId, sessionId, requestedLang);
+            if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+            await loadPlan();
         } catch (err: unknown) {
+            if (!isMountedRef.current || requestId !== requestIdRef.current) return;
             setError(err instanceof Error ? err.message : String(err));
         } finally {
-            setIsTranslating(false);
+            if (isMountedRef.current && requestId === requestIdRef.current) {
+                setIsTranslating(false);
+            }
         }
     };
 
@@ -125,7 +147,8 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
                         <select
                             value={targetLang}
                             onChange={(e) => setTargetLang(e.target.value)}
-                            className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                            disabled={isTranslating}
+                            className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none disabled:opacity-50"
                         >
                             {INDIAN_LANGUAGES.map(lang => (
                                 <option key={lang.code} value={lang.code}>

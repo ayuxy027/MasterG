@@ -133,19 +133,23 @@ const PostersPage: React.FC = () => {
       return;
     }
 
+    const requestId = ++generateRequestIdRef.current;
+    const snapshot = {
+      query: prompt.trim(),
+      category: selectedCategory,
+      language: selectedLanguage,
+      count,
+      aspectRatio,
+    };
+
     setIsGenerating(true);
     setError(null);
     setGeneratedPosters([]);
     setEnhancedPrompt("");
 
     try {
-      const response = await generatePosters({
-        query: prompt.trim(),
-        category: selectedCategory,
-        language: selectedLanguage,
-        count,
-        aspectRatio,
-      });
+      const response = await generatePosters(snapshot);
+      if (requestId !== generateRequestIdRef.current) return;
 
       setGeneratedPosters(response.posters);
       if (response.posters.length > 0) {
@@ -158,10 +162,10 @@ const PostersPage: React.FC = () => {
         ...poster,
         id: `${batchId}-${index}`,
         batchId,
-        query: prompt.trim(),
-        category: selectedCategory,
-        language: selectedLanguage,
-        aspectRatio,
+        query: snapshot.query,
+        category: snapshot.category,
+        language: snapshot.language,
+        aspectRatio: snapshot.aspectRatio,
         createdAt: timestamp,
       }));
 
@@ -169,6 +173,7 @@ const PostersPage: React.FC = () => {
       setStoredPosters(updatedStoredPosters);
       savePostersToStorage(updatedStoredPosters);
     } catch (err) {
+      if (requestId !== generateRequestIdRef.current) return;
       if (err instanceof PosterApiError) {
         setError(err.message);
       } else {
@@ -176,7 +181,7 @@ const PostersPage: React.FC = () => {
       }
       console.error("Generation error:", err);
     } finally {
-      setIsGenerating(false);
+      if (requestId === generateRequestIdRef.current) setIsGenerating(false);
     }
   };
 
@@ -190,6 +195,7 @@ const PostersPage: React.FC = () => {
   };
 
   const downloadAllTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const generateRequestIdRef = useRef(0);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   useEffect(() => () => {
