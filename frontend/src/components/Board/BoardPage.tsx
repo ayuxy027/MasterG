@@ -7,6 +7,7 @@ import MinimizedNavbar from './MinimizedNavbar';
 import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus, boardSessionApi } from '../../services/boardApi';
 import { stitchAPI } from '../../services/stitchApi';
 import Banner from '../Banner';
+import { getOrCreateUserId } from '../../utils/identity';
 
 
 interface CardState extends CardData {
@@ -106,15 +107,7 @@ const BoardPage: React.FC = () => {
     { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
   ];
 
-  // Board session management
-  const [userId] = useState(() => {
-    // Generate or get user ID from localStorage
-    const stored = localStorage.getItem('board_userId');
-    if (stored) return stored;
-    const newId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('board_userId', newId);
-    return newId;
-  });
+  const [userId] = useState(() => getOrCreateUserId('board_userId'));
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -803,7 +796,6 @@ const BoardPage: React.FC = () => {
       });
       setLastSaved(new Date());
       setCurrentSessionId(sessionId);
-      console.log('✅ Board saved successfully');
     } catch (error) {
       console.error('❌ Failed to save board:', error);
     } finally {
@@ -824,13 +816,8 @@ const BoardPage: React.FC = () => {
 
   const handleLoadBoard = useCallback(async (sessionId: string) => {
     try {
-      console.log('🔍 Loading board session:', sessionId);
       const session = await boardSessionApi.getSession(userId, sessionId);
       if (session) {
-        console.log('📦 Session data received:');
-        console.log('   - Sticky Notes:', session.stickyNotes?.length || 0);
-        console.log('   - Cards:', session.cards?.length || 0);
-        console.log('   - Drawing Paths:', session.drawingPaths?.length || 0);
 
         // Restore drawing paths
         if (session.drawingPaths && session.drawingPaths.length > 0) {
@@ -864,7 +851,6 @@ const BoardPage: React.FC = () => {
         }
 
         setCurrentSessionId(sessionId);
-        console.log('✅ Board loaded successfully:', sessionId);
       } else {
         console.warn('⚠️ No session data found for:', sessionId);
       }
@@ -879,7 +865,6 @@ const BoardPage: React.FC = () => {
     const testSessionId = 'board_test_123';
 
     if (userId === testUserId && !currentSessionId && stickyNotes.length === 0 && cards.length === 0 && drawingPaths.length === 0) {
-      console.log('🔍 Detected test user, attempting to load test session...');
       handleLoadBoard(testSessionId).catch(err => {
         console.error('Failed to auto-load test session:', err);
       });

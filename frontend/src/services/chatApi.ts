@@ -7,10 +7,8 @@ import type {
   StreamChunk,
 } from "../types/chat";
 import { API_BASE_URL } from "../config/api";
+import { getOrCreateUserId, generateSessionId as makeSessionId } from "../utils/identity";
 
-// Minimal shape of the session object returned by the Express backend.
-// Used only for narrowing inside .map() callbacks — kept intentionally loose
-// because the backend payload may include extra fields we don't depend on.
 interface ServerSession {
   sessionId: string;
   chatName?: string;
@@ -19,7 +17,6 @@ interface ServerSession {
   updatedAt: string;
 }
 
-// Minimal shape of a message item from the backend before timestamp conversion.
 interface ServerMessage {
   role: "user" | "assistant";
   content: string;
@@ -30,24 +27,9 @@ interface ServerMessage {
   translatedLanguage?: string;
 }
 
-export const generateUserId = (): string => {
-  const stored = localStorage.getItem("masterji_userId");
-  if (stored) return stored;
-
-  const newUserId = `user_${Date.now()}_${Math.random()
-    .toString(36)
-    .substring(2, 9)}`;
-  localStorage.setItem("masterji_userId", newUserId);
-  return newUserId;
-};
-
-export const generateSessionId = (): string => {
-  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-};
-
-export const getUserId = (): string => {
-  return generateUserId(); // Always gets or creates
-};
+export const generateUserId = (): string => getOrCreateUserId();
+export const getUserId = generateUserId;
+export const generateSessionId = (): string => makeSessionId("session");
 
 // API Error class
 export class ChatApiError extends Error {

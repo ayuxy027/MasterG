@@ -63,7 +63,6 @@ const LMRPage: React.FC = () => {
       setIsProcessing(false);
 
       // Show success notification
-      console.log("✅ Document uploaded successfully:", response);
 
       // Trigger history refresh
       setHistoryRefreshKey((prev) => prev + 1);
@@ -78,7 +77,6 @@ const LMRPage: React.FC = () => {
           selectedTone
         );
         setSummary(summaryData);
-        console.log(`✅ Summary generated in ${selectedLanguage}`);
       } catch (summaryError) {
         console.error("Failed to auto-generate summary:", summaryError);
         setError(
@@ -249,7 +247,6 @@ const LMRPage: React.FC = () => {
         setCurrentDisplayLanguage("en");
       } else {
         // Translate using NLLB
-        console.log(`🌐 Translating to ${selectedLanguage}...`);
 
         const translated = await LMRApi.translateContent(
           {
@@ -270,7 +267,6 @@ const LMRPage: React.FC = () => {
         setCurrentDisplayLanguage(selectedLanguage);
       }
 
-      console.log(`✅ Content now displayed in ${selectedLanguage}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Translation failed");
       console.error("Translation error:", err);

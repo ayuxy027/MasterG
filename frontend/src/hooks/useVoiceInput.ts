@@ -103,7 +103,6 @@ export function useVoiceInput({
 
             // Start recording
             mediaRecorder.start(100); // Collect data every 100ms
-            console.log("[VoiceInput] Recording started");
         } catch (err: unknown) {
             let errorMessage = "Failed to access microphone";
 
@@ -131,7 +130,6 @@ export function useVoiceInput({
     const stopRecording = useCallback(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             mediaRecorderRef.current.stop();
-            console.log("[VoiceInput] Recording stopped");
         }
     }, []);
 
@@ -188,7 +186,6 @@ function getSupportedMimeType(): string {
 
     for (const type of types) {
         if (MediaRecorder.isTypeSupported(type)) {
-            console.log("[VoiceInput] Using MIME type:", type);
             return type;
         }
     }
@@ -212,7 +209,6 @@ async function sendAudioToBackend(audioBlob: Blob, mimeType: string): Promise<st
 
     formData.append("audio", audioBlob, `recording.${extension}`);
 
-    console.log(`[VoiceInput] Sending audio to backend: ${audioBlob.size} bytes, type: ${mimeType}`);
 
     const response = await fetch(`${API_BASE_URL}/api/speech/transcribe`, {
         method: "POST",
@@ -230,7 +226,6 @@ async function sendAudioToBackend(audioBlob: Blob, mimeType: string): Promise<st
         throw new Error(data.error || "Transcription failed");
     }
 
-    console.log("[VoiceInput] Transcription received:", data.data?.text);
     return data.data?.text || "";
 }
 

@@ -52,20 +52,17 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
             const queryParams = urlParts[1] || '';
             const previewUrl = `${baseUrl}/preview?${queryParams}`;
 
-            console.log('🔍 Checking for PDF preview:', previewUrl);
 
             // Check if preview PDF exists
             const response = await fetch(previewUrl, { method: 'HEAD' });
 
             if (response.ok) {
-                console.log('✅ PDF preview available');
                 setPreviewPdfUrl(previewUrl);
                 setIsLoading(false);
                 return;
             }
 
             // No PDF preview, fall back to text content
-            console.log('⚠️ No PDF preview, falling back to text');
             await fetchTextContent();
 
         } catch (err: any) {
@@ -122,7 +119,6 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
             const queryParams = urlParts[1] || '';
             const textContentUrl = `${baseUrl}/text?${queryParams}`;
 
-            console.log('Fetching text content from:', textContentUrl);
 
             const response = await fetch(textContentUrl);
 

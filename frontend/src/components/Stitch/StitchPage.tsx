@@ -3,23 +3,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { stitchAPI, StitchApiError, StitchSessionListItem } from "../../services/stitchApi";
 import { API_BASE_URL as ROOT_URL } from "../../config/api";
+import { getOrCreateUserId, generateSessionId as makeSessionId } from "../../utils/identity";
 import StitchSessionSidebar from "./StitchSessionSidebar";
 
 const API_BASE_URL = `${ROOT_URL}/api`;
 
-const generateUserId = (): string => {
-  const stored = localStorage.getItem("masterji_userId");
-  if (stored) return stored;
-  const newUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  localStorage.setItem("masterji_userId", newUserId);
-  return newUserId;
-};
-
-const getUserId = (): string => generateUserId();
-
-const generateSessionId = (): string => {
-  return `stitch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-};
+const getUserId = (): string => getOrCreateUserId();
+const generateSessionId = (): string => makeSessionId("stitch");
 
 // All 22 scheduled Indian languages + English (from language service)
 // Sorted alphabetically by name

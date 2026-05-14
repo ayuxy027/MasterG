@@ -24,13 +24,8 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [textContent, setTextContent] = useState<string | undefined>();
 
-  // Build file URL - note: /api prefix is added here
   const fileUrl = `${API_BASE_URL}/api/files/${fileId}?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}`;
 
-  // Debug log
-  console.log(`📄 Preview URL: ${fileUrl}`);
-
-  // Determine viewer type
   const viewerType: ViewerType = mimeType
     ? getViewerTypeFromMime(mimeType)
     : getViewerTypeFromExtension(fileName);
