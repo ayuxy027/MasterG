@@ -39,7 +39,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
             if (savedTree) {
                 setTree(savedTree);
             }
-        } catch (err) {
+        } catch {
             // No saved tree, that's fine
         } finally {
             setIsLoadingTree(false);

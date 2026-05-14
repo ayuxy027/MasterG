@@ -63,12 +63,6 @@ const CORE_SUBJECTS = [
   { value: "social", label: "Social Studies" },
 ];
 
-const CONTENT_LENGTHS = [
-  { value: "short", label: "Short", description: "Brief overview (200-400 words)" },
-  { value: "medium", label: "Medium", description: "Standard explanation (500-800 words)" },
-  { value: "long", label: "Long", description: "Comprehensive coverage (1000+ words)" },
-];
-
 // Error Boundary for StitchPage
 class StitchErrorBoundary extends Component<
   { children: ReactNode },
@@ -389,13 +383,12 @@ const StitchPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"english" | string>("english"); // Active tab: "english" or language code
   const [thinkingText, setThinkingText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [generationTimes, setGenerationTimes] = useState<{
+  const [, setGenerationTimes] = useState<{
     thinkingTime?: number;
     generationTime?: number;
     translationTime?: number;
   }>({});
   const [isRefining, setIsRefining] = useState(false);
-  const [refineQuery, setRefineQuery] = useState("");
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({}); // Track translation status per language
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: "success" | "error" | "info" }>>([]);
   const contentPreviewRef = useRef<HTMLDivElement>(null); // Ref for auto-scroll
@@ -435,7 +428,7 @@ const StitchPage: React.FC = () => {
     try {
       await navigator.clipboard.writeText(content);
       showToast("Copied to clipboard!", "success");
-    } catch (err) {
+    } catch {
       showToast("Failed to copy to clipboard", "error");
     }
   }, [showToast]);
@@ -453,7 +446,7 @@ const StitchPage: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast("File downloaded successfully!", "success");
-    } catch (err) {
+    } catch {
       showToast("Failed to download file", "error");
     }
   }, [showToast]);
@@ -534,122 +527,6 @@ const StitchPage: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, englishContent, translatedContent, handleCopy, handleDownload, getLanguageName]);
-
-  // Handle refine content
-  const handleRefine = async () => {
-    if (!refineQuery.trim() || !englishContent.trim()) {
-      setError("Please enter a refinement request");
-      return;
-    }
-
-    setIsGenerating(true);
-    setError(null);
-    setThinkingText("");
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/stitch/refine`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content: englishContent,
-          refineQuery: refineQuery.trim(),
-          mode: generationMode,
-          stream: true,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error("No response body for streaming");
-      }
-
-      let buffer = "";
-      let accumulatedThinking = "";
-      let accumulatedResponse = "";
-      let thinkingStartTime: number | null = null;
-      let generationStartTime: number | null = null;
-      let firstThinkingChunk = true;
-      let firstResponseChunk = true;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-
-              if (parsed.type === "thinking") {
-                if (firstThinkingChunk) {
-                  thinkingStartTime = Date.now();
-                  firstThinkingChunk = false;
-                }
-                accumulatedThinking += parsed.content;
-                setThinkingText(accumulatedThinking);
-              } else if (parsed.type === "response") {
-                if (firstResponseChunk) {
-                  generationStartTime = Date.now();
-                  firstResponseChunk = false;
-                  if (generationMode === "cloud" && !accumulatedThinking) {
-                    setThinkingText("Processing refinement with Kimi K2 model...");
-                  }
-                }
-                accumulatedResponse += parsed.content;
-                setEnglishContent(accumulatedResponse);
-              } else if (parsed.type === "complete") {
-                const finalContent = parsed.content || accumulatedResponse;
-                setEnglishContent(finalContent);
-                setMarkdownEnabled(false);
-                if (parsed.thinkingText) {
-                  setThinkingText(parsed.thinkingText);
-                }
-
-                const thinkingTime = thinkingStartTime ? Date.now() - thinkingStartTime : undefined;
-                const generationTime = generationStartTime ? Date.now() - generationStartTime : undefined;
-                setGenerationTimes({
-                  thinkingTime,
-                  generationTime,
-                });
-              } else if (parsed.type === "error") {
-                throw new Error(parsed.error);
-              }
-            } catch (e) {
-              continue;
-            }
-          }
-        }
-      }
-
-      setIsRefining(false);
-      setRefineQuery("");
-      showToast("Content refined successfully!", "success");
-    } catch (err) {
-      const errorMessage =
-        err instanceof StitchApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to refine content. Please try again.";
-      setError(errorMessage);
-      showToast(`Refinement failed: ${errorMessage}`, "error");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   // Handle translation
   const handleTranslate = async (targetLang: string) => {
@@ -1197,7 +1074,7 @@ const StitchPage: React.FC = () => {
               } else if (parsed.type === "error") {
                 throw new Error(parsed.error);
               }
-            } catch (e) {
+            } catch {
               // Skip invalid JSON
               continue;
             }

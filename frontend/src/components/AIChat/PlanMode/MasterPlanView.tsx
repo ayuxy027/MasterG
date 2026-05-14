@@ -24,7 +24,7 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
         try {
             const data = await getLatestPlan(userId, sessionId);
             setPlan(data);
-        } catch (err: any) {
+        } catch {
             // Ignore 404
         }
     };
@@ -33,7 +33,7 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
         setIsLoading(true);
         setError(null);
         try {
-            const newPlanText = await generatePlan(userId, sessionId);
+            await generatePlan(userId, sessionId);
             // Refresh full plan object
             await loadPlan();
             setIsExpanded(true);

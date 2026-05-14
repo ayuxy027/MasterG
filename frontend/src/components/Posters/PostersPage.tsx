@@ -50,14 +50,6 @@ const loadPostersFromStorage = (): StoredPoster[] => {
   return [];
 };
 
-const clearPostersFromStorage = (): void => {
-  try {
-    localStorage.removeItem(POSTERS_STORAGE_KEY);
-  } catch (error) {
-    console.warn("Failed to clear posters from localStorage:", error);
-  }
-};
-
 const PostersPage: React.FC = () => {
   // State
   const [categories, setCategories] = useState<PosterCategory[]>([]);
@@ -77,7 +69,7 @@ const PostersPage: React.FC = () => {
   );
   const [storedPosters, setStoredPosters] = useState<StoredPoster[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [enhancedPrompt, setEnhancedPrompt] = useState<string>("");
+  const [, setEnhancedPrompt] = useState<string>("");
 
   // Load categories, languages, and stored posters on mount
   useEffect(() => {
@@ -181,14 +173,6 @@ const PostersPage: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  // Clear poster history
-  const handleClearHistory = () => {
-    clearPostersFromStorage();
-    setStoredPosters([]);
-    setGeneratedPosters([]);
-    setEnhancedPrompt("");
   };
 
   const handleDownload = (poster: GeneratedPoster, index: number) => {

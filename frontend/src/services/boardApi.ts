@@ -171,7 +171,7 @@ export async function generateCards(
             } else if (parsed.type === "error") {
               throw new Error(parsed.error);
             }
-          } catch (e) {
+          } catch {
             // Skip invalid JSON
             continue;
           }
@@ -282,7 +282,7 @@ export async function performCardAction(
             } else if (parsed.type === "error") {
               throw new Error(parsed.error);
             }
-          } catch (e) {
+          } catch {
             // Skip invalid JSON
             continue;
           }

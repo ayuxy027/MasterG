@@ -149,7 +149,7 @@ export async function sendStreamingQuery(
             try {
               const chunk = JSON.parse(jsonStr) as StreamChunk;
               onChunk(chunk);
-            } catch (e) {
+            } catch {
               // Ignore parse errors for incomplete JSON
               console.warn("Failed to parse SSE chunk:", jsonStr);
             }
@@ -194,7 +194,7 @@ export async function uploadFile(
           try {
             const data = JSON.parse(xhr.responseText);
             resolve(data);
-          } catch (e) {
+          } catch {
             reject(new ChatApiError("Invalid response format", xhr.status));
           }
         } else {
@@ -207,7 +207,7 @@ export async function uploadFile(
                 errorData
               )
             );
-          } catch (e) {
+          } catch {
             reject(new ChatApiError("Upload failed", xhr.status));
           }
         }
@@ -574,7 +574,7 @@ export async function generateChatName(firstMessage: string): Promise<string> {
       generatedName ||
       firstMessage.substring(0, 30) + (firstMessage.length > 30 ? "..." : "")
     );
-  } catch (error) {
+  } catch {
     // Fallback to truncated first message
     return (
       firstMessage.substring(0, 30) + (firstMessage.length > 30 ? "..." : "")
