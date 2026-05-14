@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { DocumentInfo } from '../../../types/topic';
 import { getDocuments } from '../../../services/analyzeApi';
 import DocumentTree from './DocumentTree';
+import { FileText } from 'lucide-react';
 
 interface PlanDashboardProps {
     userId: string;
@@ -102,7 +103,7 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
             {documents.length === 0 ? (
                 <div className="text-center py-16">
                     <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-orange-100 to-amber-100 rounded-full flex items-center justify-center">
-                        <span className="text-4xl">📄</span>
+                        <FileText className="w-10 h-10 text-gray-500" />
                     </div>
                     <h3 className="text-xl font-semibold text-gray-800 mb-2">No documents yet</h3>
                     <p className="text-gray-600 mb-4">

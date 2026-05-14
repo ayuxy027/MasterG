@@ -4,6 +4,13 @@ import type { FileListItem } from "../../types/chat";
 import ConfirmModal from "../ui/ConfirmModal";
 import DocumentPreviewModal from "../ui/DocumentPreviewModal";
 import { ResourceSkeleton } from "../ui/Skeleton";
+import {
+  FileText,
+  FileType,
+  Image as ImageIcon,
+  Presentation,
+  File as FileIcon,
+} from "lucide-react";
 
 interface ResourcesPanelProps {
   userId: string;
@@ -66,22 +73,29 @@ const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
     }
   };
 
-  const getFileIcon = (fileName: string): string => {
-    const ext = fileName.split(".").pop()?.toLowerCase();
-    const icons: Record<string, string> = {
-      pdf: "📄",
-      txt: "📝",
-      doc: "📃",
-      docx: "📃",
-      ppt: "📊",
-      pptx: "📊",
-      jpg: "🖼️",
-      jpeg: "🖼️",
-      png: "🖼️",
-      gif: "🖼️",
-      webp: "🖼️",
-    };
-    return icons[ext || ""] || "📎";
+  const getFileIcon = (fileName: string): React.ReactNode => {
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+    const className = "w-7 h-7 text-orange-500";
+    switch (ext) {
+      case "pdf":
+        return <FileText className={className} />;
+      case "txt":
+        return <FileType className={className} />;
+      case "doc":
+      case "docx":
+        return <FileText className={className} />;
+      case "ppt":
+      case "pptx":
+        return <Presentation className={className} />;
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+      case "webp":
+        return <ImageIcon className={className} />;
+      default:
+        return <FileIcon className={className} />;
+    }
   };
 
   const handlePreviewClick = (file: FileListItem) => {
@@ -186,7 +200,7 @@ const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
               >
                 {/* File Icon & Name */}
                 <div className="flex items-start gap-3 mb-3">
-                  <div className="text-3xl flex-shrink-0">
+                  <div className="flex-shrink-0">
                     {getFileIcon(file.fileName)}
                   </div>
                   <div className="flex-1 min-w-0">

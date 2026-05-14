@@ -1,5 +1,6 @@
 import React from "react";
 import { useVoiceInput } from "../../hooks/useVoiceInput";
+import { X } from "lucide-react";
 
 interface MicButtonProps {
     onTranscript: (text: string) => void;
@@ -109,9 +110,10 @@ const MicButton: React.FC<MicButtonProps> = ({
             {isError && error && (
                 <button
                     onClick={cancelRecording}
-                    className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded whitespace-nowrap shadow-md"
+                    className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded whitespace-nowrap shadow-md flex items-center gap-1"
                 >
-                    ✕ {error.length > 30 ? error.substring(0, 30) + "..." : error}
+                    <X className="w-3 h-3" />
+                    {error.length > 30 ? error.substring(0, 30) + "..." : error}
                 </button>
             )}
         </div>

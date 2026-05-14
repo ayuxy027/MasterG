@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { LMRQuiz } from "../../services/lmrApi";
+import { Check, X } from "lucide-react";
 
 interface QuizTabProps {
   quizData: LMRQuiz[];
@@ -214,12 +215,12 @@ const QuizTab: React.FC<QuizTabProps> = ({ quizData, isLoading }) => {
                         {option}
                         {isCorrectAnswer && (
                           <span className="ml-2 text-green-600 font-semibold">
-                            ✓ Correct
+                            <Check className="w-3 h-3 inline mr-1" /> Correct
                           </span>
                         )}
                         {isUserAnswer && !isCorrectAnswer && (
                           <span className="ml-2 text-red-600 font-semibold">
-                            ✗ Your answer
+                            <X className="w-3 h-3 inline mr-1" /> Your answer
                           </span>
                         )}
                       </div>

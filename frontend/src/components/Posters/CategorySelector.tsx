@@ -24,7 +24,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
         id: newCategoryName.toLowerCase().replace(/\s+/g, '-'),
         name: newCategoryName,
         description: 'Custom category',
-        icon: '📝',
+        icon: '',
         examples: []
       };
       setCustomCategories([...customCategories, newCategory]);

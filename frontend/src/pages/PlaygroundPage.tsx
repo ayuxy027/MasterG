@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { stitchAPI, StitchApiError } from "../services/stitchApi";
+import { Check, X, AlertTriangle, RotateCw, HelpCircle } from "lucide-react";
 
 interface ServiceStatus {
   name: string;
@@ -187,18 +188,19 @@ const PlaygroundPage: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string): React.ReactNode => {
+    const cls = "w-6 h-6";
     switch (status) {
       case "connected":
-        return "✓";
+        return <Check className={cls} />;
       case "disconnected":
-        return "✗";
+        return <X className={cls} />;
       case "error":
-        return "⚠";
+        return <AlertTriangle className={cls} />;
       case "checking":
-        return "⟳";
+        return <RotateCw className={`${cls} animate-spin`} />;
       default:
-        return "?";
+        return <HelpCircle className={cls} />;
     }
   };
 

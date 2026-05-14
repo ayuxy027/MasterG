@@ -105,14 +105,14 @@ const PostersPage: React.FC = () => {
           id: "science",
           name: "Science",
           description: "Scientific concepts",
-          icon: "🔬",
+          icon: "",
           examples: [],
         },
         {
           id: "mathematics",
           name: "Mathematics",
           description: "Math concepts",
-          icon: "📐",
+          icon: "",
           examples: [],
         },
       ]);

@@ -19,6 +19,7 @@ import {
 } from "../../services/chatApi";
 import type { MessageUI, SessionListItem } from "../../types/chat";
 import { INDIAN_LANGUAGES, GRADE_LEVELS } from "../../constants/appConstants";
+import { Clipboard } from "lucide-react";
 
 type TabType = "chat" | "resources" | "plan";
 
@@ -272,7 +273,7 @@ const AIChatPage: React.FC = () => {
                 : "bg-white/80 text-gray-700 border-2 border-orange-200 hover:bg-orange-50 hover:border-orange-300"
                 }`}
             >
-              <span>📋</span>
+              <Clipboard className="w-4 h-4" />
               Plan
             </button>
           </div>

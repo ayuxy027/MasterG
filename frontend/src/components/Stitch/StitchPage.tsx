@@ -5,6 +5,7 @@ import { stitchAPI, StitchApiError, StitchSessionListItem } from "../../services
 import { API_BASE_URL as ROOT_URL } from "../../config/api";
 import { getOrCreateUserId, generateSessionId as makeSessionId } from "../../utils/identity";
 import StitchSessionSidebar from "./StitchSessionSidebar";
+import { Check, X, Info, AlertTriangle } from "lucide-react";
 
 const API_BASE_URL = `${ROOT_URL}/api`;
 
@@ -275,11 +276,11 @@ const ToastNotification: React.FC<{ toast: Toast; onClose: () => void }> = ({ to
   }, [onClose]);
 
   const bgColor = toast.type === "success" ? "bg-green-500" : toast.type === "error" ? "bg-red-500" : "bg-blue-500";
-  const icon = toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : "ℹ";
+  const IconComponent = toast.type === "success" ? Check : toast.type === "error" ? X : Info;
 
   return (
     <div className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slideIn`}>
-      <span className="text-xl font-bold">{icon}</span>
+      <IconComponent className="w-5 h-5" />
       <span className="flex-1 text-sm font-medium">{toast.message}</span>
       <button onClick={onClose} className="text-white hover:text-gray-200">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1319,7 +1320,8 @@ const StitchPage: React.FC = () => {
                     </button>
                     {generationMode === "cloud" && !groqStatus.connected && !groqStatus.checking && (
                       <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                        ⚠️ Cloud mode requires Groq API connection. Please check your GROQ_API_KEY or switch to Local mode.
+                        <AlertTriangle className="w-4 h-4 inline mr-1" />
+                        Cloud mode requires Groq API connection. Please check your GROQ_API_KEY or switch to Local mode.
                       </div>
                     )}
                     {isGenerating && (

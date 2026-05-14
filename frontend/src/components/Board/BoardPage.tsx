@@ -797,7 +797,7 @@ const BoardPage: React.FC = () => {
       setLastSaved(new Date());
       setCurrentSessionId(sessionId);
     } catch (error) {
-      console.error('❌ Failed to save board:', error);
+      console.error('Failed to save board:', error);
     } finally {
       setIsSaving(false);
     }
@@ -852,10 +852,10 @@ const BoardPage: React.FC = () => {
 
         setCurrentSessionId(sessionId);
       } else {
-        console.warn('⚠️ No session data found for:', sessionId);
+        console.warn('No session data found for:', sessionId);
       }
     } catch (error) {
-      console.error('❌ Failed to load board:', error);
+      console.error('Failed to load board:', error);
     }
   }, [userId]);
 

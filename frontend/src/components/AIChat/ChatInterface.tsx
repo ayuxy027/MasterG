@@ -20,6 +20,7 @@ import { MessageSkeleton } from "../ui/Skeleton";
 import MicButton from "../ui/MicButton";
 import MentionInput from "../ui/MentionInput";
 import StreamingMessage from "../ui/StreamingMessage";
+import { Check, X } from "lucide-react";
 
 interface ChatInterfaceProps {
   userId: string;
@@ -169,8 +170,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         role: "assistant",
         content:
           error instanceof ChatApiError
-            ? `⚠️ Error: ${error.message}`
-            : "⚠️ Failed to get response. Please try again.",
+            ? `Error: ${error.message}`
+            : "Failed to get response. Please try again.",
         timestamp: new Date(),
       };
 
@@ -272,7 +273,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         const systemMessage: MessageUI = {
           id: `system-${Date.now()}`,
           role: "assistant",
-          content: `✅ Successfully uploaded **${file.name}**. You can now ask questions about this document!`,
+          content: `Successfully uploaded **${file.name}**. You can now ask questions about this document!`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, systemMessage]);
@@ -308,7 +309,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         const errorMessage: MessageUI = {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: `⚠️ Failed to upload **${file.name}**: ${
+          content: `Failed to upload **${file.name}**: ${
             error instanceof ChatApiError ? error.message : "Unknown error"
           }`,
           timestamp: new Date(),
@@ -659,12 +660,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <span className="text-gray-700 truncate">
                     {upload.fileName}
                   </span>
-                  <span className="text-gray-500 ml-2">
-                    {upload.status === "completed"
-                      ? "✓"
-                      : upload.status === "error"
-                      ? "✗"
-                      : `${Math.round(upload.progress)}%`}
+                  <span className="text-gray-500 ml-2 flex items-center">
+                    {upload.status === "completed" ? (
+                      <Check className="w-3 h-3" />
+                    ) : upload.status === "error" ? (
+                      <X className="w-3 h-3" />
+                    ) : (
+                      `${Math.round(upload.progress)}%`
+                    )}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
