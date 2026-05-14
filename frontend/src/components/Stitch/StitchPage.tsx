@@ -509,6 +509,7 @@ const StitchPage: React.FC = () => {
 
   // Handle translation
   const handleTranslate = async (targetLang: string) => {
+    if (targetLang === "en") return;
     if (!englishContent.trim()) {
       setError("No content to translate");
       return;
@@ -1542,7 +1543,7 @@ const StitchPage: React.FC = () => {
                         onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
                         className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
                       >
-                        {ALL_LANGUAGES.map((lang) => (
+                        {ALL_LANGUAGES.filter((lang) => lang.code !== "en").map((lang) => (
                           <option key={lang.code} value={lang.code}>
                             {lang.name}
                           </option>
