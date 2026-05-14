@@ -101,34 +101,37 @@ const MentionInput: React.FC<MentionInputProps> = ({
         setMentionFilter("");
     };
 
-    // Handle keyboard navigation in dropdown
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (showDropdown && filteredFiles.length > 0) {
-            switch (e.key) {
-                case "ArrowDown":
-                    e.preventDefault();
-                    setDropdownIndex((prev) => Math.min(prev + 1, filteredFiles.length - 1));
-                    break;
-                case "ArrowUp":
-                    e.preventDefault();
-                    setDropdownIndex((prev) => Math.max(prev - 1, 0));
-                    break;
-                case "Enter":
-                    if (showDropdown) {
-                        e.preventDefault();
-                        selectFile(filteredFiles[dropdownIndex]);
-                    }
-                    break;
-                case "Escape":
-                    setShowDropdown(false);
-                    break;
-                case "Tab":
-                    if (showDropdown) {
-                        e.preventDefault();
-                        selectFile(filteredFiles[dropdownIndex]);
-                    }
-                    break;
+        if (!showDropdown) return;
+
+        if (e.key === "Escape") {
+            e.preventDefault();
+            setShowDropdown(false);
+            return;
+        }
+
+        if (filteredFiles.length === 0) {
+            if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                setShowDropdown(false);
             }
+            return;
+        }
+
+        switch (e.key) {
+            case "ArrowDown":
+                e.preventDefault();
+                setDropdownIndex((prev) => Math.min(prev + 1, filteredFiles.length - 1));
+                break;
+            case "ArrowUp":
+                e.preventDefault();
+                setDropdownIndex((prev) => Math.max(prev - 1, 0));
+                break;
+            case "Enter":
+            case "Tab":
+                e.preventDefault();
+                selectFile(filteredFiles[dropdownIndex]);
+                break;
         }
     };
 
@@ -140,12 +143,12 @@ const MentionInput: React.FC<MentionInputProps> = ({
         onChange(newValue);
 
         const newCursorPos = atPosition + file.fileName.length + 2;
-        setTimeout(() => {
-            if (inputRef.current) {
-                inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
-                inputRef.current.focus();
-            }
-        }, 0);
+        requestAnimationFrame(() => {
+            const el = inputRef.current;
+            if (!el) return;
+            el.focus();
+            el.setSelectionRange(newCursorPos, newCursorPos);
+        });
 
         setShowDropdown(false);
         setMentionFilter("");
