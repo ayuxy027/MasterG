@@ -322,11 +322,10 @@ const BoardPage: React.FC = () => {
       return;
     }
 
-    // Sticky note placement
     if (currentTool === 'sticky-note') {
       const point = screenToCanvas(e.clientX, e.clientY);
       const newNote: StickyNoteState = {
-        id: `note-${Date.now()}`,
+        id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         x: point.x,
         y: point.y,
         text: '',
