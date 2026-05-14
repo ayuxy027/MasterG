@@ -680,11 +680,7 @@ const LMRPage: React.FC = () => {
                           ></path>
                         </svg>
                         Translate to{" "}
-                        {
-                          languages
-                            .find((l) => l.value === selectedLanguage)
-                            ?.label.split(" ")[0]
-                        }
+                        {languages.find((l) => l.value === selectedLanguage)?.label ?? selectedLanguage}
                       </>
                     )}
                   </button>

@@ -302,6 +302,7 @@ const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                     }
                     disabled={deletingFileId === file.fileId}
                     title="Delete file"
+                    aria-label="Delete file"
                   >
                     {deletingFileId === file.fileId ? (
                       <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>

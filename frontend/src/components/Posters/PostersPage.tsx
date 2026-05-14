@@ -38,23 +38,45 @@ const trimToLastBatches = (posters: StoredPoster[]): StoredPoster[] => {
 };
 
 const savePostersToStorage = (posters: StoredPoster[]): void => {
-  try {
-    localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(trimToLastBatches(posters)));
-  } catch (error) {
-    console.warn("Failed to save posters to localStorage:", error);
+  let trimmed = trimToLastBatches(posters);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(trimmed));
+      return;
+    } catch (error) {
+      const isQuota = error instanceof DOMException && (
+        error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED"
+      );
+      if (!isQuota) {
+        console.warn("Failed to save posters to localStorage:", error);
+        return;
+      }
+      const oldestBatch = trimmed[0]?.batchId;
+      if (!oldestBatch) return;
+      trimmed = trimmed.filter((p) => p.batchId !== oldestBatch);
+    }
   }
+};
+
+const isValidStoredPoster = (value: unknown): value is StoredPoster => {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.batchId === "string"
+    && typeof v.id === "string"
+    && typeof v.imageBase64 === "string";
 };
 
 const loadPostersFromStorage = (): StoredPoster[] => {
   try {
     const stored = localStorage.getItem(POSTERS_STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isValidStoredPoster);
   } catch (error) {
     console.warn("Failed to load posters from localStorage:", error);
+    return [];
   }
-  return [];
 };
 
 const PostersPage: React.FC = () => {
