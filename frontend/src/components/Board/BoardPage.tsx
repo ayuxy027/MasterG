@@ -811,7 +811,7 @@ const BoardPage: React.FC = () => {
   const handleSaveBoard = useCallback(async () => {
     if (!currentSessionId) {
       // Create new session ID
-      const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       setCurrentSessionId(newSessionId);
       await handleSaveBoardWithId(newSessionId);
     } else {
@@ -905,7 +905,7 @@ const BoardPage: React.FC = () => {
         handleSaveBoardWithId(currentSessionId);
       } else {
         // No session yet, create one and save
-        const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const newSessionId = `board_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         setCurrentSessionId(newSessionId);
         handleSaveBoardWithId(newSessionId);
       }

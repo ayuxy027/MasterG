@@ -16,10 +16,11 @@ import type {
 
 // LocalStorage key for storing posters
 const POSTERS_STORAGE_KEY = "masterji_generated_posters";
+const MAX_STORED_BATCHES = 5;
 
-// Extended poster type with metadata for storage
 interface StoredPoster extends GeneratedPoster {
   id: string;
+  batchId: string;
   query: string;
   category: string;
   language: string;
@@ -27,12 +28,18 @@ interface StoredPoster extends GeneratedPoster {
   createdAt: string;
 }
 
-// Helper functions for localStorage
+const trimToLastBatches = (posters: StoredPoster[]): StoredPoster[] => {
+  const batchOrder: string[] = [];
+  for (const p of posters) {
+    if (!batchOrder.includes(p.batchId)) batchOrder.push(p.batchId);
+  }
+  const keep = new Set(batchOrder.slice(-MAX_STORED_BATCHES));
+  return posters.filter((p) => keep.has(p.batchId));
+};
+
 const savePostersToStorage = (posters: StoredPoster[]): void => {
   try {
-    // Limit to last 20 posters to avoid localStorage quota issues
-    const postersToSave = posters.slice(-20);
-    localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(postersToSave));
+    localStorage.setItem(POSTERS_STORAGE_KEY, JSON.stringify(trimToLastBatches(posters)));
   } catch (error) {
     console.warn("Failed to save posters to localStorage:", error);
   }
@@ -74,14 +81,11 @@ const PostersPage: React.FC = () => {
   // Load categories, languages, and stored posters on mount
   useEffect(() => {
     loadInitialData();
-    // Load stored posters from localStorage
     const stored = loadPostersFromStorage();
     setStoredPosters(stored);
-    // Also set the most recent generation as current if available
     if (stored.length > 0) {
-      // Get the most recent batch (same createdAt timestamp)
-      const latestTimestamp = stored[stored.length - 1].createdAt;
-      const latestBatch = stored.filter(p => p.createdAt === latestTimestamp);
+      const latestBatchId = stored[stored.length - 1].batchId;
+      const latestBatch = stored.filter(p => p.batchId === latestBatchId);
       setGeneratedPosters(latestBatch);
       if (latestBatch.length > 0) {
         setEnhancedPrompt(latestBatch[0].enhancedPrompt);
@@ -148,11 +152,12 @@ const PostersPage: React.FC = () => {
         setEnhancedPrompt(response.posters[0].enhancedPrompt);
       }
 
-      // Save to localStorage with metadata
       const timestamp = new Date().toISOString();
+      const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       const newStoredPosters: StoredPoster[] = response.posters.map((poster, index) => ({
         ...poster,
-        id: `${Date.now()}-${index}`,
+        id: `${batchId}-${index}`,
+        batchId,
         query: prompt.trim(),
         category: selectedCategory,
         language: selectedLanguage,

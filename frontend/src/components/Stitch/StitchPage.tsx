@@ -406,7 +406,7 @@ const StitchPage: React.FC = () => {
 
   // Toast notification helpers
   const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
-    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 11);
     setToasts((prev) => [...prev, { id, message, type }]);
   }, []);
 
@@ -468,15 +468,7 @@ const StitchPage: React.FC = () => {
     return activeTab === "english" ? englishContent : translatedContent[activeTab] || "";
   }, [activeTab, englishContent, translatedContent]);
 
-  // Get truncated content for preview (limit ~200 words for readability)
-  const getPreviewContent = useCallback((content: string): string => {
-    if (!content) return "";
-    const words = content.trim().split(/\s+/);
-    if (words.length <= 200) return content;
-
-    const truncated = words.slice(0, 200).join(" ");
-    return `${truncated} [...]`;
-  }, []);
+  const getPreviewContent = useCallback((content: string): string => content || "", []);
 
   // Reset markdown toggle when switching away from English tab
   useEffect(() => {
