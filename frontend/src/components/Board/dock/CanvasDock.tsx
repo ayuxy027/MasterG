@@ -128,12 +128,13 @@ const CanvasDock: React.FC<CanvasDockProps> = ({
     return date.toLocaleDateString();
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
+  const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!generatePrompt.trim() || isGenerating) return;
-    await onGenerateCards?.(generatePrompt, cardCount);
+    const prompt = generatePrompt;
     setGeneratePrompt('');
     setIsGeneratePanelOpen(false);
+    onGenerateCards?.(prompt, cardCount);
   };
 
   const primaryTools = useMemo(
