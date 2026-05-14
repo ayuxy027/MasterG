@@ -606,9 +606,6 @@ const StitchPage: React.FC = () => {
         return newPrev;
       });
 
-      // Clear thinking text on error
-      setThinkingText("");
-      // Clear thinking text on error
       setThinkingText("");
 
       // If translation failed and no content was set, remove the tab
@@ -739,39 +736,12 @@ const StitchPage: React.FC = () => {
     }
   }, [userId, currentSessionId, topic, selectedGrade, selectedSubject, customGrade, customSubject, englishContent, thinkingText, translatedContent, markdownEnabled]);
 
-  // Manual save session
   const handleSaveSession = useCallback(async () => {
-    if (!currentSessionId) {
-      // Create new session if none exists
-      const newSessionId = generateSessionId();
-      setCurrentSessionId(newSessionId);
-      // Wait a bit for state to update, then save
-      setTimeout(async () => {
-        try {
-          await stitchAPI.saveSession(userId, newSessionId, {
-            topic,
-            grade: selectedGrade,
-            subject: selectedSubject,
-            customGrade: customGrade || undefined,
-            customSubject: customSubject || undefined,
-            englishContent,
-            thinkingText: thinkingText || undefined,
-            translatedContent,
-            markdownEnabled,
-          });
-          showToast("Session saved successfully!", "success");
-          // Reload sessions list to show the new one
-          loadSessions();
-        } catch (error) {
-          console.error("Failed to save session:", error);
-          showToast("Failed to save session", "error");
-        }
-      }, 100);
-      return;
-    }
+    const sessionIdToUse = currentSessionId ?? generateSessionId();
+    if (!currentSessionId) setCurrentSessionId(sessionIdToUse);
 
     try {
-      await stitchAPI.saveSession(userId, currentSessionId, {
+      await stitchAPI.saveSession(userId, sessionIdToUse, {
         topic,
         grade: selectedGrade,
         subject: selectedSubject,
@@ -783,7 +753,6 @@ const StitchPage: React.FC = () => {
         markdownEnabled,
       });
       showToast("Session saved successfully!", "success");
-      // Reload sessions list to update the UI
       loadSessions();
     } catch (error) {
       console.error("Failed to save session:", error);
@@ -1015,11 +984,15 @@ const StitchPage: React.FC = () => {
       let firstResponseChunk = true;
 
       while (true) {
+        if (controller.signal.aborted) {
+          await reader.cancel().catch(() => undefined);
+          break;
+        }
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
+        const lines = buffer.split(/\r?\n/);
         buffer = lines.pop() || "";
 
         for (const line of lines) {

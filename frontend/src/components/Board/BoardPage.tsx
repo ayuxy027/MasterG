@@ -112,6 +112,11 @@ const BoardPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const thinkingModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => () => {
+    if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
+  }, []);
 
 
   useEffect(() => {
@@ -497,8 +502,8 @@ const BoardPage: React.FC = () => {
       console.error('Failed to generate cards:', error);
     } finally {
       setIsGenerating(false);
-      // Keep thinking modal open briefly, then auto-close after 2 seconds
-      setTimeout(() => {
+      if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
+      thinkingModalTimeoutRef.current = setTimeout(() => {
         setShowThinkingModal(false);
         setThinkingText("");
       }, 2000);
@@ -673,8 +678,8 @@ const BoardPage: React.FC = () => {
       setIsPerformingAction(false);
       streamingActionCardIdsRef.current.clear();
       resultCardIdRef.current = null;
-      // Keep thinking modal open briefly, then auto-close after 2 seconds
-      setTimeout(() => {
+      if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
+      thinkingModalTimeoutRef.current = setTimeout(() => {
         setShowThinkingModal(false);
         setThinkingText("");
       }, 2000);
@@ -859,17 +864,17 @@ const BoardPage: React.FC = () => {
     }
   }, [userId]);
 
-  // Auto-load test session on mount if userId matches test user
+  const hasAutoLoadedRef = useRef(false);
   useEffect(() => {
+    if (hasAutoLoadedRef.current) return;
     const testUserId = 'user_test_board_123';
     const testSessionId = 'board_test_123';
-
-    if (userId === testUserId && !currentSessionId && stickyNotes.length === 0 && cards.length === 0 && drawingPaths.length === 0) {
-      handleLoadBoard(testSessionId).catch(err => {
-        console.error('Failed to auto-load test session:', err);
-      });
-    }
-  }, [userId, currentSessionId, handleLoadBoard, stickyNotes.length, cards.length, drawingPaths.length]);
+    if (userId !== testUserId) return;
+    hasAutoLoadedRef.current = true;
+    handleLoadBoard(testSessionId).catch(err => {
+      console.error('Failed to auto-load test session:', err);
+    });
+  }, [userId, handleLoadBoard]);
 
   const handleNewBoard = useCallback(() => {
     setDrawingPaths([]);
@@ -976,6 +981,7 @@ const BoardPage: React.FC = () => {
       setCards([]);
       setStickyNotes([]);
       setSelectedCardIds(new Set());
+      setSelectedStickyNoteIds(new Set());
     }
   }, []);
 
@@ -989,18 +995,21 @@ const BoardPage: React.FC = () => {
   }, [isPanning, isSpacePressed, currentTool]);
 
 
-  // Handle banner fade on scroll (for canvas panning)
   useEffect(() => {
+    let restoreTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleWheel = (e: WheelEvent) => {
-      // Fade banner when panning/zooming
       if (Math.abs(e.deltaY) > 10 || Math.abs(e.deltaX) > 10) {
         setBannerVisible(false);
-        setTimeout(() => setBannerVisible(true), 2000); // Show again after 2s of no interaction
+        if (restoreTimeout) clearTimeout(restoreTimeout);
+        restoreTimeout = setTimeout(() => setBannerVisible(true), 2000);
       }
     };
 
-    window.addEventListener('wheel', handleWheel);
-    return () => window.removeEventListener('wheel', handleWheel);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      if (restoreTimeout) clearTimeout(restoreTimeout);
+    };
   }, []);
 
   return (
@@ -1107,6 +1116,7 @@ const BoardPage: React.FC = () => {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
       />
 

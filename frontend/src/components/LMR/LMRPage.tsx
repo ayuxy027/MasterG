@@ -93,6 +93,13 @@ const LMRPage: React.FC = () => {
     }
   };
 
+  const [contentLanguage, setContentLanguage] = useState<{
+    summary: string | null;
+    questions: string | null;
+    quiz: string | null;
+    notes: string | null;
+  }>({ summary: null, questions: null, quiz: null, notes: null });
+
   const loadContent = async (
     type: "summary" | "questions" | "quiz" | "notes"
   ) => {
@@ -103,7 +110,7 @@ const LMRPage: React.FC = () => {
 
       switch (type) {
         case "summary":
-          if (!summary) {
+          if (!summary || contentLanguage.summary !== selectedLanguage) {
             setLoadingSummary(true);
             const summaryData = await LMRApi.generateSummary(
               fileId,
@@ -111,12 +118,13 @@ const LMRPage: React.FC = () => {
               selectedTone
             );
             setSummary(summaryData);
+            setContentLanguage((prev) => ({ ...prev, summary: selectedLanguage }));
             setLoadingSummary(false);
           }
           break;
 
         case "questions":
-          if (questions.length === 0) {
+          if (questions.length === 0 || contentLanguage.questions !== selectedLanguage) {
             setLoadingQuestions(true);
             const questionsData = await LMRApi.generateQuestions(
               fileId,
@@ -124,12 +132,13 @@ const LMRPage: React.FC = () => {
               10
             );
             setQuestions(questionsData);
+            setContentLanguage((prev) => ({ ...prev, questions: selectedLanguage }));
             setLoadingQuestions(false);
           }
           break;
 
         case "quiz":
-          if (quiz.length === 0) {
+          if (quiz.length === 0 || contentLanguage.quiz !== selectedLanguage) {
             setLoadingQuiz(true);
             const quizData = await LMRApi.generateQuiz(
               fileId,
@@ -137,18 +146,20 @@ const LMRPage: React.FC = () => {
               10
             );
             setQuiz(quizData);
+            setContentLanguage((prev) => ({ ...prev, quiz: selectedLanguage }));
             setLoadingQuiz(false);
           }
           break;
 
         case "notes":
-          if (recallNotes.length === 0) {
+          if (recallNotes.length === 0 || contentLanguage.notes !== selectedLanguage) {
             setLoadingNotes(true);
             const notesData = await LMRApi.generateRecallNotes(
               fileId,
               selectedLanguage
             );
             setRecallNotes(notesData);
+            setContentLanguage((prev) => ({ ...prev, notes: selectedLanguage }));
             setLoadingNotes(false);
           }
           break;
@@ -805,79 +816,6 @@ const LMRPage: React.FC = () => {
                         recallNotes={recallNotes}
                         isLoading={loadingNotes}
                       />
-                    )}
-                    {activeView === "pdf" && (
-                      <div className="text-center py-12">
-                        <div className="mb-6">
-                          <svg
-                            className="w-20 h-20 mx-auto text-orange-400 mb-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            ></path>
-                          </svg>
-                          <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                            Download Complete PDF
-                          </h3>
-                          <p className="text-gray-600 mb-6">
-                            Get all generated content in a beautifully formatted
-                            PDF
-                          </p>
-                        </div>
-                        <button
-                          onClick={handleDownloadPDF}
-                          disabled={downloadingPDF}
-                          className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-lg flex items-center gap-3 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {downloadingPDF ? (
-                            <>
-                              <svg
-                                className="animate-spin h-5 w-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                ></circle>
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                ></path>
-                              </svg>
-                              Generating PDF...
-                            </>
-                          ) : (
-                            <>
-                              <svg
-                                className="w-6 h-6"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                ></path>
-                              </svg>
-                              Download PDF
-                            </>
-                          )}
-                        </button>
-                      </div>
                     )}
                   </>
                 )}

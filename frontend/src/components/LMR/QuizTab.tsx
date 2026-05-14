@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { LMRQuiz } from "../../services/lmrApi";
 import { Check, X } from "lucide-react";
 
@@ -14,6 +14,13 @@ const QuizTab: React.FC<QuizTabProps> = ({ quizData, isLoading }) => {
   >({});
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
+
+  useEffect(() => {
+    setSelectedAnswers({});
+    setShowResults(false);
+    setScore(0);
+    setCurrentQuiz(0);
+  }, [quizData]);
 
   const handleAnswerSelect = (quizId: number, optionIndex: number) => {
     if (!showResults) {
