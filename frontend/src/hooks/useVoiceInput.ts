@@ -102,17 +102,18 @@ export function useVoiceInput({
             };
 
             // Start recording
-            mediaRecorder.start(100); // Collect data every 100ms
+            mediaRecorder.start(100);
         } catch (err: unknown) {
-            let errorMessage = "Failed to access microphone";
+            streamRef.current?.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+            mediaRecorderRef.current = null;
 
+            let errorMessage = "Failed to access microphone";
             if (err instanceof Error) {
                 if (err.name === "NotAllowedError") {
-                    errorMessage =
-                        "Microphone access denied. Please allow microphone access.";
+                    errorMessage = "Microphone access denied. Please allow microphone access.";
                 } else if (err.name === "NotFoundError") {
-                    errorMessage =
-                        "No microphone found. Please connect a microphone.";
+                    errorMessage = "No microphone found. Please connect a microphone.";
                 } else if (err.message) {
                     errorMessage = err.message;
                 }

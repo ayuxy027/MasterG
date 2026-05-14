@@ -101,20 +101,15 @@ export async function sendStreamingQuery(
   sessionId: string,
   query: string,
   onChunk: (chunk: StreamChunk) => void,
-  mentionedFileIds?: string[]
+  mentionedFileIds?: string[],
+  signal?: AbortSignal
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/query/stream`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId,
-        sessionId,
-        query,
-        mentionedFileIds,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, sessionId, query, mentionedFileIds }),
+      signal,
     });
 
     if (!response.ok) {
@@ -126,42 +121,37 @@ export async function sendStreamingQuery(
       );
     }
 
-    // Read the SSE stream
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
 
-    if (!reader) {
-      throw new ChatApiError("Failed to get response stream");
-    }
+    if (!reader) throw new ChatApiError("Failed to get response stream");
 
     let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        onChunk({ type: "done" } as StreamChunk);
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
-
-      // Process complete SSE messages
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || ""; // Keep incomplete line in buffer
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr && jsonStr !== "[DONE]") {
-            try {
-              const chunk = JSON.parse(jsonStr) as StreamChunk;
-              onChunk(chunk);
-            } catch {
-              // Ignore parse errors for incomplete JSON
-              console.warn("Failed to parse SSE chunk:", jsonStr);
-            }
-          }
+        if (!line.startsWith("data: ")) continue;
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr || jsonStr === "[DONE]") continue;
+        try {
+          onChunk(JSON.parse(jsonStr) as StreamChunk);
+        } catch {
+          // Stream may deliver partially-buffered JSON; skip silently.
         }
       }
     }
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return;
     if (error instanceof ChatApiError) throw error;
     throw new ChatApiError(
       error instanceof Error ? error.message : "Streaming error",
@@ -219,6 +209,14 @@ export async function uploadFile(
 
       xhr.addEventListener("error", () => {
         reject(new ChatApiError("Network error during upload"));
+      });
+
+      xhr.addEventListener("abort", () => {
+        reject(new ChatApiError("Upload aborted"));
+      });
+
+      xhr.addEventListener("timeout", () => {
+        reject(new ChatApiError("Upload timed out"));
       });
 
       xhr.open("POST", `${API_BASE_URL}/api/upload`);

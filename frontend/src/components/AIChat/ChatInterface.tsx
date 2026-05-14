@@ -50,12 +50,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [selectedMentions, setSelectedMentions] = useState<MentionedFile[]>([]);
   const [isFirstMessage, setIsFirstMessage] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    return () => {
+      streamAbortRef.current?.abort();
+    };
+  }, [sessionId]);
 
   const loadUploadedFiles = useCallback(async () => {
     try {
@@ -66,12 +77,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   }, [userId, sessionId]);
 
-  // Load uploaded files for dynamic prompt generation
   useEffect(() => {
     loadUploadedFiles();
-    // Check if this is a new session (no messages)
+  }, [loadUploadedFiles]);
+
+  useEffect(() => {
     setIsFirstMessage(messages.length === 0);
-  }, [sessionId, messages.length, loadUploadedFiles]);
+  }, [sessionId, messages.length]);
 
   // Handle initial prompt from Plan mode
   useEffect(() => {
@@ -102,11 +114,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsLoading(true);
     setIsFirstMessage(false);
 
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+
     try {
-      // STREAMING MODE
       const assistantMessageId = `assistant-${Date.now()}`;
 
-      // Add placeholder streaming message
       const streamingMessage: MessageUI = {
         id: assistantMessageId,
         role: "assistant",
@@ -157,36 +171,38 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             collectedSources.push(chunk.source);
           }
         },
-        mentionedFileIds.length > 0 ? mentionedFileIds : undefined
+        mentionedFileIds.length > 0 ? mentionedFileIds : undefined,
+        controller.signal
       );
 
-      // Trigger session update with first message for name generation
       onSessionUpdate(shouldGenerateName ? messageContent : undefined);
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error("Failed to send message:", error);
 
-      const errorMessage: MessageUI = {
-        id: `error-${Date.now()}`,
-        role: "assistant",
-        content:
-          error instanceof ChatApiError
-            ? `Error: ${error.message}`
-            : "Failed to get response. Please try again.",
-        timestamp: new Date(),
-      };
+      const failureText =
+        error instanceof ChatApiError
+          ? `Error: ${error.message}`
+          : "Failed to get response. Please try again.";
 
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.isStreaming
+            ? { ...msg, isStreaming: false, content: msg.content || failureText }
+            : msg
+        )
+      );
     } finally {
+      if (streamAbortRef.current === controller) {
+        streamAbortRef.current = null;
+      }
       setIsLoading(false);
     }
   };
 
   const handleTranslateMessage = async (messageId: string, content: string) => {
-    // Find message and check if already translated
-    const message = messages.find((m) => m.id === messageId);
-    if (!message) return;
-
-    // Allow re-translation regardless of previous state to support language switching
+    if (!messages.find((m) => m.id === messageId)) return;
+    const targetLanguage = selectedLanguage;
 
     setMessages((prev) =>
       prev.map((msg) =>
@@ -195,29 +211,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     );
 
     try {
-      const response = await translateMessage(
-        userId,
-        sessionId,
-        content,
-        "en",
-        selectedLanguage // Global selected language
-      );
+      const response = await translateMessage(userId, sessionId, content, "en", targetLanguage);
 
-      if (response.success && response.translated) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === messageId
-              ? {
-                  ...msg,
-                  translatedContent: response.translated,
-                  isTranslating: false,
-                }
-              : msg
-          )
-        );
-      } else {
+      if (!response.success || !response.translated) {
         throw new Error(response.error || "Translation failed");
       }
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                translatedContent: response.translated,
+                translatedLanguage: targetLanguage,
+                isTranslating: false,
+              }
+            : msg
+        )
+      );
     } catch (error) {
       console.error("Translation error:", error);
       setMessages((prev) =>
@@ -225,7 +236,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           msg.id === messageId ? { ...msg, isTranslating: false } : msg
         )
       );
-      // Optionally show a toast or error indicator
     }
   };
 
@@ -233,11 +243,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
     for (const file of fileArray) {
       const fileId = `upload-${Date.now()}-${Math.random()
         .toString(36)
-        .substr(2, 9)}`;
+        .substring(2, 11)}`;
 
       // Add to upload progress tracking
       setUploadProgress((prev) => [
@@ -355,7 +366,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   return (
     <div className="h-full flex flex-col bg-white/50 overflow-hidden">
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gradient-to-b from-white to-orange-50/30 min-h-0">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gradient-to-b from-white to-orange-50/30 min-h-0">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center px-4">
