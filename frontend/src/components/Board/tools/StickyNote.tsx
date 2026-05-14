@@ -86,9 +86,9 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     onUpdate(id, { x: startPos.x + deltaX, y: startPos.y + deltaY });
   }, [isDragging, dragStart.x, dragStart.y, zoom, onUpdate, id, startPos.x, startPos.y]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
 
   // Simple resize handling
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -107,9 +107,9 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     onUpdate(id, { width: newWidth, height: newHeight });
   }, [isResizing, onUpdate, id]);
 
-  const handleResizeEnd = () => {
+  const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
-  };
+  }, []);
 
   // Simple text editing
   const handleClick = () => {
@@ -140,28 +140,25 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     }
   };
 
-  // Simple event listeners
   React.useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, handleMouseMove]);
+    if (!isDragging) return;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   React.useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMove);
-      document.addEventListener('mouseup', handleResizeEnd);
-      return () => {
-        document.removeEventListener('mousemove', handleResizeMove);
-        document.removeEventListener('mouseup', handleResizeEnd);
-      };
-    }
-  }, [isResizing, handleResizeMove]);
+    if (!isResizing) return;
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
 
   React.useEffect(() => {
     if (showSettings) {

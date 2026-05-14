@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import CategorySelector from "./CategorySelector";
 import PromptInput from "./PromptInput";
 import GenerationResults from "./GenerationResults";
@@ -184,10 +184,24 @@ const PostersPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const downloadAllTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  useEffect(() => () => {
+    downloadAllTimersRef.current.forEach(clearTimeout);
+    downloadAllTimersRef.current = [];
+  }, []);
+
   const handleDownloadAll = () => {
-    generatedPosters.forEach((poster, index) => {
-      setTimeout(() => handleDownload(poster, index), index * 500);
-    });
+    if (isDownloadingAll || generatedPosters.length === 0) return;
+    setIsDownloadingAll(true);
+    downloadAllTimersRef.current.forEach(clearTimeout);
+    downloadAllTimersRef.current = generatedPosters.map((poster, index) =>
+      setTimeout(() => {
+        handleDownload(poster, index);
+        if (index === generatedPosters.length - 1) setIsDownloadingAll(false);
+      }, index * 500)
+    );
   };
 
   return (

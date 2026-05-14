@@ -19,19 +19,26 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
   const allCategories = [...categories, ...customCategories];
 
   const addCustomCategory = () => {
-    if (newCategoryName.trim() !== '') {
-      const newCategory: PosterCategory = {
-        id: newCategoryName.toLowerCase().replace(/\s+/g, '-'),
-        name: newCategoryName,
-        description: 'Custom category',
-        icon: '',
-        examples: []
-      };
-      setCustomCategories([...customCategories, newCategory]);
-      onSelectCategory(newCategory.id);
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    const slug = trimmed.toLowerCase().replace(/\s+/g, '-');
+    if (allCategories.some((c) => c.id === slug)) {
       setNewCategoryName('');
       setShowInput(false);
+      onSelectCategory(slug);
+      return;
     }
+    const newCategory: PosterCategory = {
+      id: `${slug}-${Date.now().toString(36)}`,
+      name: trimmed,
+      description: 'Custom category',
+      icon: '',
+      examples: []
+    };
+    setCustomCategories([...customCategories, newCategory]);
+    onSelectCategory(newCategory.id);
+    setNewCategoryName('');
+    setShowInput(false);
   };
 
   return (
