@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { ViewerRouter, getViewerTypeFromExtension, type ViewerType } from "../viewers";
 import { API_BASE_URL } from "../../config/api";
 
@@ -30,24 +30,26 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     ? getViewerTypeFromMime(mimeType)
     : getViewerTypeFromExtension(fileName);
 
-  const fetchTextContent = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/files/${fileId}/content?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTextContent(data.content);
-      }
-    } catch (error) {
-      console.error('Failed to fetch text content:', error);
-    }
-  }, [fileId, userId, sessionId]);
-
-  // For text files, fetch content separately
   useEffect(() => {
-    if (isOpen && viewerType === 'text') {
-      fetchTextContent();
-    }
-  }, [isOpen, viewerType, fetchTextContent]);
+    if (!isOpen || viewerType !== 'text') return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/files/${fileId}/content?userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}`,
+          { signal: controller.signal }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (!controller.signal.aborted) setTextContent(data.content);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Failed to fetch text content:', error);
+      }
+    })();
+    return () => controller.abort();
+  }, [isOpen, viewerType, fileId, userId, sessionId]);
 
   const getFileIcon = () => {
     const icons: Record<ViewerType, React.ReactNode> = {
