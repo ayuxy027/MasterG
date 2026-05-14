@@ -196,6 +196,7 @@ const SessionSidebar: React.FC<SessionSidebarProps> = ({
                         }
                         className="p-1 hover:bg-orange-100 rounded transition-colors flex-shrink-0"
                         title="Rename chat"
+                        aria-label="Rename chat"
                       >
                         <svg
                           className="w-3.5 h-3.5 text-gray-500"
@@ -223,6 +224,7 @@ const SessionSidebar: React.FC<SessionSidebarProps> = ({
                         }
                         className="p-1 hover:bg-red-100 rounded transition-colors flex-shrink-0"
                         title="Delete session"
+                        aria-label="Delete session"
                       >
                         <svg
                           className="w-3.5 h-3.5 text-red-500"

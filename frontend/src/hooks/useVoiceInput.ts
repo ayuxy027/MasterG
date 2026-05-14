@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { API_BASE_URL } from "../config/api";
 
 type VoiceInputStatus = "idle" | "recording" | "processing" | "error";
@@ -25,6 +25,16 @@ export function useVoiceInput({
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const streamRef = useRef<MediaStream | null>(null);
+    const onTranscriptRef = useRef(onTranscript);
+    const onErrorRef = useRef(onError);
+
+    useEffect(() => {
+        onTranscriptRef.current = onTranscript;
+    }, [onTranscript]);
+
+    useEffect(() => {
+        onErrorRef.current = onError;
+    }, [onError]);
 
     /**
      * Start recording audio from microphone
@@ -77,7 +87,7 @@ export function useVoiceInput({
                     const transcript = await sendAudioToBackend(audioBlob, mimeType);
 
                     if (transcript && transcript.trim()) {
-                        onTranscript(transcript);
+                        onTranscriptRef.current(transcript);
                         setStatus("idle");
                     } else {
                         throw new Error("No speech detected");
@@ -87,21 +97,19 @@ export function useVoiceInput({
                         err instanceof Error ? err.message : "Transcription failed";
                     setError(errorMessage);
                     setStatus("error");
-                    onError?.(errorMessage);
+                    onErrorRef.current?.(errorMessage);
                 }
             };
 
-            // Handle errors
             mediaRecorder.onerror = (event: Event) => {
                 const errorMessage =
                     (event as Event & { error?: { message?: string } }).error
                         ?.message || "Recording failed";
                 setError(errorMessage);
                 setStatus("error");
-                onError?.(errorMessage);
+                onErrorRef.current?.(errorMessage);
             };
 
-            // Start recording
             mediaRecorder.start(100);
         } catch (err: unknown) {
             streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -121,9 +129,9 @@ export function useVoiceInput({
 
             setError(errorMessage);
             setStatus("error");
-            onError?.(errorMessage);
+            onErrorRef.current?.(errorMessage);
         }
-    }, [onTranscript, onError]);
+    }, []);
 
     /**
      * Stop recording

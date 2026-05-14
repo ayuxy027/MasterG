@@ -149,7 +149,7 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
             </div>
           </div>
 
-          {/* Key Topics with Descriptions */}
+          {summary.keyTopics && summary.keyTopics.length > 0 && (
           <div className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden shadow-md">
             <div className="bg-orange-50 border-b-2 border-orange-200 px-6 py-4">
               <h4 className="font-bold text-gray-800 text-lg flex items-center gap-2">
@@ -197,8 +197,9 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
               </div>
             </div>
           </div>
+          )}
 
-          {/* Important Concepts with 5 Bullet Points Each */}
+          {summary.importantConcepts && summary.importantConcepts.length > 0 && (
           <div className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden shadow-md">
             <div className="bg-orange-50 border-b-2 border-orange-200 px-6 py-4">
               <h4 className="font-bold text-gray-800 text-lg flex items-center gap-2">
@@ -282,6 +283,7 @@ const MaterialsTab: React.FC<MaterialsTabProps> = ({ summary, isLoading }) => {
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
     </div>

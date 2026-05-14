@@ -138,20 +138,25 @@ const GenerationResults: React.FC<GenerationResultsProps> = ({
         <div className={`grid ${getGridClass()} gap-6`}>
           {posters.map((poster, index) => (
             <div
-              key={`${poster.imageBase64.substring(0, 20)}-${index}`}
+              key={`${poster.imageBase64?.slice(0, 32) || "missing"}-${index}`}
               className="relative overflow-hidden rounded-xl shadow-lg bg-white flex items-center justify-center"
               style={{ minHeight: "300px" }}
             >
-              <img
-                src={`data:${poster.mimeType};base64,${poster.imageBase64}`}
-                alt={`Educational poster ${index + 1}`}
-                className="w-full h-full object-contain max-h-[600px]"
-                style={{ objectFit: "contain" }}
-              />
+              {poster.imageBase64 ? (
+                <img
+                  src={`data:${poster.mimeType};base64,${poster.imageBase64}`}
+                  alt={`Educational poster ${index + 1}`}
+                  className="w-full h-full object-contain max-h-[600px]"
+                  style={{ objectFit: "contain" }}
+                />
+              ) : (
+                <div className="text-sm text-gray-400 p-4">Image unavailable</div>
+              )}
               <button
                 onClick={() => onDownload(poster, index)}
                 className="absolute top-4 right-4 bg-orange-500 text-white rounded-full p-3 shadow-lg hover:bg-orange-600 transition-colors"
                 title="Download poster"
+                aria-label="Download poster"
               >
                 <svg
                   className="w-5 h-5"

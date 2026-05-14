@@ -5,6 +5,7 @@ interface LMRHistoryProps {
   userId?: string;
   sessionId?: string;
   onSelectFile?: (fileId: string, fileName: string) => void;
+  onDeleteFile?: (fileId: string) => void;
   disabled?: boolean;
 }
 
@@ -12,6 +13,7 @@ const LMRHistoryComponent: React.FC<LMRHistoryProps> = ({
   userId,
   sessionId,
   onSelectFile,
+  onDeleteFile,
   disabled = false,
 }) => {
   const [history, setHistory] = useState<LMRHistory[]>([]);
@@ -39,7 +41,7 @@ const LMRHistoryComponent: React.FC<LMRHistoryProps> = ({
     loadHistory();
   }, [loadHistory]);
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, fileId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("Are you sure you want to delete this history entry?")) return;
 
@@ -47,6 +49,7 @@ const LMRHistoryComponent: React.FC<LMRHistoryProps> = ({
       setDeletingId(id);
       await LMRApi.deleteHistory(id);
       setHistory((prev) => prev.filter((item) => item._id !== id));
+      onDeleteFile?.(fileId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete history");
       console.error("Delete history error:", err);
@@ -206,7 +209,8 @@ const LMRHistoryComponent: React.FC<LMRHistoryProps> = ({
               </div>
             </button>
             <button
-              onClick={(e) => handleDelete(item._id, e)}
+              onClick={(e) => handleDelete(item._id, item.fileId, e)}
+              aria-label="Delete history entry"
               disabled={disabled || deletingId === item._id}
               className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white transition-all disabled:opacity-50"
               title="Delete"

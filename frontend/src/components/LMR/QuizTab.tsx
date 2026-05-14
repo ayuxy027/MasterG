@@ -15,12 +15,13 @@ const QuizTab: React.FC<QuizTabProps> = ({ quizData, isLoading }) => {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
 
+  const quizSignature = quizData.map((q) => q.id).join(",");
   useEffect(() => {
     setSelectedAnswers({});
     setShowResults(false);
     setScore(0);
     setCurrentQuiz(0);
-  }, [quizData]);
+  }, [quizSignature]);
 
   const handleAnswerSelect = (quizId: number, optionIndex: number) => {
     if (!showResults) {
@@ -249,8 +250,10 @@ const QuizTab: React.FC<QuizTabProps> = ({ quizData, isLoading }) => {
     );
   }
 
-  const quiz = quizData[currentQuiz];
-  const progress = ((currentQuiz + 1) / quizData.length) * 100;
+  const safeQuizIndex = Math.min(currentQuiz, quizData.length - 1);
+  const quiz = quizData[safeQuizIndex];
+  if (!quiz) return null;
+  const progress = ((safeQuizIndex + 1) / quizData.length) * 100;
 
   return (
     <div className="max-w-2xl mx-auto">

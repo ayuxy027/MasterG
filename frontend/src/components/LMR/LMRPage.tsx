@@ -44,15 +44,14 @@ const LMRPage: React.FC = () => {
       setUploadedFile(file);
       setIsProcessing(true);
 
-      // CRITICAL: Clear all previous content when uploading a NEW document
-      // This prevents stale data from the previous document from persisting
       setSummary(null);
       setQuestions([]);
       setQuiz([]);
       setRecallNotes([]);
-      setFileId(""); // Clear old fileId immediately
+      setFileId("");
+      setContentLanguage({ summary: null, questions: null, quiz: null, notes: null });
+      setCurrentDisplayLanguage("en");
 
-      // Upload document to backend
       const response = await LMRApi.uploadDocument(
         file,
         "lmr-user",
@@ -61,14 +60,10 @@ const LMRPage: React.FC = () => {
       setFileId(response.fileId);
 
       setIsProcessing(false);
-
-      // Show success notification
-
-      // Trigger history refresh
       setHistoryRefreshKey((prev) => prev + 1);
-
-      // Auto-generate summary using selected language and tone
       setActiveView("summary");
+
+      const requestId = ++loadRequestIdRef.current.summary;
       setLoadingSummary(true);
       try {
         const summaryData = await LMRApi.generateSummary(
@@ -76,14 +71,18 @@ const LMRPage: React.FC = () => {
           selectedLanguage,
           selectedTone
         );
+        if (requestId !== loadRequestIdRef.current.summary) return;
         setSummary(summaryData);
+        setContentLanguage((prev) => ({ ...prev, summary: selectedLanguage }));
       } catch (summaryError) {
+        if (requestId !== loadRequestIdRef.current.summary) return;
         console.error("Failed to auto-generate summary:", summaryError);
         setError(
           "Document uploaded but failed to generate summary. Please try again."
         );
+      } finally {
+        if (requestId === loadRequestIdRef.current.summary) setLoadingSummary(false);
       }
-      setLoadingSummary(false);
     } catch (err) {
       setIsProcessing(false);
       setError(
@@ -100,81 +99,98 @@ const LMRPage: React.FC = () => {
     notes: string | null;
   }>({ summary: null, questions: null, quiz: null, notes: null });
 
+  const loadRequestIdRef = useRef<Record<string, number>>({
+    summary: 0,
+    questions: 0,
+    quiz: 0,
+    notes: 0,
+  });
+
   const loadContent = async (
     type: "summary" | "questions" | "quiz" | "notes"
   ) => {
     if (!fileId) return;
+    const requestId = ++loadRequestIdRef.current[type];
+    const requestFileId = fileId;
+    const requestLanguage = selectedLanguage;
+
+    const setLoading = (v: boolean) => {
+      if (type === "summary") setLoadingSummary(v);
+      else if (type === "questions") setLoadingQuestions(v);
+      else if (type === "quiz") setLoadingQuiz(v);
+      else setLoadingNotes(v);
+    };
+
+    const isStale = () =>
+      requestId !== loadRequestIdRef.current[type] || requestFileId !== fileId;
 
     try {
       setError("");
 
       switch (type) {
         case "summary":
-          if (!summary || contentLanguage.summary !== selectedLanguage) {
-            setLoadingSummary(true);
+          if (!summary || contentLanguage.summary !== requestLanguage) {
+            setLoading(true);
             const summaryData = await LMRApi.generateSummary(
-              fileId,
-              selectedLanguage,
+              requestFileId,
+              requestLanguage,
               selectedTone
             );
+            if (isStale()) return;
             setSummary(summaryData);
-            setContentLanguage((prev) => ({ ...prev, summary: selectedLanguage }));
-            setLoadingSummary(false);
+            setContentLanguage((prev) => ({ ...prev, summary: requestLanguage }));
           }
           break;
 
         case "questions":
-          if (questions.length === 0 || contentLanguage.questions !== selectedLanguage) {
-            setLoadingQuestions(true);
+          if (questions.length === 0 || contentLanguage.questions !== requestLanguage) {
+            setLoading(true);
             const questionsData = await LMRApi.generateQuestions(
-              fileId,
-              selectedLanguage,
+              requestFileId,
+              requestLanguage,
               10
             );
+            if (isStale()) return;
             setQuestions(questionsData);
-            setContentLanguage((prev) => ({ ...prev, questions: selectedLanguage }));
-            setLoadingQuestions(false);
+            setContentLanguage((prev) => ({ ...prev, questions: requestLanguage }));
           }
           break;
 
         case "quiz":
-          if (quiz.length === 0 || contentLanguage.quiz !== selectedLanguage) {
-            setLoadingQuiz(true);
+          if (quiz.length === 0 || contentLanguage.quiz !== requestLanguage) {
+            setLoading(true);
             const quizData = await LMRApi.generateQuiz(
-              fileId,
-              selectedLanguage,
+              requestFileId,
+              requestLanguage,
               10
             );
+            if (isStale()) return;
             setQuiz(quizData);
-            setContentLanguage((prev) => ({ ...prev, quiz: selectedLanguage }));
-            setLoadingQuiz(false);
+            setContentLanguage((prev) => ({ ...prev, quiz: requestLanguage }));
           }
           break;
 
         case "notes":
-          if (recallNotes.length === 0 || contentLanguage.notes !== selectedLanguage) {
-            setLoadingNotes(true);
+          if (recallNotes.length === 0 || contentLanguage.notes !== requestLanguage) {
+            setLoading(true);
             const notesData = await LMRApi.generateRecallNotes(
-              fileId,
-              selectedLanguage
+              requestFileId,
+              requestLanguage
             );
+            if (isStale()) return;
             setRecallNotes(notesData);
-            setContentLanguage((prev) => ({ ...prev, notes: selectedLanguage }));
-            setLoadingNotes(false);
+            setContentLanguage((prev) => ({ ...prev, notes: requestLanguage }));
           }
           break;
       }
     } catch (err) {
+      if (isStale()) return;
       setError(
         err instanceof Error ? err.message : `Failed to generate ${type}`
       );
       console.error(`${type} generation error:`, err);
-
-      // Reset loading states
-      setLoadingSummary(false);
-      setLoadingQuestions(false);
-      setLoadingQuiz(false);
-      setLoadingNotes(false);
+    } finally {
+      if (!isStale()) setLoading(false);
     }
   };
 
@@ -196,9 +212,11 @@ const LMRPage: React.FC = () => {
     setQuestions([]);
     setQuiz([]);
     setRecallNotes([]);
+    setContentLanguage({ summary: null, questions: null, quiz: null, notes: null });
+    setCurrentDisplayLanguage("en");
     setActiveView("summary");
 
-    // Auto-load summary
+    const requestId = ++loadRequestIdRef.current.summary;
     try {
       setLoadingSummary(true);
       const summaryData = await LMRApi.generateSummary(
@@ -206,11 +224,14 @@ const LMRPage: React.FC = () => {
         selectedLanguage,
         selectedTone
       );
+      if (requestId !== loadRequestIdRef.current.summary) return;
       setSummary(summaryData);
+      setContentLanguage((prev) => ({ ...prev, summary: selectedLanguage }));
     } catch (err) {
+      if (requestId !== loadRequestIdRef.current.summary) return;
       console.error("Failed to load summary:", err);
     } finally {
-      setLoadingSummary(false);
+      if (requestId === loadRequestIdRef.current.summary) setLoadingSummary(false);
     }
   };
   // Translation state
@@ -463,6 +484,18 @@ const LMRPage: React.FC = () => {
                 userId="lmr-user"
                 sessionId="lmr-session"
                 onSelectFile={handleSelectHistory}
+                onDeleteFile={(deletedFileId) => {
+                  if (deletedFileId === fileId) {
+                    setFileId("");
+                    setUploadedFile(null);
+                    setSummary(null);
+                    setQuestions([]);
+                    setQuiz([]);
+                    setRecallNotes([]);
+                    setContentLanguage({ summary: null, questions: null, quiz: null, notes: null });
+                    setCurrentDisplayLanguage("en");
+                  }
+                }}
               />
 
               {/* Upload Section */}

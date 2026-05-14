@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -38,8 +38,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   isUnderline = false,
   color = "#2c3e50",
 }) => {
-  // Pre-process content to handle various LaTeX formats
-  const processedContent = preprocessLatex(content);
+  const processedContent = useMemo(() => preprocessLatex(content), [content]);
 
   // Combine custom styles with text styling props
   const combinedStyle: React.CSSProperties = {
