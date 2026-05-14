@@ -80,8 +80,9 @@ const loadPostersFromStorage = (): StoredPoster[] => {
 };
 
 const PostersPage: React.FC = () => {
-  // State
   const [categories, setCategories] = useState<PosterCategory[]>([]);
+  const [customCategories, setCustomCategories] = useState<PosterCategory[]>([]);
+  const allCategories = [...categories, ...customCategories];
   const [languages, setLanguages] = useState<Language[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("science");
   const [selectedLanguage, setSelectedLanguage] = useState("English");
@@ -257,9 +258,10 @@ const PostersPage: React.FC = () => {
           <div className="lg:col-span-1 space-y-6">
             {/* Category Selector */}
             <CategorySelector
-              categories={categories}
+              categories={allCategories}
               selectedCategory={selectedCategory}
               onSelectCategory={setSelectedCategory}
+              onAddCategory={(c) => setCustomCategories((prev) => [...prev, c])}
             />
 
             {/* Language Selector */}
@@ -372,7 +374,7 @@ const PostersPage: React.FC = () => {
               onGenerate={handleGenerate}
               isGenerating={isGenerating}
               selectedCategory={selectedCategory}
-              categories={categories}
+              categories={allCategories}
             />
 
             {/* Error Display */}

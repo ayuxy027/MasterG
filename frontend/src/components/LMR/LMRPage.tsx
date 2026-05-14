@@ -265,10 +265,13 @@ const LMRPage: React.FC = () => {
         setQuiz([]);
         setRecallNotes([]);
         setLoadingSummary(true);
-        const summaryData = await LMRApi.generateSummary(fileId, "en", selectedTone);
-        if (requestId !== translateRequestIdRef.current) return;
-        setSummary(summaryData);
-        setLoadingSummary(false);
+        try {
+          const summaryData = await LMRApi.generateSummary(fileId, "en", selectedTone);
+          if (requestId !== translateRequestIdRef.current) return;
+          setSummary(summaryData);
+        } finally {
+          if (requestId === translateRequestIdRef.current) setLoadingSummary(false);
+        }
       } else {
         const translated = await LMRApi.translateContent(
           {

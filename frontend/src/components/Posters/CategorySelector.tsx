@@ -5,18 +5,19 @@ interface CategorySelectorProps {
   categories: PosterCategory[];
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
+  onAddCategory?: (category: PosterCategory) => void;
 }
 
 const CategorySelector: React.FC<CategorySelectorProps> = ({
   categories,
   selectedCategory,
-  onSelectCategory
+  onSelectCategory,
+  onAddCategory,
 }) => {
-  const [customCategories, setCustomCategories] = useState<PosterCategory[]>([]);
   const [showInput, setShowInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const allCategories = [...categories, ...customCategories];
+  const allCategories = categories;
 
   const addCustomCategory = () => {
     const trimmed = newCategoryName.trim();
@@ -35,7 +36,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
       icon: '',
       examples: []
     };
-    setCustomCategories([...customCategories, newCategory]);
+    onAddCategory?.(newCategory);
     onSelectCategory(newCategory.id);
     setNewCategoryName('');
     setShowInput(false);
