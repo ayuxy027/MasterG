@@ -118,6 +118,17 @@ const BoardPage: React.FC = () => {
     if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
   }, []);
 
+  useEffect(() => {
+    const reset = () => {
+      isDrawingRef.current = false;
+      currentPathRef.current = [];
+      lastPointRef.current = null;
+      setIsPanning(false);
+    };
+    window.addEventListener("blur", reset);
+    return () => window.removeEventListener("blur", reset);
+  }, []);
+
 
   useEffect(() => {
     // Initial check
@@ -919,30 +930,31 @@ const BoardPage: React.FC = () => {
   }, [drawingPaths, cards, stickyNotes, viewOffset, zoom, currentSessionId, handleSaveBoardWithId]);
 
 
+  const translateRequestIdRef = useRef(0);
+
   const handleTranslate = useCallback(async (targetLanguageCode: string) => {
-    if (selectedStickyNoteIds.size === 0) return;
+    if (isTranslating || selectedStickyNoteIds.size === 0) return;
 
     const selectedNotes = stickyNotes.filter(note => selectedStickyNoteIds.has(note.id));
     if (selectedNotes.length === 0) return;
 
+    const requestId = ++translateRequestIdRef.current;
     setIsTranslating(true);
     setIsTranslateDropdownOpen(false);
 
-    // Translate each selected note
     for (const note of selectedNotes) {
+      if (requestId !== translateRequestIdRef.current) return;
       try {
         const result = await stitchAPI.translateContent({
           text: note.text,
-          sourceLanguage: 'en', // Assuming English as source
+          sourceLanguage: 'en',
           targetLanguage: targetLanguageCode,
         });
 
+        if (requestId !== translateRequestIdRef.current) return;
         if (result.success && result.translated) {
-          // Update the sticky note with translated text
           setStickyNotes(prev => prev.map(n =>
-            n.id === note.id
-              ? { ...n, text: result.translated! }
-              : n
+            n.id === note.id ? { ...n, text: result.translated! } : n
           ));
         }
       } catch (error) {
@@ -950,10 +962,11 @@ const BoardPage: React.FC = () => {
       }
     }
 
-    setIsTranslating(false);
-    // Clear selection after translation
-    setSelectedStickyNoteIds(new Set());
-  }, [selectedStickyNoteIds, stickyNotes]);
+    if (requestId === translateRequestIdRef.current) {
+      setIsTranslating(false);
+      setSelectedStickyNoteIds(new Set());
+    }
+  }, [isTranslating, selectedStickyNoteIds, stickyNotes]);
 
 
   const handleToolChange = useCallback((tool: string) => {
