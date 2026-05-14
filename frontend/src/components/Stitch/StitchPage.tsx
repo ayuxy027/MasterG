@@ -361,6 +361,7 @@ const StitchPage: React.FC = () => {
   const [topic, setTopic] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const generationIdRef = useRef(0);
   const [englishContent, setEnglishContent] = useState(""); // Store original English content
   const [translatedContent, setTranslatedContent] = useState<Record<string, string>>({}); // Store translations by language code
   const [translatingLanguages, setTranslatingLanguages] = useState<Set<string>>(new Set()); // Track languages currently being translated
@@ -513,26 +514,23 @@ const StitchPage: React.FC = () => {
       return;
     }
 
-    // Input validation: Only warn for extremely long texts, don't block
     if (englishContent.length > 100000) {
       console.warn("Very long content detected. Translation may take longer.");
     }
 
-    // Check if already translated
     if (translatedContent[targetLang] && !translatingLanguages.has(targetLang)) {
       setActiveTab(targetLang);
       return;
     }
 
-    // UX IMPROVEMENT: Create tab immediately with skeleton UI
+    const requestGenerationId = generationIdRef.current;
     setTranslatingLanguages(prev => new Set(prev).add(targetLang));
-    setActiveTab(targetLang); // Switch to the new tab immediately
+    setActiveTab(targetLang);
     setIsTranslating(prev => ({ ...prev, [targetLang]: true }));
     setError(null);
 
     const translationStartTime = Date.now();
 
-    // Show thinking text for translation
     if (generationMode === "cloud") {
       setThinkingText(`Translating to ${getLanguageName(targetLang)} using Kimi K2...`);
     } else {
@@ -540,18 +538,17 @@ const StitchPage: React.FC = () => {
     }
 
     try {
-      // Use simple non-streaming translation (reliable and correct)
       const resp = await stitchAPI.translateContent({
         text: englishContent,
         sourceLanguage: "en",
         targetLanguage: targetLang,
-        mode: generationMode, // Pass mode for Groq translation
+        mode: generationMode,
       });
+
+      if (requestGenerationId !== generationIdRef.current) return;
 
       const translationTime = Date.now() - translationStartTime;
       setGenerationTimes(prev => ({ ...prev, translationTime }));
-
-      // Clear thinking text after translation
       setThinkingText("");
 
       if (resp.success && resp.translated) {
@@ -564,14 +561,8 @@ const StitchPage: React.FC = () => {
         setError(errorMsg);
         showToast(`Translation failed: ${errorMsg}`, "error");
       }
-
-      // Translation complete
-      setTranslatingLanguages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(targetLang);
-        return newSet;
-      });
     } catch (err) {
+      if (requestGenerationId !== generationIdRef.current) return;
       const msg =
         err instanceof StitchApiError
           ? err.message
@@ -581,33 +572,18 @@ const StitchPage: React.FC = () => {
       setError(msg);
       showToast(`Translation failed: ${msg}`, "error");
 
-      // Remove from translating set on error
+      setThinkingText("");
+
+      if (!translatedContent[targetLang] && activeTab === targetLang) {
+        setActiveTab("english");
+      }
+    } finally {
+      if (requestGenerationId !== generationIdRef.current) return;
       setTranslatingLanguages(prev => {
         const newSet = new Set(prev);
         newSet.delete(targetLang);
         return newSet;
       });
-      setIsTranslating(prev => {
-        const newPrev = { ...prev };
-        delete newPrev[targetLang];
-        return newPrev;
-      });
-
-      setThinkingText("");
-
-      // If translation failed and no content was set, remove the tab
-      if (!translatedContent[targetLang]) {
-        setTranslatedContent(prev => {
-          const newPrev = { ...prev };
-          delete newPrev[targetLang];
-          return newPrev;
-        });
-        // If the active tab was the one that failed, switch to English
-        if (activeTab === targetLang) {
-          setActiveTab("english");
-        }
-      }
-    } finally {
       setIsTranslating(prev => {
         const newPrev = { ...prev };
         delete newPrev[targetLang];
@@ -813,6 +789,7 @@ const StitchPage: React.FC = () => {
   const handleNewSession = useCallback(() => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+    generationIdRef.current += 1;
     setIsGenerating(false);
 
     const newSessionId = generateSessionId();
@@ -837,9 +814,12 @@ const StitchPage: React.FC = () => {
   const handleSessionSelect = useCallback((sessionId: string) => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+    generationIdRef.current += 1;
     setIsGenerating(false);
     setEnglishContent("");
     setTranslatedContent({});
+    setTranslatingLanguages(new Set());
+    setIsTranslating({});
     setThinkingText("");
     setActiveTab("english");
     setCurrentSessionId(sessionId);
@@ -931,12 +911,15 @@ const StitchPage: React.FC = () => {
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    generationIdRef.current += 1;
 
     setIsGenerating(true);
     setError(null);
     setThinkingText("");
     setEnglishContent("");
     setTranslatedContent({});
+    setTranslatingLanguages(new Set());
+    setIsTranslating({});
     setActiveTab("english");
     setGenerationTimes({});
     setMarkdownEnabled(false);

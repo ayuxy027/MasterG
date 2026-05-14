@@ -518,6 +518,8 @@ const BoardPage: React.FC = () => {
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       console.error('Failed to generate cards:', error);
+      const message = error instanceof Error ? error.message : "Failed to generate";
+      alert(`Generation failed: ${message}`);
     } finally {
       if (aiAbortControllerRef.current === controller) {
         aiAbortControllerRef.current = null;
@@ -683,6 +685,7 @@ const BoardPage: React.FC = () => {
 
       if (!result.success) {
         console.error('Action failed:', result.message);
+        alert(`AI action failed: ${result.message ?? "Unknown error"}`);
         return;
       }
 
