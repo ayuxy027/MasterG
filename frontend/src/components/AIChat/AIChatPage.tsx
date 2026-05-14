@@ -38,6 +38,7 @@ const AIChatPage: React.FC = () => {
   // Chat State
   const [messages, setMessages] = useState<MessageUI[]>([]);
   const [pendingStudyPrompt, setPendingStudyPrompt] = useState<string | null>(null);
+  const clientCreatedSessionsRef = React.useRef<Set<string>>(new Set());
 
   // Global Settings
   const [selectedLanguage, setSelectedLanguage] = useState("hi");
@@ -110,11 +111,13 @@ const AIChatPage: React.FC = () => {
     loadSessions();
   }, [loadSessions]);
 
-  // Load session messages when session changes
   useEffect(() => {
-    if (currentSessionId) {
-      loadSessionMessages(currentSessionId);
+    if (!currentSessionId) return;
+    if (clientCreatedSessionsRef.current.has(currentSessionId)) {
+      setMessages([]);
+      return;
     }
+    loadSessionMessages(currentSessionId);
   }, [currentSessionId, loadSessionMessages]);
 
   // Handle banner fade on scroll
@@ -130,20 +133,18 @@ const AIChatPage: React.FC = () => {
 
   const handleNewSession = useCallback(() => {
     const newSessionId = generateSessionId();
+    clientCreatedSessionsRef.current.add(newSessionId);
 
-    // Create a new session entry and add it to the top of the list immediately
     const newSession: SessionListItem = {
       sessionId: newSessionId,
-      chatName: undefined, // Will be auto-generated after first message
+      chatName: undefined,
       messageCount: 0,
       lastMessage: "New conversation",
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    // Add to sessions list at the top for immediate visibility
     setSessions((prev) => [newSession, ...prev]);
-
     setCurrentSessionId(newSessionId);
     setMessages([]);
     setActiveTab("chat");
@@ -162,6 +163,7 @@ const AIChatPage: React.FC = () => {
     if (!confirmModal.sessionId) return;
 
     try {
+      clientCreatedSessionsRef.current.delete(confirmModal.sessionId);
       await deleteSession(userId, confirmModal.sessionId);
       const remainingSessions = sessions.filter((s) => s.sessionId !== confirmModal.sessionId);
       setSessions(remainingSessions);
@@ -200,6 +202,7 @@ const AIChatPage: React.FC = () => {
   };
 
   const handleSessionUpdate = useCallback(async (sessionId: string, firstUserMessage?: string) => {
+    clientCreatedSessionsRef.current.delete(sessionId);
     await loadSessions();
 
     if (!firstUserMessage || !sessionId) return;
