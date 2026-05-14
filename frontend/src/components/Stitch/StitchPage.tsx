@@ -154,12 +154,11 @@ const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
     return null;
   }
 
-  try {
-    return (
-      <div className="markdown-content prose prose-lg max-w-none">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
+  return (
+    <div className="markdown-content prose prose-lg max-w-none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
             // Minimal, professional heading styles
             h1: ({ children, ...props }) => (
               <h1 {...props} className="text-2xl font-semibold text-gray-900 mb-3 mt-6 first:mt-0">
@@ -250,14 +249,10 @@ const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
             ),
           }}
         >
-          {safeContent}
-        </ReactMarkdown>
-      </div>
-    );
-  } catch (error) {
-    console.error("Error rendering markdown:", error);
-    throw error; // Let error boundary handle it
-  }
+        {safeContent}
+      </ReactMarkdown>
+    </div>
+  );
 };
 
 // Toast Notification Component

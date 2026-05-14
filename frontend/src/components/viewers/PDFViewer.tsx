@@ -17,22 +17,12 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ url, fileName }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Set a timeout to detect if PDF fails to load
     useEffect(() => {
-        setIsLoading(true);
-        setError(null);
-
-        // Give the PDF 5 seconds to load before showing content
-        timeoutRef.current = setTimeout(() => {
-            setIsLoading(false);
-        }, 3000);
-
+        timeoutRef.current = setTimeout(() => setIsLoading(false), 3000);
         return () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [url]);
+    }, []);
 
     const handleLoad = () => {
         if (timeoutRef.current) {

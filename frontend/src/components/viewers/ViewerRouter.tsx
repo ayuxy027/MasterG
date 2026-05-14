@@ -80,7 +80,7 @@ export const getViewerTypeFromExtension = (fileName: string): ViewerType => {
 const ViewerRouter: React.FC<ViewerRouterProps> = ({ url, fileName, fileType, textContent }) => {
     switch (fileType) {
         case 'pdf':
-            return <PDFViewer url={url} fileName={fileName} />;
+            return <PDFViewer key={url} url={url} fileName={fileName} />;
 
         case 'text':
             return <TextViewer url={url} fileName={fileName} content={textContent} />;

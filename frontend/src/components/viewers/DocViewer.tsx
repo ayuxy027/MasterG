@@ -158,7 +158,7 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
         return (
             <div className="h-full">
                 {/* PDF Viewer - no header since modal provides one */}
-                <PDFViewer url={previewPdfUrl} fileName={`${fileName}.pdf`} />
+                <PDFViewer key={previewPdfUrl} url={previewPdfUrl} fileName={`${fileName}.pdf`} />
             </div>
         );
     }
