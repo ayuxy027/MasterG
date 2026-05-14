@@ -199,29 +199,23 @@ const AIChatPage: React.FC = () => {
     }
   };
 
-  const handleSessionUpdate = useCallback(async (firstUserMessage?: string) => {
-    // Reload sessions to get updated data
+  const handleSessionUpdate = useCallback(async (sessionId: string, firstUserMessage?: string) => {
     await loadSessions();
 
-    // Auto-generate chat name for new sessions after first user message
-    if (firstUserMessage && currentSessionId) {
-      try {
-        const chatName = await generateChatName(firstUserMessage);
+    if (!firstUserMessage || !sessionId) return;
 
-        // Update UI
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.sessionId === currentSessionId && !s.chatName ? { ...s, chatName } : s
-          )
-        );
-
-        // Save to database
-        await updateChatName(userId, currentSessionId, chatName);
-      } catch (error) {
-        console.error("Failed to generate/save chat name:", error);
-      }
+    try {
+      const chatName = await generateChatName(firstUserMessage);
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.sessionId === sessionId && !s.chatName ? { ...s, chatName } : s
+        )
+      );
+      await updateChatName(userId, sessionId, chatName);
+    } catch (error) {
+      console.error("Failed to generate/save chat name:", error);
     }
-  }, [userId, currentSessionId, loadSessions]);
+  }, [userId, loadSessions]);
 
 
 

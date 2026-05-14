@@ -947,6 +947,7 @@ const StitchPage: React.FC = () => {
     setTranslatedContent({});
     setActiveTab("english");
     setGenerationTimes({});
+    setMarkdownEnabled(false);
 
     try {
       const response = await fetch(`${API_BASE_URL}/stitch/generate`, {
@@ -1021,9 +1022,7 @@ const StitchPage: React.FC = () => {
                 setEnglishContent(accumulatedResponse); // Store English version
               } else if (parsed.type === "complete") {
                 const finalContent = parsed.content || accumulatedResponse;
-                setEnglishContent(finalContent); // Store English version
-                // Reset markdown toggle to false when new content is generated
-                setMarkdownEnabled(false); // Always start with plain text view after generation
+                setEnglishContent(finalContent);
                 if (parsed.thinkingText) {
                   setThinkingText(parsed.thinkingText);
                 }

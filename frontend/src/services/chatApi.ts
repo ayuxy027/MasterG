@@ -536,52 +536,11 @@ export async function getAllUserFiles(
 }
 
 export async function generateChatName(firstMessage: string): Promise<string> {
-  try {
-    // Use Gemini to generate a short, descriptive chat name
-    const prompt = `Generate a very short (2-5 words) title for a chat that starts with: "${firstMessage.substring(
-      0,
-      100
-    )}...". Only return the title, nothing else.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY || ""
-      }`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      // Fallback to truncated first message
-      return (
-        firstMessage.substring(0, 30) + (firstMessage.length > 30 ? "..." : "")
-      );
-    }
-
-    const data = await response.json();
-    const generatedName =
-      data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    return (
-      generatedName ||
-      firstMessage.substring(0, 30) + (firstMessage.length > 30 ? "..." : "")
-    );
-  } catch {
-    // Fallback to truncated first message
-    return (
-      firstMessage.substring(0, 30) + (firstMessage.length > 30 ? "..." : "")
-    );
-  }
+  const trimmed = firstMessage.trim();
+  if (trimmed.length <= 30) return trimmed;
+  const sliced = trimmed.slice(0, 30);
+  const lastSpace = sliced.lastIndexOf(" ");
+  return `${(lastSpace > 12 ? sliced.slice(0, lastSpace) : sliced).trim()}...`;
 }
 
 export async function deleteFile(

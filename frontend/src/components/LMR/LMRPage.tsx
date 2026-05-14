@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import MaterialsTab from "./MaterialsTab";
 import QuestionsTab from "./QuestionsTab";
 import QuizTab from "./QuizTab";
@@ -216,14 +216,11 @@ const LMRPage: React.FC = () => {
   // Translation state
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentDisplayLanguage, setCurrentDisplayLanguage] = useState("en");
+  const translateRequestIdRef = useRef(0);
 
-  /**
-   * Translate all generated content to the selected language using NLLB
-   */
   const handleTranslate = async () => {
     if (!fileId || selectedLanguage === currentDisplayLanguage) return;
 
-    // Check if we have any content to translate
     const hasAnyContent =
       summary ||
       questions.length > 0 ||
@@ -234,31 +231,24 @@ const LMRPage: React.FC = () => {
       return;
     }
 
+    const requestId = ++translateRequestIdRef.current;
+    const targetLanguage = selectedLanguage;
+
     try {
       setIsTranslating(true);
       setError("");
 
-      // If switching to English, regenerate content in English (original)
-      if (selectedLanguage === "en") {
-        // Reload content in English
-        setCurrentDisplayLanguage("en");
+      if (targetLanguage === "en") {
         setSummary(null);
         setQuestions([]);
         setQuiz([]);
         setRecallNotes([]);
-        // Load summary again
         setLoadingSummary(true);
-        const summaryData = await LMRApi.generateSummary(
-          fileId,
-          "en",
-          selectedTone
-        );
+        const summaryData = await LMRApi.generateSummary(fileId, "en", selectedTone);
+        if (requestId !== translateRequestIdRef.current) return;
         setSummary(summaryData);
         setLoadingSummary(false);
-        setCurrentDisplayLanguage("en");
       } else {
-        // Translate using NLLB
-
         const translated = await LMRApi.translateContent(
           {
             summary: summary || undefined,
@@ -266,23 +256,23 @@ const LMRPage: React.FC = () => {
             quiz: quiz.length > 0 ? quiz : undefined,
             recallNotes: recallNotes.length > 0 ? recallNotes : undefined,
           },
-          selectedLanguage
+          targetLanguage
         );
+        if (requestId !== translateRequestIdRef.current) return;
 
-        // Update all content with translations
         if (translated.summary) setSummary(translated.summary);
         if (translated.questions) setQuestions(translated.questions);
         if (translated.quiz) setQuiz(translated.quiz);
         if (translated.recallNotes) setRecallNotes(translated.recallNotes);
-
-        setCurrentDisplayLanguage(selectedLanguage);
       }
 
+      setCurrentDisplayLanguage(targetLanguage);
     } catch (err) {
+      if (requestId !== translateRequestIdRef.current) return;
       setError(err instanceof Error ? err.message : "Translation failed");
       console.error("Translation error:", err);
     } finally {
-      setIsTranslating(false);
+      if (requestId === translateRequestIdRef.current) setIsTranslating(false);
     }
   };
 

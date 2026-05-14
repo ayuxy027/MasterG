@@ -27,7 +27,7 @@ interface ChatInterfaceProps {
   sessionId: string;
   messages: MessageUI[];
   setMessages: React.Dispatch<React.SetStateAction<MessageUI[]>>;
-  onSessionUpdate: (firstUserMessage?: string) => void;
+  onSessionUpdate: (sessionId: string, firstUserMessage?: string) => void;
   initialPrompt?: string | null;
   onInitialPromptConsumed?: () => void;
   selectedLanguage: string;
@@ -175,7 +175,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         controller.signal
       );
 
-      onSessionUpdate(shouldGenerateName ? messageContent : undefined);
+      onSessionUpdate(sessionId, shouldGenerateName ? messageContent : undefined);
     } catch (error) {
       if (controller.signal.aborted) return;
       console.error("Failed to send message:", error);
