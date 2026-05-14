@@ -736,7 +736,7 @@ const LMRPage: React.FC = () => {
                       <button
                         key={view.id}
                         onClick={() =>
-                          !isDisabled && handleViewChange(view.id as any)
+                          !isDisabled && handleViewChange(view.id as "summary" | "questions" | "quiz" | "notes")
                         }
                         disabled={isDisabled}
                         className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 rounded-full transition-all font-semibold text-xs sm:text-sm md:text-base shadow-md transform whitespace-nowrap flex-shrink-0 ${

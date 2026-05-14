@@ -47,30 +47,7 @@ const AIChatPage: React.FC = () => {
     sessionName: string;
   }>({ isOpen: false, sessionId: null, sessionName: "" });
 
-  // Load sessions on mount
-  useEffect(() => {
-    loadSessions();
-  }, [userId]);
-
-  // Load session messages when session changes
-  useEffect(() => {
-    if (currentSessionId) {
-      loadSessionMessages(currentSessionId);
-    }
-  }, [currentSessionId]);
-
-  // Handle banner fade on scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      setBannerVisible(scrollY < 50);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
       const sessionsList = await getAllSessions(userId);
@@ -93,9 +70,9 @@ const AIChatPage: React.FC = () => {
     } finally {
       setSessionsLoading(false);
     }
-  };
+  }, [userId, currentSessionId]);
 
-  const loadSessionMessages = async (sessionId: string) => {
+  const loadSessionMessages = useCallback(async (sessionId: string) => {
     try {
       const sessionDetails = await getSessionDetails(userId, sessionId);
       const uiMessages: MessageUI[] = sessionDetails.messages.map(
@@ -121,7 +98,30 @@ const AIChatPage: React.FC = () => {
       // Start fresh if session doesn't exist
       setMessages([]);
     }
-  };
+  }, [userId]);
+
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  // Load session messages when session changes
+  useEffect(() => {
+    if (currentSessionId) {
+      loadSessionMessages(currentSessionId);
+    }
+  }, [currentSessionId, loadSessionMessages]);
+
+  // Handle banner fade on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setBannerVisible(scrollY < 50);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleNewSession = useCallback(() => {
     const newSessionId = generateSessionId();
@@ -216,7 +216,7 @@ const AIChatPage: React.FC = () => {
         console.error("Failed to generate/save chat name:", error);
       }
     }
-  }, [userId, currentSessionId]);
+  }, [userId, currentSessionId, loadSessions]);
 
 
 

@@ -303,7 +303,7 @@ const PostersPage: React.FC = () => {
                 </label>
                 <select
                   value={aspectRatio}
-                  onChange={(e) => setAspectRatio(e.target.value as any)}
+                  onChange={(e) => setAspectRatio(e.target.value as "1:1" | "16:9" | "9:16" | "4:3" | "3:4")}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-300 bg-white text-gray-900 transition-all"
                 >
                   <option value="1:1">Square (1:1)</option>

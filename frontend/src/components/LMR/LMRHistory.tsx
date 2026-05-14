@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import LMRApi, { LMRHistory } from "../../services/lmrApi";
 
 interface LMRHistoryProps {
@@ -19,11 +19,7 @@ const LMRHistoryComponent: React.FC<LMRHistoryProps> = ({
   const [error, setError] = useState<string>("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadHistory();
-  }, [userId, sessionId]);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!userId && !sessionId) return;
 
     try {
@@ -37,7 +33,11 @@ const LMRHistoryComponent: React.FC<LMRHistoryProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId, sessionId]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();

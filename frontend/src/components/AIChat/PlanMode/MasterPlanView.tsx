@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PlanResponse, generatePlan, getLatestPlan, translatePlan } from '../../../services/planApi';
 import { INDIAN_LANGUAGES } from '../../../constants/appConstants';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
@@ -16,18 +16,18 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 
-    useEffect(() => {
-        loadPlan();
-    }, [userId, sessionId]);
-
-    const loadPlan = async () => {
+    const loadPlan = useCallback(async () => {
         try {
             const data = await getLatestPlan(userId, sessionId);
             setPlan(data);
         } catch {
             // Ignore 404
         }
-    };
+    }, [userId, sessionId]);
+
+    useEffect(() => {
+        loadPlan();
+    }, [loadPlan]);
 
     const handleGenerate = async () => {
         setIsLoading(true);
@@ -37,8 +37,8 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
             // Refresh full plan object
             await loadPlan();
             setIsExpanded(true);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setIsLoading(false);
         }
@@ -51,8 +51,8 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
         try {
             await translatePlan(userId, sessionId, targetLang);
             await loadPlan(); // Refresh to get new translations
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setIsTranslating(false);
         }

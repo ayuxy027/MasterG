@@ -8,20 +8,21 @@ interface RecallNotesTabProps {
 
 // Helper function to safely convert any value to a displayable string
 // This fixes the "[object Object]" bug when AI returns nested objects
-const safeToString = (value: any): string => {
+const safeToString = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
   if (typeof value === 'boolean') return String(value);
   if (value === null || value === undefined) return '';
   if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
     // Try to extract meaningful text from common property names
-    if (value.text) return String(value.text);
-    if (value.content) return String(value.content);
-    if (value.point) return String(value.point);
-    if (value.fact) return String(value.fact);
-    if (value.value) return String(value.value);
-    if (value.description) return String(value.description);
-    if (value.name) return String(value.name);
+    if (obj.text) return String(obj.text);
+    if (obj.content) return String(obj.content);
+    if (obj.point) return String(obj.point);
+    if (obj.fact) return String(obj.fact);
+    if (obj.value) return String(obj.value);
+    if (obj.description) return String(obj.description);
+    if (obj.name) return String(obj.name);
     // Last resort: stringify, but filter out unhelpful results
     const stringified = JSON.stringify(value);
     if (stringified === '{}' || stringified === '[]') return '';
@@ -31,7 +32,7 @@ const safeToString = (value: any): string => {
 };
 
 // Helper function to normalize an array of items to strings
-const normalizeItems = (items: any): string[] => {
+const normalizeItems = (items: unknown): string[] => {
   if (!items) return [];
   if (!Array.isArray(items)) return [safeToString(items)];
   return items

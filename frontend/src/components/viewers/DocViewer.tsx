@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 // Import PDFViewer for displaying converted PPT previews
 import PDFViewer from './PDFViewer';
@@ -24,24 +24,41 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const ext = fileName.toLowerCase().split('.').pop() || '';
 
-    useEffect(() => {
-        if (ext === 'docx') {
-            renderDocx();
-        } else if (ext === 'pptx' || ext === 'ppt') {
-            // Try PDF preview first, then fall back to text
-            tryPdfPreview();
-        } else if (ext === 'doc') {
+    const fetchTextContent = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const urlParts = url.split('?');
+            const baseUrl = urlParts[0];
+            const queryParams = urlParts[1] || '';
+            const textContentUrl = `${baseUrl}/text?${queryParams}`;
+
+
+            const response = await fetch(textContentUrl);
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.content) {
+                    setTextContent(data.content);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
+            setError('Preview not available for this document type. Please download to view.');
             setIsLoading(false);
-            setError('Legacy .doc format requires Microsoft Word. Please download the file.');
-        } else {
+        } catch (err: unknown) {
+            console.error('Text content fetch error:', err);
+            setError('Could not load document preview');
             setIsLoading(false);
         }
-    }, [url, ext]);
+    }, [url]);
 
     /**
      * Try to load converted PDF preview for PPT files
      */
-    const tryPdfPreview = async () => {
+    const tryPdfPreview = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
@@ -65,14 +82,14 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
             // No PDF preview, fall back to text content
             await fetchTextContent();
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Preview check error:', err);
             // Fall back to text content
             await fetchTextContent();
         }
-    };
+    }, [url, fetchTextContent]);
 
-    const renderDocx = async () => {
+    const renderDocx = useCallback(async () => {
         try {
             setIsLoading(true);
             setError(null);
@@ -98,47 +115,30 @@ const DocViewer: React.FC<DocViewerProps> = ({ url, fileName }) => {
                     });
                 }
                 setIsLoading(false);
-            } catch (importError: any) {
+            } catch (importError: unknown) {
                 console.error('docx-preview not available:', importError);
                 await fetchTextContent();
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('DOCX render error:', err);
-            setError(err.message || 'Failed to render document');
+            setError(err instanceof Error ? err.message : 'Failed to render document');
             setIsLoading(false);
         }
-    };
+    }, [url, fetchTextContent]);
 
-    const fetchTextContent = async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
-
-            const urlParts = url.split('?');
-            const baseUrl = urlParts[0];
-            const queryParams = urlParts[1] || '';
-            const textContentUrl = `${baseUrl}/text?${queryParams}`;
-
-
-            const response = await fetch(textContentUrl);
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.content) {
-                    setTextContent(data.content);
-                    setIsLoading(false);
-                    return;
-                }
-            }
-
-            setError('Preview not available for this document type. Please download to view.');
+    useEffect(() => {
+        if (ext === 'docx') {
+            renderDocx();
+        } else if (ext === 'pptx' || ext === 'ppt') {
+            // Try PDF preview first, then fall back to text
+            tryPdfPreview();
+        } else if (ext === 'doc') {
             setIsLoading(false);
-        } catch (err: any) {
-            console.error('Text content fetch error:', err);
-            setError('Could not load document preview');
+            setError('Legacy .doc format requires Microsoft Word. Please download the file.');
+        } else {
             setIsLoading(false);
         }
-    };
+    }, [url, ext, renderDocx, tryPdfPreview]);
 
     // Loading state
     if (isLoading) {

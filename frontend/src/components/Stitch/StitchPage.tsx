@@ -214,7 +214,7 @@ const SafeMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
               </em>
             ),
             // Code blocks and inline code - SIMPLIFIED
-            code: ({ children, className: codeClassName, ...props }: any) => {
+            code: ({ children, className: codeClassName, ...props }: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode }) => {
               const isInline = !codeClassName;
 
               if (isInline) {

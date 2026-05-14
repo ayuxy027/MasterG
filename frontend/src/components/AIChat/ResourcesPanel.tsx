@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getSessionDocuments, deleteFile } from "../../services/chatApi";
 import type { FileListItem } from "../../types/chat";
 import ConfirmModal from "../ui/ConfirmModal";
@@ -29,11 +29,7 @@ const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
   }>({ isOpen: false, fileId: "", fileName: "" });
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadFiles();
-  }, [sessionId]);
-
-  const loadFiles = async () => {
+  const loadFiles = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -45,7 +41,11 @@ const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId, sessionId]);
+
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles]);
 
   const handleDeleteClick = (fileId: string, fileName: string) => {
     setConfirmModal({ isOpen: true, fileId, fileName });

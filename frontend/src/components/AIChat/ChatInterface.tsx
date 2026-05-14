@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   sendStreamingQuery,
   uploadFile,
@@ -56,12 +56,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const loadUploadedFiles = useCallback(async () => {
+    try {
+      const files = await getSessionDocuments(userId, sessionId);
+      setUploadedFiles(files);
+    } catch (error) {
+      console.error("Failed to load files:", error);
+    }
+  }, [userId, sessionId]);
+
   // Load uploaded files for dynamic prompt generation
   useEffect(() => {
     loadUploadedFiles();
     // Check if this is a new session (no messages)
     setIsFirstMessage(messages.length === 0);
-  }, [sessionId, messages.length]);
+  }, [sessionId, messages.length, loadUploadedFiles]);
 
   // Handle initial prompt from Plan mode
   useEffect(() => {
@@ -70,15 +79,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       onInitialPromptConsumed?.();
     }
   }, [initialPrompt, onInitialPromptConsumed]);
-
-  const loadUploadedFiles = async () => {
-    try {
-      const files = await getSessionDocuments(userId, sessionId);
-      setUploadedFiles(files);
-    } catch (error) {
-      console.error("Failed to load files:", error);
-    }
-  };
 
   const handleSendMessage = async () => {
     if (inputValue.trim() === "" || isLoading) return;

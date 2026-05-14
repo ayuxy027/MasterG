@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { DocumentInfo } from '../../../types/topic';
 import { getDocuments } from '../../../services/analyzeApi';
 import DocumentTree from './DocumentTree';
@@ -21,21 +21,21 @@ const PlanDashboard: React.FC<PlanDashboardProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
-    useEffect(() => {
-        loadDocuments();
-    }, [userId, sessionId]);
-
-    const loadDocuments = async () => {
+    const loadDocuments = useCallback(async () => {
         setIsLoading(true);
         try {
             const docs = await getDocuments(userId, sessionId);
             setDocuments(docs);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [userId, sessionId]);
+
+    useEffect(() => {
+        loadDocuments();
+    }, [loadDocuments]);
 
     if (isLoading) {
         return (

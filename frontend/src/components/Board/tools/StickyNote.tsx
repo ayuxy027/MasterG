@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { LuSettings } from 'react-icons/lu';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
 
@@ -78,13 +78,13 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     setStartPos({ x, y });
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     // Account for zoom when calculating delta
     const deltaX = (e.clientX - dragStart.x) / zoom;
     const deltaY = (e.clientY - dragStart.y) / zoom;
     onUpdate(id, { x: startPos.x + deltaX, y: startPos.y + deltaY });
-  };
+  }, [isDragging, dragStart.x, dragStart.y, zoom, onUpdate, id, startPos.x, startPos.y]);
 
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -98,14 +98,14 @@ const StickyNote: React.FC<StickyNoteProps> = ({
     setIsResizing(true);
   };
 
-  const handleResizeMove = (e: MouseEvent) => {
+  const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizing) return;
     const rect = noteRef.current?.getBoundingClientRect();
     if (!rect) return;
     const newWidth = Math.max(150, e.clientX - rect.left);
     const newHeight = Math.max(100, e.clientY - rect.top);
     onUpdate(id, { width: newWidth, height: newHeight });
-  };
+  }, [isResizing, onUpdate, id]);
 
   const handleResizeEnd = () => {
     setIsResizing(false);
@@ -150,7 +150,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart.x, dragStart.y, id, onUpdate]);
+  }, [isDragging, handleMouseMove]);
 
   React.useEffect(() => {
     if (isResizing) {
@@ -161,7 +161,7 @@ const StickyNote: React.FC<StickyNoteProps> = ({
         document.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, id, onUpdate]);
+  }, [isResizing, handleResizeMove]);
 
   React.useEffect(() => {
     if (showSettings) {

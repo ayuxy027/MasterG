@@ -23,7 +23,6 @@ const MentionInput: React.FC<MentionInputProps> = ({
     value,
     onChange,
     // selectedMentions is tracked internally via prevMentionsRef
-    selectedMentions: _selectedMentions,
     onMentionsChange,
     availableFiles,
     placeholder = "Type your message...",

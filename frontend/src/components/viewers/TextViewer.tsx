@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface TextViewerProps {
     url: string;
@@ -16,25 +16,25 @@ const TextViewer: React.FC<TextViewerProps> = ({ url, content: initialContent, f
     const [error, setError] = useState<string | null>(null);
     const [showLineNumbers, setShowLineNumbers] = useState(true);
 
-    useEffect(() => {
-        if (!initialContent && url) {
-            fetchContent();
-        }
-    }, [url, initialContent]);
-
-    const fetchContent = async () => {
+    const fetchContent = useCallback(async () => {
         try {
             setIsLoading(true);
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to load file');
             const text = await response.text();
             setContent(text);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load content');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to load content');
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [url]);
+
+    useEffect(() => {
+        if (!initialContent && url) {
+            fetchContent();
+        }
+    }, [url, initialContent, fetchContent]);
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(content);

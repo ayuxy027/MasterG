@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { DocumentTree as DocumentTreeType, TreeNode } from '../../../types/documentTree';
 import { extractDocumentTree, getDocumentTree } from '../../../services/documentTreeApi';
 import { optimizePrompt } from '../../../services/planApi';
@@ -27,12 +27,7 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [optimizingNodeId, setOptimizingNodeId] = useState<string | null>(null);
 
-    // Load saved tree from MongoDB on mount
-    useEffect(() => {
-        loadSavedTree();
-    }, [document.id]);
-
-    const loadSavedTree = async () => {
+    const loadSavedTree = useCallback(async () => {
         setIsLoadingTree(true);
         try {
             const savedTree = await getDocumentTree(userId, sessionId, document.id);
@@ -44,7 +39,12 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
         } finally {
             setIsLoadingTree(false);
         }
-    };
+    }, [userId, sessionId, document.id]);
+
+    // Load saved tree from MongoDB on mount
+    useEffect(() => {
+        loadSavedTree();
+    }, [loadSavedTree]);
 
     const handleExtractTree = async () => {
         setIsLoading(true);
@@ -57,8 +57,8 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
                 document.fileName
             );
             setTree(result);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setIsLoading(false);
         }
@@ -89,12 +89,12 @@ const DocumentTree: React.FC<DocumentTreeProps> = ({
 
             // 4. Switch to Chat with result
             onSwitchToStudy(optimizedPrompt);
-        } catch (error: any) {
+        } catch (error: unknown) {
 
             // Fallback with error visibility for debugging
             // User sees: "Error: [Message] -> Explain..."
             // This helps Identify if it's a network error, 500, or logical error.
-            const errorMsg = error.message || "Unknown error";
+            const errorMsg = error instanceof Error ? error.message : "Unknown error";
             onSwitchToStudy(`[Optimization Failed: ${errorMsg}] Explain "${node.title}" from ${document.fileName}`);
         } finally {
             setOptimizingNodeId(null);
