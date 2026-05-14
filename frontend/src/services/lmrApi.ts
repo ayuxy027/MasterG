@@ -1,12 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
+import { API_BASE_URL } from "../config/api";
 
-// Enhanced key topic with description for quick recall
 export interface KeyTopic {
   name: string;
   description: string;
 }
 
-// Enhanced important concept with 5 bullet point descriptions
 export interface ImportantConcept {
   name: string;
   points: string[];
@@ -88,9 +86,6 @@ export interface LMRHistory {
 }
 
 export class LMRApi {
-  /**
-   * Helper to handle API errors with better error messages
-   */
   private static async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       let errorMessage = `Server error: ${response.status} ${response.statusText}`;
@@ -125,9 +120,6 @@ export class LMRApi {
     throw new Error("Unexpected response format from server");
   }
 
-  /**
-   * Upload document for LMR processing
-   */
   static async uploadDocument(
     file: File,
     userId?: string,
@@ -152,9 +144,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Generate summary from uploaded document
-   */
   static async generateSummary(
     fileId: string,
     language: string = "english",
@@ -179,9 +168,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Generate questions from uploaded document
-   */
   static async generateQuestions(
     fileId: string,
     language: string = "english",
@@ -208,9 +194,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Generate quiz from uploaded document
-   */
   static async generateQuiz(
     fileId: string,
     language: string = "english",
@@ -235,9 +218,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Generate recall notes from uploaded document
-   */
   static async generateRecallNotes(
     fileId: string,
     language: string = "english"
@@ -260,9 +240,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Generate all content at once
-   */
   static async generateAllContent(
     fileId: string,
     language: string = "english"
@@ -285,9 +262,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Download PDF with all generated content
-   */
   static async downloadPDF(
     fileId: string,
     language: string = "english",
@@ -323,9 +297,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Get LMR history for a user or session
-   */
   static async getHistory(
     userId?: string,
     sessionId?: string,
@@ -353,9 +324,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Delete a history entry
-   */
   static async deleteHistory(id: string): Promise<void> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/lmr/history/${id}`, {
@@ -369,9 +337,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Translate LMR content to target language using NLLB-200
-   */
   static async translateContent(
     content: {
       summary?: LMRSummary;
@@ -413,9 +378,6 @@ export class LMRApi {
     }
   }
 
-  /**
-   * Get list of supported languages for NLLB translation
-   */
   static getSupportedLanguages(): Array<{ code: string; name: string }> {
     return [
       { code: "en", name: "English" },

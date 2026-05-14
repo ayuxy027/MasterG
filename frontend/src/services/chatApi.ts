@@ -6,11 +6,8 @@ import type {
   FileListItem,
   StreamChunk,
 } from "../types/chat";
+import { API_BASE_URL } from "../config/api";
 
-// API Configuration - VITE_API_URL should NOT include /api suffix
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
-
-// Utility functions for session management
 export const generateUserId = (): string => {
   const stored = localStorage.getItem("masterji_userId");
   if (stored) return stored;
@@ -170,9 +167,6 @@ export async function sendStreamingQuery(
   }
 }
 
-/**
- * Upload a file (PDF or image) to the chat session
- */
 export async function uploadFile(
   userId: string,
   sessionId: string,
@@ -236,9 +230,6 @@ export async function uploadFile(
   }
 }
 
-/**
- * Get all chat sessions for a user
- */
 export async function getAllSessions(
   userId: string
 ): Promise<SessionListItem[]> {
@@ -284,9 +275,6 @@ export async function getAllSessions(
   }
 }
 
-/**
- * Get details of a specific chat session
- */
 export async function getSessionDetails(
   userId: string,
   sessionId: string
@@ -337,9 +325,6 @@ export async function getSessionDetails(
   }
 }
 
-/**
- * Delete a chat session
- */
 export async function deleteSession(
   userId: string,
   sessionId: string
@@ -374,9 +359,6 @@ export async function deleteSession(
   }
 }
 
-/**
- * Update chat name/title and save to database
- */
 export async function updateChatName(
   userId: string,
   sessionId: string,
@@ -418,9 +400,6 @@ export async function updateChatName(
 
 
 
-/**
- * Update session settings (language, grade)
- */
 export async function updateSessionSettings(
   userId: string,
   sessionId: string,
@@ -460,9 +439,6 @@ export async function updateSessionSettings(
   }
 }
 
-/**
- * Get all documents in a chat session
- */
 export async function getSessionDocuments(
   userId: string,
   sessionId: string
@@ -511,9 +487,6 @@ export async function getSessionDocuments(
   }
 }
 
-/**
- * Get unique files list (all files uploaded by user in a session)
- */
 export async function getAllUserFiles(
   userId: string,
   sessionId: string
@@ -560,9 +533,6 @@ export async function getAllUserFiles(
   }
 }
 
-/**
- * Generate chat name using Gemini API
- */
 export async function generateChatName(firstMessage: string): Promise<string> {
   try {
     // Use Gemini to generate a short, descriptive chat name
@@ -612,9 +582,6 @@ export async function generateChatName(firstMessage: string): Promise<string> {
   }
 }
 
-/**
- * Delete a file from session
- */
 export async function deleteFile(
   userId: string,
   sessionId: string,
@@ -650,9 +617,6 @@ export async function deleteFile(
   }
 }
 
-/**
- * Translate a message using NLLB and persist to MongoDB
- */
 export async function translateMessage(
   userId: string,
   sessionId: string,

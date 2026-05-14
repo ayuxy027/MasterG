@@ -1,10 +1,6 @@
 import type { DocumentTree, LearningPlan, TreeNode } from "../types/documentTree";
+import { API_BASE_URL } from "../config/api";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
-
-/**
- * Extract knowledge tree from a document (and save to MongoDB)
- */
 export async function extractDocumentTree(
     userId: string,
     sessionId: string,
@@ -25,9 +21,6 @@ export async function extractDocumentTree(
     return response.json();
 }
 
-/**
- * Get saved document tree from MongoDB
- */
 export async function getDocumentTree(
     userId: string,
     sessionId: string,
@@ -53,9 +46,6 @@ export async function getDocumentTree(
     return data.tree || null;
 }
 
-/**
- * Generate learning path from document tree
- */
 export async function generateLearningPath(
     documentId: string,
     rootNodes: TreeNode[]

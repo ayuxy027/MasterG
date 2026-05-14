@@ -1,9 +1,4 @@
-/**
- * Board API Service
- * Communicates with backend for AI card generation and actions
- */
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
+import { API_BASE_URL } from "../config/api";
 
 export interface CardData {
   id: string;
@@ -89,9 +84,6 @@ class BoardApiError extends Error {
   }
 }
 
-/**
- * Check Ollama connection status
- */
 export async function checkOllamaStatus(): Promise<OllamaStatus> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/board/ollama/status`, {
@@ -109,9 +101,6 @@ export async function checkOllamaStatus(): Promise<OllamaStatus> {
   }
 }
 
-/**
- * Generate educational cards from a prompt (with streaming support)
- */
 export async function generateCards(
   prompt: string,
   cardCount: number = 3,
@@ -206,9 +195,6 @@ export async function generateCards(
   }
 }
 
-/**
- * Perform AI action on selected cards (with streaming support)
- */
 export async function performCardAction(
   action: CardAction,
   cardContents: string[],
@@ -329,13 +315,7 @@ export async function performCardAction(
   }
 }
 
-/**
- * Board Session Management
- */
 export class BoardSessionApi {
-  /**
-   * Get all Board sessions for a user
-   */
   async getAllSessions(userId: string): Promise<BoardSession[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/board/sessions/${userId}`, {
@@ -362,9 +342,6 @@ export class BoardSessionApi {
     }
   }
 
-  /**
-   * Get a specific Board session
-   */
   async getSession(userId: string, sessionId: string): Promise<BoardSessionData> {
     try {
       const response = await fetch(
@@ -397,9 +374,6 @@ export class BoardSessionApi {
     }
   }
 
-  /**
-   * Save Board session
-   */
   async saveSession(
     userId: string,
     sessionId: string,
@@ -469,9 +443,6 @@ export class BoardSessionApi {
     }
   }
 
-  /**
-   * Delete Board session
-   */
   async deleteSession(userId: string, sessionId: string): Promise<void> {
     try {
       const response = await fetch(
@@ -498,9 +469,6 @@ export class BoardSessionApi {
     }
   }
 
-  /**
-   * Update session name
-   */
   async updateSessionName(
     userId: string,
     sessionId: string,

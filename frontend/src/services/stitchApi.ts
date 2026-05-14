@@ -1,6 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : "http://localhost:5001/api";
+import { API_BASE_URL as ROOT_URL } from "../config/api";
+
+const API_BASE_URL = `${ROOT_URL}/api`;
 
 export interface StitchGenerateRequest {
   topic: string;
@@ -106,9 +106,6 @@ export class StitchApiError extends Error {
 }
 
 class StitchApi {
-  /**
-   * Check Ollama connection status
-   */
   async checkStatus(): Promise<StitchStatusResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/stitch/status`, {
@@ -136,9 +133,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * List available models
-   */
   async listModels(): Promise<StitchModel[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/stitch/models`, {
@@ -167,9 +161,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Generate content
-   */
   async generateContent(
     request: StitchGenerateRequest
   ): Promise<StitchGenerateResponse> {
@@ -200,9 +191,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Translate generated content using NLLB-200
-   */
   async translateContent(
     request: StitchTranslateRequest
   ): Promise<StitchTranslateResponse> {
@@ -317,12 +305,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Check NLLB-200 connection status
-   */
-  /**
-   * Check Groq API connection status
-   */
   async checkGroqStatus(): Promise<{
     success: boolean;
     connected: boolean;
@@ -354,9 +336,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Check NLLB-200 connection status
-   */
   async checkNLLBStatus(): Promise<{
     success: boolean;
     connected: boolean;
@@ -393,9 +372,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Get all Stitch sessions for a user
-   */
   async getAllSessions(userId: string): Promise<StitchSessionListItem[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/stitch/sessions/${userId}`, {
@@ -424,9 +400,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Get a specific Stitch session
-   */
   async getSessionDetails(
     userId: string,
     sessionId: string
@@ -461,9 +434,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Save or update a Stitch session
-   */
   async saveSession(
     userId: string,
     sessionId: string,
@@ -500,9 +470,6 @@ class StitchApi {
     }
   }
 
-  /**
-   * Delete a Stitch session
-   */
   async deleteSession(userId: string, sessionId: string): Promise<void> {
     try {
       const response = await fetch(

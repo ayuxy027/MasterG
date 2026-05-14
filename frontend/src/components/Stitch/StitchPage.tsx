@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, Component, Er
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { stitchAPI, StitchApiError, StitchSessionListItem } from "../../services/stitchApi";
+import { API_BASE_URL as ROOT_URL } from "../../config/api";
 import StitchSessionSidebar from "./StitchSessionSidebar";
 
-// User ID and Session ID utilities (same as chat)
+const API_BASE_URL = `${ROOT_URL}/api`;
+
 const generateUserId = (): string => {
   const stored = localStorage.getItem("masterji_userId");
   if (stored) return stored;
@@ -545,10 +547,6 @@ const StitchPage: React.FC = () => {
     setThinkingText("");
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL
-        ? `${import.meta.env.VITE_API_URL}/api`
-        : "http://localhost:5001/api";
-
       const response = await fetch(`${API_BASE_URL}/stitch/refine`, {
         method: "POST",
         headers: {
@@ -1111,13 +1109,9 @@ const StitchPage: React.FC = () => {
     setEnglishContent("");
     setTranslatedContent({});
     setActiveTab("english");
-    setGenerationTimes({}); // Reset times
+    setGenerationTimes({});
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL
-        ? `${import.meta.env.VITE_API_URL}/api`
-        : "http://localhost:5001/api";
-
       const response = await fetch(`${API_BASE_URL}/stitch/generate`, {
         method: "POST",
         headers: {

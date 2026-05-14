@@ -4,8 +4,7 @@ import type {
   PosterGenerationRequest,
   PosterGenerationResponse,
 } from '../types/poster';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+import { API_BASE_URL } from '../config/api';
 
 export class PosterApiError extends Error {
   constructor(
@@ -18,9 +17,6 @@ export class PosterApiError extends Error {
   }
 }
 
-/**
- * Generate educational poster(s)
- */
 export async function generatePosters(
   request: PosterGenerationRequest
 ): Promise<PosterGenerationResponse> {
@@ -54,9 +50,6 @@ export async function generatePosters(
   }
 }
 
-/**
- * Get available poster categories
- */
 export async function getCategories(): Promise<PosterCategory[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/posters/categories`, {
@@ -77,9 +70,6 @@ export async function getCategories(): Promise<PosterCategory[]> {
   }
 }
 
-/**
- * Get supported languages
- */
 export async function getLanguages(): Promise<Language[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/posters/languages`, {

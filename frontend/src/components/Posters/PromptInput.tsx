@@ -78,9 +78,9 @@ const PromptInput: React.FC<PromptInputProps> = ({
       <div className="mb-4">
         <p className="text-xs font-medium text-gray-600 mb-2">Try these examples:</p>
         <div className="flex flex-wrap gap-2">
-          {getExamplePrompts().slice(0, 3).map((example, index) => (
+          {getExamplePrompts().slice(0, 3).map((example) => (
             <button
-              key={index}
+              key={example}
               onClick={() => handleExampleClick(example)}
               className="text-xs px-3 py-1.5 bg-orange-50 text-orange-700 rounded-full hover:bg-orange-100 transition-colors border border-orange-200"
             >

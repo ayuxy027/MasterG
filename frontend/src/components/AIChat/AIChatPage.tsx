@@ -5,7 +5,7 @@ import ResourcesPanel from "./ResourcesPanel";
 import PlanDashboard from "./PlanMode/PlanDashboard";
 import ConfirmModal from "../ui/ConfirmModal";
 import Navbar from "../Navbar";
-import Banner from "../../../Banner";
+import Banner from "../Banner";
 import {
   getUserId,
   generateSessionId,

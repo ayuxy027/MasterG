@@ -773,9 +773,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {uploadedFiles.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             <span className="text-xs text-gray-500 font-medium">Try:</span>
-            {getExamplePrompts().map((prompt, index) => (
+            {getExamplePrompts().map((prompt) => (
               <button
-                key={index}
+                key={prompt}
                 className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full hover:bg-orange-100 hover:text-orange-800 transition-all border border-orange-200 font-medium"
                 onClick={() => setInputValue(prompt)}
                 disabled={isLoading}

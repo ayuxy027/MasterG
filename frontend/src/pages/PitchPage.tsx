@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { Zap, Wrench, Brain, Database, Building2, Flame, Plus, Minus } from 'lucide-react';
-import Banner from '../../Banner';
+import Banner from '../components/Banner';
 import Navbar from '../components/Navbar';
 
 interface Benchmark {
@@ -265,7 +265,7 @@ const PitchPage = () => {
               <div className="grid md:grid-cols-2 gap-4 items-start">
                 {CORE_REQUIREMENTS.map((req, index) => (
                   <RequirementCard
-                    key={index}
+                    key={req.title}
                     title={req.title}
                     description={req.description}
                     className={index === CORE_REQUIREMENTS.length - 1 ? "md:col-span-2" : ""}
@@ -442,8 +442,8 @@ const PitchPage = () => {
                     { phase: 'Phase 2', milestone: 'Completion of MVP in hybrid model where we had offline/online fixture', progress: 50 },
                     { phase: 'Phase 3', milestone: 'Migrated all cloud services to offline', progress: 75 },
                     { phase: 'Phase 4', milestone: 'Aggressive optimization - saw state of art changes and responses from our architectures', progress: 100 }
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center gap-6">
+                  ].map((item) => (
+                    <div key={item.phase} className="flex items-center gap-6">
                       <div className="shrink-0 w-16 h-16 rounded-full bg-gradient-to-br from-orange-300/70 to-orange-400/80 shadow-lg flex items-center justify-center border-4 border-white">
                         <div className="w-3 h-3 rounded-full bg-white"></div>
                       </div>

@@ -54,13 +54,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     ...style,
   };
 
-  // No inline styles needed - global CSS handles KaTeX
   const katexStyleFix = ``;
 
-  // Custom components to maintain styling consistency
   const components: Components = {
-    // ... (rest of components remain same, just patching the start of function)
-    // Headers with proper spacing
     h1: ({ children, ...props }) => (
       <h1
         {...props}

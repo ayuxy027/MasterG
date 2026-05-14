@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { API_BASE_URL } from "../config/api";
 
 type VoiceInputStatus = "idle" | "recording" | "processing" | "error";
 
@@ -13,8 +14,6 @@ interface UseVoiceInputReturn {
     toggleRecording: () => Promise<void>;
     cancelRecording: () => void;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 export function useVoiceInput({
     onTranscript,

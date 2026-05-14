@@ -130,7 +130,7 @@ const RecallNotesTab: React.FC<RecallNotesTabProps> = ({
 
         return (
           <div
-            key={index}
+            key={topicName}
             className="bg-white rounded-xl border-2 border-orange-200 overflow-hidden hover:shadow-lg transition-all duration-300"
           >
             {/* Topic header */}

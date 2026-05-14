@@ -2,7 +2,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import Navbar from "./Navbar";
 import Pattern from "../design/Pattern";
-import Banner from "../../Banner";
+import Banner from "./Banner";
 
 interface LayoutProps {
     children: ReactNode;

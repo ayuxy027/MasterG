@@ -1,10 +1,7 @@
 import type { DocumentInfo, AnalysisResult } from "../types/topic";
+import { API_BASE_URL } from "../config/api";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
-/**
- * Get all documents for a session
- */
 export async function getDocuments(
     userId: string,
     sessionId: string
@@ -22,9 +19,6 @@ export async function getDocuments(
     return data.documents;
 }
 
-/**
- * Analyze a document and extract topics
- */
 export async function extractTopics(
     userId: string,
     sessionId: string,

@@ -6,11 +6,8 @@ import Card from './Card';
 import MinimizedNavbar from './MinimizedNavbar';
 import { generateCards, performCardAction, checkOllamaStatus, CardData, CardAction, OllamaStatus, boardSessionApi } from '../../services/boardApi';
 import { stitchAPI } from '../../services/stitchApi';
-import Banner from '../../../Banner';
+import Banner from '../Banner';
 
-// ============================================================================
-// TYPES
-// ============================================================================
 
 interface CardState extends CardData {
   x: number;
@@ -37,9 +34,6 @@ interface StickyNoteState {
   isUnderline?: boolean;
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 
 const BoardPage: React.FC = () => {
   // Canvas refs
@@ -126,9 +120,6 @@ const BoardPage: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ============================================================================
-  // OLLAMA STATUS CHECK
-  // ============================================================================
 
   useEffect(() => {
     // Initial check
@@ -142,9 +133,6 @@ const BoardPage: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // ============================================================================
-  // CANVAS COORDINATE HELPERS
-  // ============================================================================
 
   const screenToCanvas = useCallback((clientX: number, clientY: number): Point => {
     const canvas = canvasRef.current;
@@ -156,9 +144,6 @@ const BoardPage: React.FC = () => {
     };
   }, [viewOffset, zoom]);
 
-  // ============================================================================
-  // CANVAS REDRAW
-  // ============================================================================
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -211,9 +196,6 @@ const BoardPage: React.FC = () => {
     zoomRef.current = zoom;
   }, [zoom]);
 
-  // ============================================================================
-  // CANVAS RESIZE & REDRAW
-  // ============================================================================
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -241,9 +223,6 @@ const BoardPage: React.FC = () => {
     };
   }, [drawingPaths, viewOffset, zoom, redrawCanvas]);
 
-  // ============================================================================
-  // KEYBOARD SHORTCUTS
-  // ============================================================================
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -298,9 +277,6 @@ const BoardPage: React.FC = () => {
     };
   }, []);
 
-  // ============================================================================
-  // ZOOM (Mouse wheel)
-  // ============================================================================
 
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
@@ -314,9 +290,6 @@ const BoardPage: React.FC = () => {
     return () => window.removeEventListener('wheel', handleWheel);
   }, []);
 
-  // ============================================================================
-  // DRAWING HANDLERS (Using refs to avoid race conditions)
-  // ============================================================================
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -449,9 +422,6 @@ const BoardPage: React.FC = () => {
     lastPointRef.current = null;
   }, [isPanning, currentColor, strokeWidth, currentTool]);
 
-  // ============================================================================
-  // AI CARD GENERATION
-  // ============================================================================
 
   const handleGenerateCards = useCallback(async (prompt: string, count: number = 3) => {
     if (isGenerating) return;
@@ -542,9 +512,6 @@ const BoardPage: React.FC = () => {
     }
   }, [isGenerating, viewOffset, zoom]);
 
-  // ============================================================================
-  // AI CARD ACTIONS (Summarize, Explain, Quiz, Key Points)
-  // ============================================================================
 
   const handleCardAction = useCallback(async (action: CardAction) => {
     // Use sticky notes if selected, otherwise fall back to cards
@@ -721,9 +688,6 @@ const BoardPage: React.FC = () => {
     }
   }, [selectedStickyNoteIds, selectedCardIds, stickyNotes, cards, isPerformingAction, viewOffset, zoom]);
 
-  // ============================================================================
-  // CARD SELECTION
-  // ============================================================================
 
   const handleCardSelect = useCallback((cardId: string, isMultiSelect: boolean) => {
     setSelectedCardIds(prev => {
@@ -761,9 +725,6 @@ const BoardPage: React.FC = () => {
     });
   }, []);
 
-  // ============================================================================
-  // STICKY NOTE HANDLERS
-  // ============================================================================
 
   const handleStickyNoteUpdate = useCallback((id: string, updates: Partial<StickyNoteState>) => {
     setStickyNotes(prev => prev.map(note =>
@@ -801,9 +762,6 @@ const BoardPage: React.FC = () => {
     });
   }, []);
 
-  // ============================================================================
-  // BOARD SESSION MANAGEMENT
-  // ============================================================================
 
   const handleSaveBoardWithId = useCallback(async (sessionId: string) => {
     setIsSaving(true);
@@ -970,9 +928,6 @@ const BoardPage: React.FC = () => {
     };
   }, [drawingPaths, cards, stickyNotes, viewOffset, zoom, currentSessionId, handleSaveBoardWithId]);
 
-  // ============================================================================
-  // TRANSLATION HANDLER
-  // ============================================================================
 
   const handleTranslate = useCallback(async (targetLanguageCode: string) => {
     if (selectedStickyNoteIds.size === 0) return;
@@ -1010,9 +965,6 @@ const BoardPage: React.FC = () => {
     setSelectedStickyNoteIds(new Set());
   }, [selectedStickyNoteIds, stickyNotes]);
 
-  // ============================================================================
-  // TOOLBAR HANDLERS
-  // ============================================================================
 
   const handleToolChange = useCallback((tool: string) => {
     setCurrentTool(tool);
@@ -1042,9 +994,6 @@ const BoardPage: React.FC = () => {
     }
   }, []);
 
-  // ============================================================================
-  // CURSOR STYLE
-  // ============================================================================
 
   const getCursorStyle = useCallback(() => {
     if (isPanning || isSpacePressed) return 'grabbing';
@@ -1054,9 +1003,6 @@ const BoardPage: React.FC = () => {
     return 'default';
   }, [isPanning, isSpacePressed, currentTool]);
 
-  // ============================================================================
-  // RENDER
-  // ============================================================================
 
   // Handle banner fade on scroll (for canvas panning)
   useEffect(() => {
