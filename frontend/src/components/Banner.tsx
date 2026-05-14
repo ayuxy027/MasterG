@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
+import { useBannerDismissed } from "../hooks/useBannerDismissed";
 
 interface BannerProps {
     isVisible?: boolean;
 }
 
 const Banner: React.FC<BannerProps> = ({ isVisible = true }) => {
-    const [dismissed, setDismissed] = useState(false);
+    const [dismissed, dismiss] = useBannerDismissed();
 
     if (dismissed) return null;
 
@@ -40,7 +41,7 @@ const Banner: React.FC<BannerProps> = ({ isVisible = true }) => {
             </a>
             <button
                 type="button"
-                onClick={() => setDismissed(true)}
+                onClick={dismiss}
                 aria-label="Dismiss banner"
                 className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/15 active:scale-95 transition-colors"
             >

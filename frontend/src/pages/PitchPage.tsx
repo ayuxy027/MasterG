@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 
 import { Zap, Wrench, Brain, Database, Building2, Flame, Plus, Minus } from 'lucide-react';
 import Banner from '../components/Banner';
 import Navbar from '../components/Navbar';
+import { useBannerDismissed } from '../hooks/useBannerDismissed';
 
 interface Benchmark {
   name: string;
@@ -132,6 +133,8 @@ const PitchPage = () => {
   const [showResults, setShowResults] = useState(false);
   const [showJourney, setShowJourney] = useState(true);
   const [bannerVisible, setBannerVisible] = useState(true);
+  const [bannerDismissed] = useBannerDismissed();
+  const navbarTopClass = bannerDismissed ? "top-0" : "top-[40px] sm:top-[44px]";
   const problemRef = useRef<HTMLDivElement>(null);
   const requirementsRef = useRef<HTMLDivElement>(null);
   const benchmarksRef = useRef<HTMLDivElement>(null);
@@ -190,8 +193,7 @@ const PitchPage = () => {
       {/* Banner at the top - fades on scroll */}
       <Banner isVisible={bannerVisible} />
       
-      {/* Fixed Navbar - always visible on pitch page */}
-      <div className="fixed top-[40px] sm:top-[44px] left-0 right-0 z-50">
+      <div className={`fixed ${navbarTopClass} left-0 right-0 z-50 transition-all duration-300`}>
         <Navbar alwaysVisible={true} />
       </div>
 

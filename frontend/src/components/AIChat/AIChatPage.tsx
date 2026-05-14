@@ -20,6 +20,7 @@ import {
 import type { MessageUI, SessionListItem } from "../../types/chat";
 import { INDIAN_LANGUAGES, GRADE_LEVELS } from "../../constants/appConstants";
 import { Clipboard } from "lucide-react";
+import { useBannerDismissed } from "../../hooks/useBannerDismissed";
 
 type TabType = "chat" | "resources" | "plan";
 
@@ -30,6 +31,9 @@ const AIChatPage: React.FC = () => {
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [bannerVisible, setBannerVisible] = useState(true);
+  const [bannerDismissed] = useBannerDismissed();
+  const navbarTopClass = bannerDismissed ? "top-0" : "top-[40px] sm:top-[44px]";
+  const contentTopClass = bannerDismissed ? "mt-[60px] sm:mt-[60px]" : "mt-[100px] sm:mt-[104px]";
 
   // Chat State
   const [messages, setMessages] = useState<MessageUI[]>([]);
@@ -225,13 +229,11 @@ const AIChatPage: React.FC = () => {
     <div className="flex flex-col overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30" style={{ height: '100dvh' }}>
       {/* Banner at the top - fades on scroll */}
       <Banner isVisible={bannerVisible} />
-      {/* Fixed Navbar - Renders the fixed navbar */}
-      <div className="fixed top-[40px] sm:top-[44px] left-0 right-0 z-50">
+      <div className={`fixed ${navbarTopClass} left-0 right-0 z-50 transition-all duration-300`}>
         <Navbar />
       </div>
 
-      {/* Header Section */}
-      <div className="flex-shrink-0 px-4 sm:px-6 md:px-8 py-2 sm:py-3 border-b-2 border-orange-100 bg-white/50 backdrop-blur-sm max-w-[1920px] w-full mx-auto mt-[100px] sm:mt-[104px]">
+      <div className={`flex-shrink-0 px-4 sm:px-6 md:px-8 py-2 sm:py-3 border-b-2 border-orange-100 bg-white/50 backdrop-blur-sm max-w-[1920px] w-full mx-auto ${contentTopClass} transition-all duration-300`}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-gray-800">
