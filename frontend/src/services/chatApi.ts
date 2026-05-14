@@ -8,6 +8,28 @@ import type {
 } from "../types/chat";
 import { API_BASE_URL } from "../config/api";
 
+// Minimal shape of the session object returned by the Express backend.
+// Used only for narrowing inside .map() callbacks — kept intentionally loose
+// because the backend payload may include extra fields we don't depend on.
+interface ServerSession {
+  sessionId: string;
+  chatName?: string;
+  messages?: { content: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Minimal shape of a message item from the backend before timestamp conversion.
+interface ServerMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  sources?: unknown[];
+  metadata?: Record<string, unknown>;
+  translatedContent?: string;
+  translatedLanguage?: string;
+}
+
 export const generateUserId = (): string => {
   const stored = localStorage.getItem("masterji_userId");
   if (stored) return stored;
@@ -254,7 +276,7 @@ export async function getAllSessions(
 
     // Transform to SessionListItem format
     return (
-      data.sessions?.map((session: any) => ({
+      data.sessions?.map((session: ServerSession) => ({
         sessionId: session.sessionId,
         chatName: session.chatName,
         messageCount: session.messages?.length || 0,
@@ -306,7 +328,7 @@ export async function getSessionDetails(
       sessionId: data.session.sessionId,
       chromaCollectionName: data.session.chromaCollectionName,
       messages:
-        data.session.messages?.map((msg: any) => ({
+        data.session.messages?.map((msg: ServerMessage) => ({
           ...msg,
           timestamp: new Date(msg.timestamp),
         })) || [],
