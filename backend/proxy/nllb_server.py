@@ -270,15 +270,16 @@ def load_model():
         sys.stderr.write("Continuing with FP32 model (slower but still works)\n")
     
     # Use torch.compile for faster inference on CUDA (PyTorch 2.0+)
-    # Note: MPS doesn't support torch.compile yet, so skip for MPS
-    try:
-      if device == "cuda" and hasattr(torch, "compile"):
-        # CUDA: Use torch.compile for faster inference
+    # NOTE: torch.compile requires TorchDynamo. We disabled dynamo globally
+    # above for CPU/MPS stability, so opt back in here only for CUDA.
+    if device == "cuda" and hasattr(torch, "compile"):
+      try:
+        torch._dynamo.config.disable = False
         model = torch.compile(model, mode="reduce-overhead")
         sys.stderr.write("Enabled torch.compile for CUDA optimization\n")
-    except Exception as e:
-      # Fallback if compile fails - model will still work, just slower
-      sys.stderr.write(f"Note: torch.compile not available or failed: {e}\n")
+      except Exception as e:
+        sys.stderr.write(f"Note: torch.compile not available or failed: {e}\n")
+        torch._dynamo.config.disable = True
     
     sys.stderr.write(f"✅ NLLB-200 model loaded on {device}!\n")
     
@@ -417,13 +418,13 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
         outputs = model.generate(
           **inputs,
           forced_bos_token_id=tgt_lang_id,
-          max_length=adaptive_max_length,
+          max_new_tokens=adaptive_max_length,
           num_beams=beam_size,
           use_cache=True,
-          early_stopping=True,
-          repetition_penalty=1.05 if device == "cpu" else 1.1,  # Lower for CPU speed
-          length_penalty=0.7 if device == "cpu" else 0.8,  # Lower for CPU speed
-          do_sample=False,  # Deterministic for consistency
+          early_stopping=beam_size > 1,
+          repetition_penalty=1.05 if device == "cpu" else 1.1,
+          length_penalty=0.7 if device == "cpu" else 0.8,
+          do_sample=False,
         )
       
       # Decode entire batch at once
@@ -452,13 +453,14 @@ def translate(text: str, src_lang: str, tgt_lang: str, batch_size: int = None) -
           inputs = {k: v.to(device) for k, v in inputs.items()}
           
           with torch.inference_mode():
+            single_beams = 1 if device == "cpu" else 2
             outputs = model.generate(
               **inputs,
               forced_bos_token_id=tgt_lang_id,
-              max_length=adaptive_max_length,
-              num_beams=1 if device == "cpu" else 2,
+              max_new_tokens=adaptive_max_length,
+              num_beams=single_beams,
               use_cache=True,
-              early_stopping=True,
+              early_stopping=single_beams > 1,
             )
           
           translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
@@ -627,10 +629,10 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
         outputs = model.generate(
           **inputs,
           forced_bos_token_id=tgt_lang_id,
-          max_length=adaptive_max_length,
+          max_new_tokens=adaptive_max_length,
           num_beams=beam_size,
           use_cache=True,
-          early_stopping=True,
+          early_stopping=beam_size > 1,
           repetition_penalty=rep_penalty,
           length_penalty=len_penalty,
           do_sample=False,
@@ -676,10 +678,10 @@ def translate_stream(text: str, src_lang: str, tgt_lang: str, batch_size: int = 
             outputs = model.generate(
               **inputs,
               forced_bos_token_id=tgt_lang_id,
-              max_length=adaptive_max_length,
+              max_new_tokens=adaptive_max_length,
               num_beams=beam_size,
               use_cache=True,
-              early_stopping=True,
+              early_stopping=beam_size > 1,
             )
           
           translation = tokenizer.batch_decode(outputs, skip_special_tokens=True)
