@@ -8,6 +8,7 @@ import { generateCards, performCardAction, checkOllamaStatus, CardData, CardActi
 import { stitchAPI } from '../../services/stitchApi';
 import Banner from '../Banner';
 import { getOrCreateUserId } from '../../utils/identity';
+import { useNLLBStatus } from '../../hooks/useNLLBStatus';
 
 
 interface CardState extends CardData {
@@ -114,10 +115,12 @@ const BoardPage: React.FC = () => {
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const thinkingModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const aiAbortControllerRef = useRef<AbortController | null>(null);
+  const { status: nllbStatus } = useNLLBStatus();
 
   useEffect(() => () => {
     if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
     aiAbortControllerRef.current?.abort();
+    translateAbortRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -954,6 +957,7 @@ const BoardPage: React.FC = () => {
 
 
   const translateRequestIdRef = useRef(0);
+  const translateAbortRef = useRef<AbortController | null>(null);
 
   const handleTranslate = useCallback(async (targetLanguageCode: string) => {
     if (isTranslating || selectedStickyNoteIds.size === 0) return;
@@ -961,26 +965,38 @@ const BoardPage: React.FC = () => {
     const selectedNotes = stickyNotes.filter(note => selectedStickyNoteIds.has(note.id));
     if (selectedNotes.length === 0) return;
 
+    translateAbortRef.current?.abort();
+    const controller = new AbortController();
+    translateAbortRef.current = controller;
     const requestId = ++translateRequestIdRef.current;
     setIsTranslating(true);
     setIsTranslateDropdownOpen(false);
 
+    let successCount = 0;
+    let failureCount = 0;
+
     for (const note of selectedNotes) {
-      if (requestId !== translateRequestIdRef.current) return;
+      if (requestId !== translateRequestIdRef.current || controller.signal.aborted) return;
       try {
         const result = await stitchAPI.translateContent({
           text: note.text,
           sourceLanguage: 'en',
           targetLanguage: targetLanguageCode,
+          signal: controller.signal,
         });
 
         if (requestId !== translateRequestIdRef.current) return;
         if (result.success && result.translated) {
+          successCount++;
           setStickyNotes(prev => prev.map(n =>
             n.id === note.id ? { ...n, text: result.translated! } : n
           ));
+        } else {
+          failureCount++;
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        failureCount++;
         console.error(`Failed to translate note ${note.id}:`, error);
       }
     }
@@ -988,6 +1004,12 @@ const BoardPage: React.FC = () => {
     if (requestId === translateRequestIdRef.current) {
       setIsTranslating(false);
       setSelectedStickyNoteIds(new Set());
+      if (failureCount > 0) {
+        alert(`Translated ${successCount} of ${selectedNotes.length} notes (${failureCount} failed).`);
+      }
+      if (translateAbortRef.current === controller) {
+        translateAbortRef.current = null;
+      }
     }
   }, [isTranslating, selectedStickyNoteIds, stickyNotes]);
 
@@ -1297,16 +1319,22 @@ const BoardPage: React.FC = () => {
 
                   {/* Language Dropdown */}
                   {isTranslateDropdownOpen && (
-                    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-56 bg-white rounded-xl shadow-xl border border-blue-200 overflow-hidden z-50">
+                    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-64 bg-white rounded-xl shadow-xl border border-blue-200 overflow-hidden z-50">
                       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-blue-100/50">
                         <span className="text-xs font-semibold text-gray-700">Select Language</span>
                         <button
                           onClick={() => setIsTranslateDropdownOpen(false)}
                           className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+                          aria-label="Close translate menu"
                         >
                           <X className="w-3.5 h-3.5 text-gray-500" />
                         </button>
                       </div>
+                      {!nllbStatus.checking && !nllbStatus.connected && (
+                        <div className="px-3 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-200">
+                          NLLB service unreachable — translations may fail.
+                        </div>
+                      )}
                       <div className="max-h-48 overflow-y-auto">
                         {TOP_LANGUAGES.map((lang) => (
                           <button

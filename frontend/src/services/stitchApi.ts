@@ -1,4 +1,5 @@
 import { API_BASE_URL as ROOT_URL } from "../config/api";
+import { translateLong } from "./translateClient";
 
 const API_BASE_URL = `${ROOT_URL}/api`;
 
@@ -192,33 +193,25 @@ class StitchApi {
   }
 
   async translateContent(
-    request: StitchTranslateRequest
+    request: StitchTranslateRequest & { signal?: AbortSignal }
   ): Promise<StitchTranslateResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/stitch/translate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(request),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new StitchApiError(
-          errorData.error || `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (error instanceof StitchApiError) {
-        throw error;
-      }
-      throw new StitchApiError(
-        error instanceof Error ? error.message : "Failed to translate content"
-      );
+    const { text, sourceLanguage, targetLanguage, mode, signal } = request;
+    if (!text) {
+      throw new StitchApiError("Text is required for translation");
     }
+    const result = await translateLong({
+      text,
+      sourceLanguage: sourceLanguage ?? "en",
+      targetLanguage: targetLanguage ?? "hi",
+      mode: mode === "cloud" ? "cloud" : "local",
+      signal,
+    });
+
+    if (!result.success || !result.translated) {
+      throw new StitchApiError(result.error || "Failed to translate content");
+    }
+
+    return { success: true, translated: result.translated };
   }
 
   /**
