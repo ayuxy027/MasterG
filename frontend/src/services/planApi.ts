@@ -46,13 +46,14 @@ export async function getLatestPlan(userId: string, sessionId: string): Promise<
     };
 }
 
-export async function translatePlan(userId: string, sessionId: string, targetLang: string): Promise<string> {
+export async function translatePlan(userId: string, sessionId: string, targetLang: string, signal?: AbortSignal): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/api/plan/translate`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({ userId, sessionId, targetLang }),
+        signal,
     });
 
     if (!response.ok) {

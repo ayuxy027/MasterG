@@ -9,6 +9,8 @@ import { stitchAPI } from '../../services/stitchApi';
 import Banner from '../Banner';
 import { getOrCreateUserId } from '../../utils/identity';
 import { useNLLBStatus } from '../../hooks/useNLLBStatus';
+import { useToast } from '../../hooks/useToast';
+import { ToastContainer } from '../ui/Toast';
 
 
 interface CardState extends CardData {
@@ -58,9 +60,25 @@ const BoardPage: React.FC = () => {
   const zoomRef = useRef(1);
 
   // Tool state
-  const [currentTool, setCurrentTool] = useState<string>('pen');
-  const [currentColor, setCurrentColor] = useState('#F97316');
-  const [strokeWidth, setStrokeWidth] = useState(3);
+  const [currentTool, setCurrentTool] = useState<string>(
+    () => localStorage.getItem('board_tool') || 'pen'
+  );
+  const [currentColor, setCurrentColor] = useState(
+    () => localStorage.getItem('board_color') || '#F97316'
+  );
+  const [strokeWidth, setStrokeWidth] = useState<number>(
+    () => Number(localStorage.getItem('board_strokeWidth')) || 3
+  );
+
+  useEffect(() => {
+    localStorage.setItem('board_tool', currentTool);
+  }, [currentTool]);
+  useEffect(() => {
+    localStorage.setItem('board_color', currentColor);
+  }, [currentColor]);
+  useEffect(() => {
+    localStorage.setItem('board_strokeWidth', String(strokeWidth));
+  }, [strokeWidth]);
 
   // Drawing paths (stored after completion)
   const [drawingPaths, setDrawingPaths] = useState<DrawingPath[]>([]);
@@ -116,6 +134,7 @@ const BoardPage: React.FC = () => {
   const thinkingModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const aiAbortControllerRef = useRef<AbortController | null>(null);
   const { status: nllbStatus } = useNLLBStatus();
+  const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
   useEffect(() => () => {
     if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
@@ -516,12 +535,17 @@ const BoardPage: React.FC = () => {
         controller.signal
       );
 
-      if (!controller.signal.aborted) updateStickyNotesFromCards(newCards);
+      if (!controller.signal.aborted) {
+        updateStickyNotesFromCards(newCards);
+        const generatedIds = newCards.map((card) => `ai-generated-${card.id}`);
+        setSelectedStickyNoteIds(new Set(generatedIds));
+        showToast(`Generated ${newCards.length} card${newCards.length === 1 ? '' : 's'}`, 'success');
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       console.error('Failed to generate cards:', error);
       const message = error instanceof Error ? error.message : "Failed to generate";
-      alert(`Generation failed: ${message}`);
+      showToast(`Generation failed: ${message}`, 'error');
     } finally {
       if (aiAbortControllerRef.current === controller) {
         aiAbortControllerRef.current = null;
@@ -533,7 +557,7 @@ const BoardPage: React.FC = () => {
         setThinkingText("");
       }, 2000);
     }
-  }, [isGenerating, viewOffset, zoom]);
+  }, [isGenerating, viewOffset, zoom, showToast]);
 
 
   const handleCardAction = useCallback(async (action: CardAction) => {
@@ -543,7 +567,7 @@ const BoardPage: React.FC = () => {
     const controller = new AbortController();
     aiAbortControllerRef.current = controller;
     if (selectedIds.size > 4) {
-      alert('Maximum 4 items can be selected for AI actions');
+      showToast('Maximum 4 items can be selected for AI actions', 'warning');
       return;
     }
 
@@ -687,7 +711,7 @@ const BoardPage: React.FC = () => {
 
       if (!result.success) {
         console.error('Action failed:', result.message);
-        alert(`AI action failed: ${result.message ?? "Unknown error"}`);
+        showToast(`AI action failed: ${result.message ?? "Unknown error"}`, 'error');
         return;
       }
 
@@ -716,7 +740,7 @@ const BoardPage: React.FC = () => {
         setThinkingText("");
       }, 2000);
     }
-  }, [selectedStickyNoteIds, selectedCardIds, stickyNotes, cards, isPerformingAction, viewOffset, zoom]);
+  }, [selectedStickyNoteIds, selectedCardIds, stickyNotes, cards, isPerformingAction, viewOffset, zoom, showToast]);
 
 
   const handleCardSelect = useCallback((cardId: string, isMultiSelect: boolean) => {
@@ -1005,13 +1029,15 @@ const BoardPage: React.FC = () => {
       setIsTranslating(false);
       setSelectedStickyNoteIds(new Set());
       if (failureCount > 0) {
-        alert(`Translated ${successCount} of ${selectedNotes.length} notes (${failureCount} failed).`);
+        showToast(`Translated ${successCount}/${selectedNotes.length} notes — ${failureCount} failed.`, 'warning');
+      } else if (successCount > 0) {
+        showToast(`Translated ${successCount} note${successCount === 1 ? '' : 's'}.`, 'success');
       }
       if (translateAbortRef.current === controller) {
         translateAbortRef.current = null;
       }
     }
-  }, [isTranslating, selectedStickyNoteIds, stickyNotes]);
+  }, [isTranslating, selectedStickyNoteIds, stickyNotes, showToast]);
 
 
   const handleToolChange = useCallback((tool: string) => {
@@ -1029,8 +1055,40 @@ const BoardPage: React.FC = () => {
     setStrokeWidth(width);
   }, []);
 
+  const undoStackRef = useRef<Array<{
+    drawingPaths: DrawingPath[];
+    cards: CardState[];
+    stickyNotes: StickyNoteState[];
+  }>>([]);
+  const isApplyingUndoRef = useRef(false);
+
+  useEffect(() => {
+    if (isApplyingUndoRef.current) {
+      isApplyingUndoRef.current = false;
+      return;
+    }
+    const snapshot = { drawingPaths, cards, stickyNotes };
+    const stack = undoStackRef.current;
+    const last = stack[stack.length - 1];
+    const unchanged = last
+      && last.drawingPaths === drawingPaths
+      && last.cards === cards
+      && last.stickyNotes === stickyNotes;
+    if (unchanged) return;
+    stack.push(snapshot);
+    if (stack.length > 50) stack.shift();
+  }, [drawingPaths, cards, stickyNotes]);
+
   const handleUndo = useCallback(() => {
-    setDrawingPaths(prev => prev.slice(0, -1));
+    const stack = undoStackRef.current;
+    if (stack.length < 2) return;
+    stack.pop();
+    const previous = stack[stack.length - 1];
+    if (!previous) return;
+    isApplyingUndoRef.current = true;
+    setDrawingPaths(previous.drawingPaths);
+    setCards(previous.cards);
+    setStickyNotes(previous.stickyNotes);
   }, []);
 
   const handleClear = useCallback(() => {
@@ -1072,7 +1130,7 @@ const BoardPage: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
-      {/* Banner at the top - fades on interaction */}
+      <ToastContainer toasts={toasts} onClose={dismissToast} />
       <Banner isVisible={bannerVisible} />
 
       {/* Background - fixed dot grid, only pans */}

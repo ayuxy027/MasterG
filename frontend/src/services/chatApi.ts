@@ -583,7 +583,8 @@ export async function translateMessage(
   sessionId: string,
   text: string,
   sourceLanguage: string,
-  targetLanguage: string
+  targetLanguage: string,
+  signal?: AbortSignal
 ): Promise<{ success: boolean; translated?: string; error?: string }> {
   try {
     const response = await fetch(
@@ -600,6 +601,7 @@ export async function translateMessage(
           sourceLanguage,
           targetLanguage,
         }),
+        signal,
       }
     );
 

@@ -344,7 +344,8 @@ export class LMRApi {
       quiz?: LMRQuiz[];
       recallNotes?: LMRRecallNote[];
     },
-    targetLanguage: string
+    targetLanguage: string,
+    signal?: AbortSignal
   ): Promise<{
     summary?: LMRSummary;
     questions?: LMRQuestion[];
@@ -361,6 +362,7 @@ export class LMRApi {
           content,
           targetLanguage,
         }),
+        signal,
       });
 
       const result = await this.handleResponse<
