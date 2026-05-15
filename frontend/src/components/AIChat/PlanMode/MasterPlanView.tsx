@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PlanResponse, generatePlan, getLatestPlan, translatePlan } from '../../../services/planApi';
 import { INDIAN_LANGUAGES } from '../../../constants/appConstants';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
+import LanguagePicker from '../../ui/LanguagePicker';
 
 interface MasterPlanViewProps {
     userId: string;
@@ -144,18 +145,15 @@ const MasterPlanView: React.FC<MasterPlanViewProps> = ({ userId, sessionId }) =>
 
                 {isExpanded && (
                     <div className="flex items-center gap-2">
-                        <select
+                        <div className="w-44">
+                          <LanguagePicker
+                            options={INDIAN_LANGUAGES.map((l) => ({ code: l.code, name: l.name }))}
                             value={targetLang}
-                            onChange={(e) => setTargetLang(e.target.value)}
+                            onChange={setTargetLang}
                             disabled={isTranslating}
-                            className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none disabled:opacity-50"
-                        >
-                            {INDIAN_LANGUAGES.map(lang => (
-                                <option key={lang.code} value={lang.code}>
-                                    {lang.name}
-                                </option>
-                            ))}
-                        </select>
+                            storageKey="plan_recent_languages"
+                          />
+                        </div>
                         <button
                             onClick={handleTranslate}
                             disabled={isTranslating || isTranslated}

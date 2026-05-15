@@ -5,6 +5,7 @@ import { stitchAPI, StitchApiError, StitchSessionListItem } from "../../services
 import { API_BASE_URL as ROOT_URL } from "../../config/api";
 import { getOrCreateUserId, generateSessionId as makeSessionId } from "../../utils/identity";
 import StitchSessionSidebar from "./StitchSessionSidebar";
+import LanguagePicker from "../ui/LanguagePicker";
 import { Check, X, Info, AlertTriangle } from "lucide-react";
 
 const API_BASE_URL = `${ROOT_URL}/api`;
@@ -1539,17 +1540,16 @@ const StitchPage: React.FC = () => {
                           Bulk
                         </button>
                       )}
-                      <select
-                        value={targetLanguageForTranslation}
-                        onChange={(e) => setTargetLanguageForTranslation(e.target.value)}
-                        className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white text-gray-800"
-                      >
-                        {ALL_LANGUAGES.filter((lang) => lang.code !== "en").map((lang) => (
-                          <option key={lang.code} value={lang.code}>
-                            {lang.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="w-40">
+                        <LanguagePicker
+                          options={ALL_LANGUAGES}
+                          value={targetLanguageForTranslation}
+                          onChange={setTargetLanguageForTranslation}
+                          excludeCodes={["en"]}
+                          storageKey="stitch_recent_languages"
+                          className="text-xs"
+                        />
+                      </div>
                       <button
                         type="button"
                         disabled={!englishContent.trim() || isTranslating[targetLanguageForTranslation]}

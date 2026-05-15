@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import LanguagePicker from "../ui/LanguagePicker";
 import MaterialsTab from "./MaterialsTab";
 import QuestionsTab from "./QuestionsTab";
 import QuizTab from "./QuizTab";
@@ -626,17 +627,13 @@ const LMRPage: React.FC = () => {
                     <span className="text-xs text-orange-500">(Translate)</span>
                   )}
                 </label>
-                <select
+                <LanguagePicker
+                  options={languages.map((l) => ({ code: l.value, name: l.label }))}
                   value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent text-gray-700 transition-all"
-                >
-                  {languages.map((lang) => (
-                    <option key={lang.value} value={lang.value}>
-                      {lang.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedLanguage}
+                  storageKey="lmr_recent_languages"
+                  className="w-full"
+                />
                 {/* Translate Button - shows when content exists and language differs */}
                 {hasContent && selectedLanguage !== currentDisplayLanguage && (
                   <button
