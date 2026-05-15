@@ -3,6 +3,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import { track } from '@vercel/analytics';
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
+import ErrorBoundary from "./components/ui/ErrorBoundary";
 
 const AIChatPage = lazy(() => import("./components/AIChat/AIChatPage"));
 const LMRPage = lazy(() => import("./components/LMR/LMRPage"));
@@ -29,21 +30,25 @@ const RouteFallback = () => (
   </div>
 );
 
+const wrap = (children: React.ReactNode) => (
+  <ErrorBoundary>{children}</ErrorBoundary>
+);
+
 const App = () => {
   return (
     <>
       <RouteChangeTracker />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<Layout><Landing /></Layout>} />
-          <Route path="/chat" element={<Layout><AIChatPage /></Layout>} />
-          <Route path="/lmr" element={<Layout><LMRPage /></Layout>} />
-          <Route path="/posters" element={<Layout><PostersPage /></Layout>} />
-          <Route path="/board" element={<Layout><BoardPage /></Layout>} />
-          <Route path="/stitch" element={<Layout><StitchPage /></Layout>} />
-          <Route path="/playground" element={<Layout><PlaygroundPage /></Layout>} />
-          <Route path="/benchmarks" element={<Layout><BenchmarksPage /></Layout>} />
-          <Route path="/pitch" element={<PitchPage />} />
+          <Route path="/" element={wrap(<Layout><Landing /></Layout>)} />
+          <Route path="/chat" element={wrap(<Layout><AIChatPage /></Layout>)} />
+          <Route path="/lmr" element={wrap(<Layout><LMRPage /></Layout>)} />
+          <Route path="/posters" element={wrap(<Layout><PostersPage /></Layout>)} />
+          <Route path="/board" element={wrap(<Layout><BoardPage /></Layout>)} />
+          <Route path="/stitch" element={wrap(<Layout><StitchPage /></Layout>)} />
+          <Route path="/playground" element={wrap(<Layout><PlaygroundPage /></Layout>)} />
+          <Route path="/benchmarks" element={wrap(<Layout><BenchmarksPage /></Layout>)} />
+          <Route path="/pitch" element={wrap(<PitchPage />)} />
         </Routes>
       </Suspense>
     </>

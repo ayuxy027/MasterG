@@ -1,9 +1,25 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import type { PluggableList } from "unified";
+
+const MATH_MARKER = /\$\$|\$[^\s$][\s\S]*?\$|\\\[|\\\(/;
+
+let mathPluginsPromise: Promise<{ remark: PluggableList[number]; rehype: PluggableList[number] }> | null = null;
+
+const loadMathPlugins = () => {
+  if (!mathPluginsPromise) {
+    mathPluginsPromise = Promise.all([
+      import("remark-math"),
+      import("rehype-katex"),
+      import("katex/dist/katex.min.css"),
+    ]).then(([remarkMath, rehypeKatex]) => ({
+      remark: remarkMath.default,
+      rehype: rehypeKatex.default,
+    }));
+  }
+  return mathPluginsPromise;
+};
 
 interface MarkdownRendererProps {
   content: string;
@@ -39,6 +55,28 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   color = "#2c3e50",
 }) => {
   const processedContent = useMemo(() => preprocessLatex(content), [content]);
+  const hasMath = useMemo(() => MATH_MARKER.test(content), [content]);
+  const [mathPlugins, setMathPlugins] = useState<{ remark: PluggableList[number]; rehype: PluggableList[number] } | null>(null);
+
+  useEffect(() => {
+    if (!hasMath || mathPlugins) return;
+    let cancelled = false;
+    loadMathPlugins().then((plugins) => {
+      if (!cancelled) setMathPlugins(plugins);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasMath, mathPlugins]);
+
+  const remarkPlugins = useMemo<PluggableList>(
+    () => (mathPlugins ? [remarkGfm, mathPlugins.remark] : [remarkGfm]),
+    [mathPlugins]
+  );
+  const rehypePlugins = useMemo<PluggableList>(
+    () => (mathPlugins ? [mathPlugins.rehype] : []),
+    [mathPlugins]
+  );
 
   // Combine custom styles with text styling props
   const combinedStyle: React.CSSProperties = {
@@ -323,8 +361,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     <div className={`markdown-content ${className}`} style={combinedStyle}>
       <style>{katexStyleFix}</style>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
         components={components}
       >
         {processedContent}
