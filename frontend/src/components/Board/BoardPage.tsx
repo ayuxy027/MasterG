@@ -135,6 +135,7 @@ const BoardPage: React.FC = () => {
   const aiAbortControllerRef = useRef<AbortController | null>(null);
   const { status: nllbStatus } = useNLLBStatus();
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
+  const [generatingNoteIds, setGeneratingNoteIds] = useState<Set<string>>(new Set());
 
   useEffect(() => () => {
     if (thinkingModalTimeoutRef.current) clearTimeout(thinkingModalTimeoutRef.current);
@@ -795,6 +796,30 @@ const BoardPage: React.FC = () => {
     });
   }, []);
 
+  const handleGenerateForNote = useCallback(async (noteId: string, prompt: string) => {
+    setGeneratingNoteIds(prev => new Set(prev).add(noteId));
+    try {
+      const cards = await generateCards(prompt, 1);
+      const card = cards[0];
+      if (!card) throw new Error('No content generated');
+      setStickyNotes(prev => prev.map(note =>
+        note.id === noteId
+          ? { ...note, text: `${card.title}\n\n${card.content}` }
+          : note
+      ));
+      showToast('Note generated', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Generation failed';
+      showToast(`Generation failed: ${message}`, 'error');
+    } finally {
+      setGeneratingNoteIds(prev => {
+        const next = new Set(prev);
+        next.delete(noteId);
+        return next;
+      });
+    }
+  }, [showToast]);
+
   const handleStickyNoteSelect = useCallback((noteId: string, isMultiSelect: boolean) => {
     setSelectedStickyNoteIds(prev => {
       const newSet = new Set(prev);
@@ -1294,6 +1319,8 @@ const BoardPage: React.FC = () => {
               onSelect={currentTool === 'operate' ? handleStickyNoteSelect : undefined}
               onUpdate={handleStickyNoteUpdate}
               onDelete={handleStickyNoteDelete}
+              onGenerateAI={handleGenerateForNote}
+              isGenerating={generatingNoteIds.has(note.id)}
             />
           </div>
         ))}

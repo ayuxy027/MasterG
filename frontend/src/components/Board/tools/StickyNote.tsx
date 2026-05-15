@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { LuSettings } from 'react-icons/lu';
+import { Sparkles } from 'lucide-react';
 import MarkdownRenderer from '../../ui/MarkdownRenderer';
 
 interface StickyNoteProps {
@@ -20,9 +21,11 @@ interface StickyNoteProps {
   isItalic?: boolean;
   isUnderline?: boolean;
   zoom?: number;
+  isGenerating?: boolean;
   onUpdate: (id: string, updates: Partial<StickyNoteProps>) => void;
   onDelete: (id: string) => void;
   onSelect?: (id: string, isMultiSelect: boolean) => void;
+  onGenerateAI?: (id: string, prompt: string) => void;
 }
 
 const StickyNote: React.FC<StickyNoteProps> = ({
@@ -43,12 +46,16 @@ const StickyNote: React.FC<StickyNoteProps> = ({
   isItalic = false,
   isUnderline = false,
   zoom = 1,
+  isGenerating = false,
   onUpdate,
   onDelete,
-  onSelect
+  onSelect,
+  onGenerateAI,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [showAIPrompt, setShowAIPrompt] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -361,6 +368,84 @@ const StickyNote: React.FC<StickyNoteProps> = ({
           </div>
         )}
       </div>
+
+      {!text && !isEditing && onGenerateAI && !showAIPrompt && !isGenerating && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAIPrompt(true);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-purple-500/90 hover:bg-purple-600 text-white text-xs font-medium rounded-md shadow-sm transition-colors"
+          aria-label="Generate with AI"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Generate with AI
+        </button>
+      )}
+
+      {showAIPrompt && !isGenerating && (
+        <div
+          className="absolute inset-x-2 bottom-2 bg-white rounded-md shadow-lg border border-purple-200 p-2 flex flex-col gap-1.5"
+          style={{ zIndex: 50 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <textarea
+            autoFocus
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (aiPrompt.trim() && onGenerateAI) {
+                  onGenerateAI(id, aiPrompt.trim());
+                  setAiPrompt('');
+                  setShowAIPrompt(false);
+                }
+              }
+              if (e.key === 'Escape') {
+                setShowAIPrompt(false);
+                setAiPrompt('');
+              }
+            }}
+            placeholder="What should this note say?"
+            rows={2}
+            className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:border-purple-400 resize-none"
+          />
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                if (aiPrompt.trim() && onGenerateAI) {
+                  onGenerateAI(id, aiPrompt.trim());
+                  setAiPrompt('');
+                  setShowAIPrompt(false);
+                }
+              }}
+              disabled={!aiPrompt.trim()}
+              className="flex-1 px-2 py-1 text-xs bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded font-medium"
+            >
+              Generate
+            </button>
+            <button
+              onClick={() => {
+                setShowAIPrompt(false);
+                setAiPrompt('');
+              }}
+              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isGenerating && (
+        <div className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-2 bg-white/90 backdrop-blur rounded-md py-1.5 text-xs text-purple-700 font-medium">
+          <div className="w-3 h-3 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
+          Generating…
+        </div>
+      )}
 
       {/* Resize Handle */}
       {selectionMode && (
